@@ -5,7 +5,8 @@ import React, {
 import { 
   ArrowRight, Maximize, Crop, 
   Database, GitCommit, X, Edit3, FileText, Hash, Layers, 
-  Network, Book, Download, Plus, Trash2, Search, Tag
+  Network, Book, Download, Plus, Trash2, Search, Tag,
+  ChevronRight, ChevronDown, Folder, FolderOpen
 } from 'lucide-react';
 
 // --- Type Definitions ---
@@ -15,7 +16,7 @@ interface NodeData {
   disciplines: string[]; // 核心学科：流体力学、颗粒物理等
   topic: string; // 研究主题（可跨多学科）：颗粒流、湍流等
   title: string;
-  type: 'FORMULA' | 'LAW' | 'MODEL' | 'PAPER' | 'EVIDENCE';
+  type: 'FORMULA' | 'LAW' | 'MODEL' | 'PAPER' | 'EVIDENCE' | 'TOPIC';
   latex: string;
   desc: string;
   references: string;
@@ -68,6 +69,7 @@ const NODE_TYPES: Record<string, NodeTypeConfig> = {
   MODEL: { label: '模型 (Model)', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', nodeColor: '#10b981' },
   PAPER: { label: '文献 (Paper)', color: 'bg-slate-100 text-slate-700 border-slate-200', nodeColor: '#64748b' },
   EVIDENCE: { label: '证据/反例 (Evidence)', color: 'bg-rose-50 text-rose-700 border-rose-200', nodeColor: '#f43f5e' },
+  TOPIC: { label: '主题 (Topic)', color: 'bg-amber-50 text-amber-700 border-amber-200', nodeColor: '#f59e0b' },
 };
 
 // 节点类型 -> 形状映射
@@ -77,6 +79,7 @@ const NODE_SHAPE_MAP: Record<string, string> = {
   MODEL: 'polygon',       // 多边形
   PAPER: 'diamond',       // 菱形
   EVIDENCE: 'star',       // 星形
+  TOPIC: 'rect',          // 矩形 (Root Node)
 };
 
 // Topic 颜色映射（基于 HSL 空间）
@@ -884,6 +887,7 @@ const PhysMemosApp: FC = () => {
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
   const [showOcrPanel, setShowOcrPanel] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
   
@@ -892,9 +896,13 @@ const PhysMemosApp: FC = () => {
   const [newRelType, setNewRelType] = useState<Relation['type']>('DERIVES_FROM');
   const [newRelCondition, setNewRelCondition] = useState("");
 
+  const generateTopicId = (name: string) => `topic_${name.trim().replace(/\s+/g, '_')}`;
+
   const loadData = async () => {
     try {
       const data = await dbHelper.getAll();
+      let nodesToSet: NodeData[] = [];
+
       if (data.length === 0) {
         const initialData: NodeData[] = [
           {
@@ -964,18 +972,63 @@ const PhysMemosApp: FC = () => {
             ]
           }
         ];
-        for (const item of initialData) await dbHelper.put(item);
-        setNodes(initialData);
-        setActiveNodeId('fd1');
+        // Don't save yet, will process topics below
+        nodesToSet = initialData;
       } else {
-        // 数据迁移：确保所有节点都有 disciplines 字段
-        const migratedData = data.map(n => ({
+        nodesToSet = data.map(n => ({
           ...n,
           disciplines: n.disciplines || [],
           topic: n.topic || '未分类'
         }));
-        setNodes(migratedData);
-        if (migratedData.length > 0) setActiveNodeId(migratedData[0].id);
+      }
+
+      // --- Topic Migration Logic ---
+      const allTopics = Array.from(new Set(nodesToSet.map(n => n.topic).filter(Boolean)));
+      const existingTopicNodes = new Set(nodesToSet.filter(n => n.type === 'TOPIC').map(n => n.title));
+      const newTopicNodes: NodeData[] = [];
+
+      allTopics.forEach(topicName => {
+        if (!existingTopicNodes.has(topicName)) {
+          const children = nodesToSet.filter(n => n.topic === topicName);
+          const disciplines = Array.from(new Set(children.flatMap(c => c.disciplines)));
+
+          newTopicNodes.push({
+            id: generateTopicId(topicName),
+            topic: topicName, // Topic belongs to itself as a category
+            title: topicName,
+            type: 'TOPIC',
+            disciplines: disciplines,
+            latex: '',
+            desc: `# ${topicName}\n\n自动生成的主题概览。包含 ${children.length} 个子条目。`,
+            references: '',
+            constraints: [],
+            relations: []
+          });
+        }
+      });
+
+      const finalNodes = [...nodesToSet, ...newTopicNodes];
+
+      // Save all (new + old if not saved)
+      // If initialized from empty, we need to save everything.
+      // If migrated, we only need to save new topic nodes.
+      // But dbHelper.put is idempotent (upsert).
+      if (data.length === 0 || newTopicNodes.length > 0) {
+        // Optimization: only save new/changed if performance matters, but for small dataset just save needed.
+        // If data.length === 0, save all.
+        // If data.length > 0, save only newTopicNodes.
+        if (data.length === 0) {
+          for (const node of finalNodes) await dbHelper.put(node);
+        } else {
+          for (const node of newTopicNodes) await dbHelper.put(node);
+        }
+      }
+
+      setNodes(finalNodes);
+      if (finalNodes.length > 0 && !activeNodeId) {
+         // Prefer selecting the first Topic if available, else first node
+         const firstTopic = finalNodes.find(n => n.type === 'TOPIC');
+         setActiveNodeId(firstTopic ? firstTopic.id : finalNodes[0].id);
       }
     } catch (err) {
       console.error("DB Error:", err);
@@ -1009,10 +1062,20 @@ const PhysMemosApp: FC = () => {
   };
 
   const handleCreateNode = async () => {
+    let initialTopic = '未分类 (Uncategorized)';
+    const activeNode = nodes.find(n => n.id === activeNodeId);
+    if (activeNode) {
+       if (activeNode.type === 'TOPIC') {
+          initialTopic = activeNode.title;
+       } else {
+          initialTopic = activeNode.topic;
+       }
+    }
+
     const newNode: NodeData = {
       id: crypto.randomUUID(),
       disciplines: [],
-      topic: '未分类 (Uncategorized)',
+      topic: initialTopic,
       title: '新物理概念',
       type: 'FORMULA',
       latex: '',
@@ -1024,6 +1087,36 @@ const PhysMemosApp: FC = () => {
     await dbHelper.put(newNode);
     setNodes(prev => [...prev, newNode]);
     setActiveNodeId(newNode.id);
+  };
+
+  const handleDeleteNode = async () => {
+    const activeNode = nodes.find(n => n.id === activeNodeId);
+    if (!activeNode) return;
+
+    const idsToDelete = new Set<string>([activeNode.id]);
+
+    if (activeNode.type === 'TOPIC') {
+       const children = nodes.filter(n => n.topic === activeNode.title && n.id !== activeNode.id);
+       if (children.length > 0) {
+          if (!window.confirm(`确定删除主题 "${activeNode.title}" 及其包含的 ${children.length} 个条目吗？`)) {
+             return;
+          }
+          children.forEach(c => idsToDelete.add(c.id));
+       } else {
+          if (!window.confirm('确定删除此主题吗？')) return;
+       }
+    } else {
+       if (!window.confirm('确定删除此条目吗？')) return;
+    }
+
+    // Delete from DB
+    for (const id of idsToDelete) {
+      await dbHelper.delete(id);
+    }
+
+    // Update state
+    setNodes(prev => prev.filter(n => !idsToDelete.has(n.id)));
+    setActiveNodeId(null);
   };
 
   const handleExport = () => {
@@ -1071,6 +1164,19 @@ const PhysMemosApp: FC = () => {
     );
   });
 
+  // Group filtered nodes by topic for sidebar
+  const relevantTopics = Array.from(new Set(filteredNodes.map(n => n.topic))).sort();
+
+  const toggleTopicCollapse = (topic: string) => {
+    const newSet = new Set(collapsedTopics);
+    if (newSet.has(topic)) {
+      newSet.delete(topic);
+    } else {
+      newSet.add(topic);
+    }
+    setCollapsedTopics(newSet);
+  };
+
   return (
     <div className="flex h-screen w-full bg-slate-50 text-slate-800 font-sans overflow-hidden">
       
@@ -1115,38 +1221,81 @@ const PhysMemosApp: FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {filteredNodes.map(node => (
-            <div
-              key={node.id}
-              onClick={() => {
-                setActiveNodeId(node.id);
-                setViewMode('editor');
-              }}
-              className={`group px-4 py-3 border-b border-slate-50 cursor-pointer transition-all hover:bg-slate-50 ${activeNodeId === node.id ? 'bg-indigo-50/60 border-l-4 border-l-indigo-500' : 'border-l-4 border-l-transparent'}`}
-            >
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1 flex items-center gap-1">
-                <Layers className="w-3 h-3" />
-                {node.disciplines.length > 0
-                  ? node.disciplines.map(d => DISCIPLINES[d]?.label || d).join(' × ')
-                  : '未分类'}
+          {relevantTopics.map(topic => {
+            // Find Topic Node (Header)
+            const topicNode = nodes.find(n => n.type === 'TOPIC' && n.title === topic);
+            // Find Children (excluding Topic Node itself, from filtered list)
+            const children = filteredNodes.filter(n => n.topic === topic && n.type !== 'TOPIC');
+
+            // If strictly searching (query not empty), always expand. Else check state.
+            const isExpanded = searchQuery ? true : !collapsedTopics.has(topic);
+            const isTopicActive = topicNode && activeNodeId === topicNode.id;
+
+            return (
+              <div key={topic} className="border-b border-slate-50">
+                {/* Topic Header */}
+                <div
+                  className={`group flex items-center justify-between px-3 py-2 cursor-pointer transition-colors ${
+                    isTopicActive ? 'bg-indigo-50/80 border-l-4 border-l-indigo-500 pl-2' : 'hover:bg-slate-50 border-l-4 border-l-transparent pl-2'
+                  }`}
+                >
+                  <div
+                    className="flex items-center gap-2 flex-1 overflow-hidden"
+                    onClick={() => {
+                      if (topicNode) {
+                        setActiveNodeId(topicNode.id);
+                        setViewMode('editor');
+                      }
+                    }}
+                  >
+                    {isExpanded ? <FolderOpen className="w-4 h-4 text-amber-400 flex-shrink-0" /> : <Folder className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                    <span className={`font-semibold text-sm truncate ${isTopicActive ? 'text-indigo-900' : 'text-slate-700'}`}>
+                      {topicNode ? topicNode.title : topic}
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTopicCollapse(topic);
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-200/50"
+                  >
+                    {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                {/* Children List */}
+                {isExpanded && (
+                  <div className="bg-slate-50/30 pb-1">
+                    {children.map(node => {
+                      const isActive = activeNodeId === node.id;
+                      return (
+                        <div
+                          key={node.id}
+                          onClick={() => {
+                            setActiveNodeId(node.id);
+                            setViewMode('editor');
+                          }}
+                          className={`pl-9 pr-3 py-2 cursor-pointer transition-all flex items-center justify-between group/item ${
+                            isActive ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-100/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-indigo-400' : 'bg-slate-300'}`}></div>
+                            <span className="truncate text-xs">{node.title}</span>
+                          </div>
+                          {node.type === 'FORMULA' && <span className="text-[10px] font-serif italic text-slate-400 opacity-0 group-hover/item:opacity-100">f(x)</span>}
+                        </div>
+                      );
+                    })}
+                    {children.length === 0 && !topicNode && (
+                      <div className="pl-9 py-2 text-xs text-slate-400 italic">No items</div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="flex justify-between items-start mb-1.5">
-                <span className={`font-semibold text-sm truncate w-40 ${activeNodeId === node.id ? 'text-indigo-900' : 'text-slate-700'}`}>
-                  {node.title}
-                </span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded border ${NODE_TYPES[node.type]?.color} scale-95 origin-right`}>
-                  {NODE_TYPES[node.type]?.label.split(' ')[0]}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                {(node.constraints || []).slice(0, 3).map((c, i) => (
-                  <span key={i} className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-sm">
-                    {c}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Bottom Controls */}
@@ -1273,11 +1422,7 @@ const PhysMemosApp: FC = () => {
                   </button>
                   {activeNode && (
                     <button
-                      onClick={() => {
-                        if (window.confirm('确定删除吗？')) {
-                          // delete logic
-                        }
-                      }}
+                      onClick={handleDeleteNode}
                       className="text-slate-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-full transition"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1317,6 +1462,188 @@ const PhysMemosApp: FC = () => {
             </div>
 
             {activeNode ? (
+              activeNode.type === 'TOPIC' ? (
+                // --- TOPIC OVERVIEW PAGE ---
+                <div className="flex-1 overflow-y-auto bg-slate-50/30">
+                  <div className="max-w-5xl mx-auto p-8 space-y-8">
+                    {/* Header Section */}
+                    <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
+                      <div className="mb-6">
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">主题名称 / Topic Name (Renaming moves children)</label>
+                        <input
+                          type="text"
+                          value={activeNode.title}
+                          onChange={async (e) => {
+                            const newTitle = e.target.value;
+                            const oldTitle = activeNode.title;
+
+                            // Check collision
+                            if (nodes.some(n => n.type === 'TOPIC' && n.title === newTitle && n.id !== activeNode.id)) {
+                              // Just update UI for now, validation on blur? Or prevent?
+                              // Simple: allow typing, validation on save/blur is better UX, but here we save on change usually.
+                              // Let's just update local state and handle the "move" logic.
+                            }
+
+                            // Optimistic update for UI
+                            const updatedNode = { ...activeNode, title: newTitle, topic: newTitle };
+
+                            // Propagate to children
+                            const children = nodes.filter(n => n.topic === oldTitle && n.id !== activeNode.id);
+                            const updatedChildren = children.map(c => ({ ...c, topic: newTitle }));
+
+                            const newNodes = nodes.map(n => {
+                              if (n.id === activeNode.id) return updatedNode;
+                              const child = updatedChildren.find(c => c.id === n.id);
+                              return child || n;
+                            });
+
+                            setNodes(newNodes);
+                            await dbHelper.put(updatedNode);
+                            for (const child of updatedChildren) await dbHelper.put(child);
+                          }}
+                          className="text-3xl font-bold text-slate-800 bg-transparent border-b-2 border-transparent hover:border-slate-200 focus:border-indigo-500 focus:outline-none w-full transition-colors"
+                          placeholder="Topic Name..."
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                         <div>
+                            <EditableBlock
+                              label="主题摘要 / Summary"
+                              value={activeNode.desc}
+                              onChange={(val) => saveNode({ ...activeNode, desc: val as string })}
+                              type="markdown"
+                              variant="subtle"
+                              placeholder="Describe this topic..."
+                              className="bg-slate-50 rounded-lg p-4 min-h-[120px]"
+                            />
+                         </div>
+                         <div className="space-y-4">
+                            <div>
+                               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">所属学科 / Disciplines</span>
+                               <div className="flex flex-wrap gap-2">
+                                  {Object.entries(DISCIPLINES).map(([key, disc]) => {
+                                    const isSelected = activeNode.disciplines.includes(key);
+                                    return (
+                                      <button
+                                        key={key}
+                                        onClick={() => {
+                                          const updated = isSelected
+                                            ? activeNode.disciplines.filter(d => d !== key)
+                                            : [...activeNode.disciplines, key];
+                                          saveNode({ ...activeNode, disciplines: updated });
+                                        }}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                                          isSelected
+                                            ? `bg-${disc.color}/10 border-${disc.color} text-${disc.color}`.replace('bg-#', 'bg-opacity-10 bg-').replace('text-#', 'text-').replace('border-#', 'border-') // Tailwind class hack won't work with hex.
+                                            : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300'
+                                        }`}
+                                        style={isSelected ? { backgroundColor: `${disc.color}20`, color: disc.color, borderColor: disc.color } : {}}
+                                      >
+                                        {disc.label}
+                                      </button>
+                                    );
+                                  })}
+                               </div>
+                            </div>
+                            <div className="p-4 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                               <div className="text-2xl font-bold text-indigo-600 mb-1">
+                                 {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').length}
+                               </div>
+                               <div className="text-xs text-indigo-400 font-medium uppercase tracking-wider">Entries</div>
+                            </div>
+                         </div>
+                      </div>
+                    </div>
+
+                    {/* Children Cards List */}
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
+                        <Layers className="w-5 h-5 text-slate-400" />
+                        Entries in {activeNode.title}
+                      </h3>
+                      <div className="space-y-3">
+                        {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').map(child => (
+                          <div
+                            key={child.id}
+                            onClick={() => setActiveNodeId(child.id)}
+                            className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group flex gap-4"
+                          >
+                             {/* Icon / Type */}
+                             <div className="flex flex-col items-center gap-2 pt-1">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm ${NODE_TYPES[child.type]?.color.split(' ')[0].replace('bg-', 'bg-indigo-500')}`} style={{ backgroundColor: NODE_TYPES[child.type]?.nodeColor }}>
+                                   {/* Simple Icon based on type */}
+                                   <span className="font-bold text-xs">{child.type[0]}</span>
+                                </div>
+                             </div>
+
+                             {/* Content */}
+                             <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-2">
+                                   <h4 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">{child.title}</h4>
+                                   <span className={`text-[10px] px-2 py-0.5 rounded border ${NODE_TYPES[child.type]?.color}`}>
+                                      {NODE_TYPES[child.type]?.label.split(' ')[0]}
+                                   </span>
+                                </div>
+
+                                {child.latex && (
+                                  <div className="mb-3 px-3 py-2 bg-slate-50 rounded border border-slate-100 overflow-x-auto">
+                                     <RichTextRenderer content={`$${child.latex}$`} />
+                                  </div>
+                                )}
+
+                                <p className="text-xs text-slate-500 line-clamp-2 mb-2">
+                                  {child.desc.replace(/[#*`]/g, '')}
+                                </p>
+
+                                {child.relations && child.relations.length > 0 && (
+                                   <div className="flex flex-wrap gap-2 mt-2">
+                                      {child.relations.map((r, i) => (
+                                         <span key={i} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                                            <span>{RELATION_TYPES[r.type]?.icon}</span>
+                                            <span className="max-w-[100px] truncate">{nodes.find(n => n.id === r.targetId)?.title}</span>
+                                         </span>
+                                      ))}
+                                   </div>
+                                )}
+                             </div>
+                          </div>
+                        ))}
+                        {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').length === 0 && (
+                           <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 bg-slate-50/50">
+                              No entries in this topic yet.
+                           </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Aggregated References */}
+                    <div className="bg-slate-100 rounded-xl p-6 border border-slate-200">
+                       <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Book className="w-4 h-4" />
+                          Aggregated References
+                       </h3>
+                       <ol className="list-decimal list-outside ml-4 space-y-2 text-xs text-slate-600">
+                          {Array.from(new Set(
+                             nodes
+                               .filter(n => n.topic === activeNode.title && n.type !== 'TOPIC')
+                               .flatMap(n => (n.references || '').split('\n'))
+                               .map(r => r.trim())
+                               .filter(Boolean)
+                          )).map((ref, i) => (
+                             <li key={i}>
+                                <RichTextRenderer content={ref} className="inline-block" />
+                             </li>
+                          ))}
+                          {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').every(n => !n.references) && (
+                             <li className="text-slate-400 italic list-none -ml-4">No references found.</li>
+                          )}
+                       </ol>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // --- STANDARD NODE EDITOR ---
               <div className="flex-1 overflow-y-auto bg-slate-50/30">
                 <div className="max-w-4xl mx-auto p-8 space-y-6">
                   <EditableBlock
@@ -1462,6 +1789,7 @@ const PhysMemosApp: FC = () => {
                   </div>
                 </div>
               </div>
+            )
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-300 bg-slate-50/30">
                 <Database className="w-20 h-20 mb-6 text-slate-200" />

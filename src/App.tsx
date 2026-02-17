@@ -610,7 +610,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
   }, [graphData, onNodeClick]);
 
   return (
-    <div className="w-full h-full relative bg-slate-50/50">
+    <div className="w-full h-full relative bg-slate-50/50 select-none">
       <svg ref={svgRef} className="w-full h-full" style={{ touchAction: 'none' }}></svg>
       {/* Legend */}
       <div className="absolute bottom-4 right-4 bg-white/90 p-3 rounded-lg border border-slate-200 shadow-sm text-xs backdrop-blur-sm">

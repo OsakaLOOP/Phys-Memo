@@ -1350,16 +1350,16 @@ const PhysMemosApp: FC = () => {
           />
         ) : (
           <>
-            <div className="h-24 bg-white border-b border-slate-100 flex flex-col justify-center px-8 z-10 space-y-2">
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2">
+            <div className={`bg-white border-b border-slate-100 flex flex-col justify-center px-8 z-10 transition-all ${activeNode?.type === 'TOPIC' ? 'h-16' : 'h-24 space-y-2'}`}>
+              <div className="flex items-center justify-between w-full h-full">
+                <div className="flex items-center gap-2 h-full">
                   {!sidebarOpen && (
-                    <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition">
+                    <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition mr-2">
                       <ArrowRight className="w-5 h-5" />
                     </button>
                   )}
-                  {activeNode && (
-                    <div className="flex items-center gap-4">
+                  {activeNode && activeNode.type !== 'TOPIC' && (
+                    <div className="flex items-center gap-4 animate-in fade-in slide-in-from-left-2">
                       {/* 学科多选（圆形按钮） */}
                       <div className="flex flex-col gap-2">
                         <span className="text-xs font-bold text-slate-400 flex items-center gap-2">
@@ -1409,7 +1409,14 @@ const PhysMemosApp: FC = () => {
                       </div>
                     </div>
                   )}
+                  {activeNode && activeNode.type === 'TOPIC' && (
+                    <div className="flex items-center gap-2 text-slate-400 font-medium text-sm animate-in fade-in slide-in-from-left-2">
+                      <FolderOpen className="w-5 h-5 text-amber-400" />
+                      <span>主题概览模式</span>
+                    </div>
+                  )}
                 </div>
+
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setShowOcrPanel(!showOcrPanel)}
@@ -1424,38 +1431,43 @@ const PhysMemosApp: FC = () => {
                     <button
                       onClick={handleDeleteNode}
                       className="text-slate-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-full transition"
+                      title={activeNode.type === 'TOPIC' ? "删除主题" : "删除条目"}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
               </div>
+
+              {/* Secondary Row: Title & Type (Only for non-TOPIC nodes) */}
               {activeNode ? (
-                <div className="flex items-center gap-4 w-full">
-                  <input
-                    type="text"
-                    value={activeNode.title}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => saveNode({ ...activeNode, title: e.target.value })}
-                    className="text-2xl font-bold text-slate-800 bg-transparent border-none focus:outline-none focus:ring-0 placeholder-slate-300 min-w-[200px]"
-                    placeholder="输入概念标题..."
-                  />
-                  <div className="relative">
-                    <select
-                      value={activeNode.type}
-                      onChange={(e: ChangeEvent<HTMLSelectElement>) => saveNode({ ...activeNode, type: e.target.value as NodeData['type'] })}
-                      className="appearance-none pl-3 pr-8 py-1 text-xs font-medium border border-slate-200 rounded-full bg-slate-50 hover:bg-white transition cursor-pointer focus:ring-2 focus:ring-indigo-100 outline-none text-slate-600"
-                    >
-                      {Object.keys(NODE_TYPES).map(key => (
-                        <option key={key} value={key}>
-                          {NODE_TYPES[key as keyof typeof NODE_TYPES].label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute right-2.5 top-1.5 pointer-events-none text-slate-400">
-                      <ArrowRight className="w-3 h-3 rotate-90" />
+                activeNode.type !== 'TOPIC' ? (
+                  <div className="flex items-center gap-4 w-full animate-in fade-in slide-in-from-bottom-2">
+                    <input
+                      type="text"
+                      value={activeNode.title}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => saveNode({ ...activeNode, title: e.target.value })}
+                      className="text-2xl font-bold text-slate-800 bg-transparent border-none focus:outline-none focus:ring-0 placeholder-slate-300 min-w-[200px]"
+                      placeholder="输入概念标题..."
+                    />
+                    <div className="relative">
+                      <select
+                        value={activeNode.type}
+                        onChange={(e: ChangeEvent<HTMLSelectElement>) => saveNode({ ...activeNode, type: e.target.value as NodeData['type'] })}
+                        className="appearance-none pl-3 pr-8 py-1 text-xs font-medium border border-slate-200 rounded-full bg-slate-50 hover:bg-white transition cursor-pointer focus:ring-2 focus:ring-indigo-100 outline-none text-slate-600"
+                      >
+                        {Object.keys(NODE_TYPES).map(key => (
+                          <option key={key} value={key}>
+                            {NODE_TYPES[key as keyof typeof NODE_TYPES].label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute right-2.5 top-1.5 pointer-events-none text-slate-400">
+                        <ArrowRight className="w-3 h-3 rotate-90" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : null
               ) : (
                 <span className="text-slate-300 font-medium">请在左侧选择或新建条目</span>
               )}

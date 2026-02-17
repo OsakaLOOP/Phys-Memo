@@ -10,17 +10,10 @@ import {
 
 // --- Type Definitions ---
 
-interface TopicData {
-  id: string;
-  name: string; // Topic 名称
-  desc: string; // Topic 概要/描述
-  color?: string; // 可选的主题颜色
-}
-
 interface NodeData {
   id: string;
   disciplines: string[]; // 核心学科：流体力学、颗粒物理等
-  topicId: string; // 关联的 topic ID
+  topic: string; // 研究主题（可跨多学科）：颗粒流、湍流等
   title: string;
   type: 'FORMULA' | 'LAW' | 'MODEL' | 'PAPER' | 'EVIDENCE';
   latex: string;
@@ -617,7 +610,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
   }, [graphData, onNodeClick]);
 
   return (
-    <div className="w-full h-full relative bg-slate-50/50 select-none">
+    <div className="w-full h-full relative bg-slate-50/50">
       <svg ref={svgRef} className="w-full h-full" style={{ touchAction: 'none' }}></svg>
       {/* Legend */}
       <div className="absolute bottom-4 right-4 bg-white/90 p-3 rounded-lg border border-slate-200 shadow-sm text-xs backdrop-blur-sm">
@@ -888,10 +881,7 @@ type ViewMode = AppViewMode[keyof AppViewMode];
 
 const PhysMemosApp: FC = () => {
   const [nodes, setNodes] = useState<NodeData[]>([]);
-  const [topics, setTopics] = useState<TopicData[]>([]);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
-  const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
-  const [activePanelMode, setActivePanelMode] = useState<'node' | 'topic'>('node');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showOcrPanel, setShowOcrPanel] = useState(false);
@@ -904,37 +894,25 @@ const PhysMemosApp: FC = () => {
 
   const loadData = async () => {
     try {
-      const allData = await dbHelper.getAll();
-      
-      // 分离 topics 和 nodes
-      const topicsData = allData.filter(item => !('type' in item) || item.type === undefined) as TopicData[];
-      const nodesData = allData.filter(item => 'type' in item && item.type !== undefined) as NodeData[];
-
-      if (nodesData.length === 0) {
-        // 初始化：创建 topics
-        const initialTopics: TopicData[] = [
-          { id: 'topic-fluid-flow', name: '流体流动', desc: '流体运动的基本理论与现象' },
-          { id: 'topic-granular-flow', name: '颗粒流', desc: '离散颗粒运动规律' },
-          { id: 'topic-clogging', name: '颗粒流堵塞', desc: '颗粒堵塞机制与模型' }
-        ];
-
-        const initialNodes: NodeData[] = [
+      const data = await dbHelper.getAll();
+      if (data.length === 0) {
+        const initialData: NodeData[] = [
           {
             id: 'fd1',
             disciplines: ['Fluid Dynamics'],
-            topicId: 'topic-fluid-flow',
+            topic: '流体流动',
             title: '伯努利原理 (Bernoulli Principle)',
             type: 'LAW',
             latex: 'P + \\frac{1}{2}\\rho v^2 + \\rho gh = \\text{Constant}',
             desc: '流体动力学中的能量守恒表述。即对于不可压缩、无粘流体，沿流线的总能量密度保持不变。\n\n> 局限性：不适用于粘性流体（需考虑粘滞耗散）或可压缩流体（需考虑内能变化）。',
-            references: "Landau, L. D., & Lifshitz, E. M. (2013). *Fluid Mechanics*. Elsevier.",
+            references: "Landau, L. D., & Lifshitz, E. M. (2013). *Fluid Mechanics*. Elsevier.\nBatchelor, G. K. (2000). *An introduction to fluid dynamics*.",
             constraints: ['无粘 (Inviscid)', '不可压缩 (Incompressible)', '定常流 (Steady)'],
             relations: []
           },
           {
             id: 'fd2',
             disciplines: ['Fluid Dynamics'],
-            topicId: 'topic-fluid-flow',
+            topic: '流体流动',
             title: '托里拆利定律 (Torricelli Law)',
             type: 'FORMULA',
             latex: 'v_{out} = \\sqrt{2gh}',
@@ -946,63 +924,58 @@ const PhysMemosApp: FC = () => {
           {
             id: 'gp1',
             disciplines: ['Granular Physics'],
-            topicId: 'topic-clogging',
+            topic: '颗粒流堵塞',
             title: '堵塞拱模型 (Clogging Arch)',
             type: 'MODEL',
             latex: 'P_{clog} \\propto \\exp\\left(-\\frac{D}{d}\\right)',
-            desc: '颗粒流流出孔口前形成的亚稳态结构。',
-            references: "Zuriguel, I., et al. (2005). *Physical Review E*.",
+            desc: '颗粒流流出孔口前形成的亚稳态结构。多个颗粒相互挤压形成拱桥，承担上方压力，导致流动中断。只有破坏拱结构（如振动）才能恢复流动 [1]。',
+            references: "Zuriguel, I., et al. (2005). Jamming during the discharge of granular matter from a silo. *Physical Review E*.",
             constraints: ['干颗粒 (Dry Grains)', '拥塞状态 (Jamming)'],
             relations: []
           },
           {
             id: 'gp2',
             disciplines: ['Granular Physics'],
-            topicId: 'topic-granular-flow',
+            topic: '颗粒流',
             title: 'Beverloo 流量公式',
             type: 'LAW',
             latex: 'W = C \\rho_{bulk} \\sqrt{g} (D - kd)^{2.5}',
-            desc: '颗粒流流量经验公式。',
-            references: "Beverloo, W. A. (1961). *Chemical Engineering Science*.",
+            desc: '著名的颗粒流流量经验公式。与流体 ($D^2$) 不同，颗粒流流量遵循 $D^{2.5}$ 缩放律。\n\n**物理机制**：\n提出 **"Empty Annulus" (空环)** 概念，即由于颗粒的离散性，孔口边缘 $k \\cdot d$ 宽度的区域没有有效流量贡献 [1]。',
+            references: "Beverloo, W. A., Leniger, H. A., & Van de Velde, J. (1961). The flow of granular solids through orifices. *Chemical Engineering Science*.",
             constraints: ['粗颗粒 (Coarse Grains)', '重力驱动 (Gravity)'],
-            relations: [{ targetId: 'gp1', type: 'EMPIRICAL_FIT', condition: '基于空环假设' }]
+            relations: [
+              { targetId: 'gp1', type: 'EMPIRICAL_FIT', condition: '基于空环假设对实验数据的拟合' },
+              { targetId: 'fd2', type: 'CONTRADICTS', condition: '流体遵循 $\\sqrt{H}$ 压力依赖，而颗粒流流量与筒仓高度 $H$ 无关（Janssen 效应）' }
+            ]
           },
           {
             id: 'gp3',
             disciplines: ['Granular Physics', 'Statistical Mechanics'],
-            topicId: 'topic-granular-flow',
+            topic: '颗粒流',
             title: 'Alonso et al. (2021)',
             type: 'EVIDENCE',
             latex: '\\mu(P) = \\mu_0 + \\frac{\\mu_1 - \\mu_0}{1 + P_0/P}',
-            desc: '高重力条件下的颗粒摩擦材料特性。',
-            references: "Alonso-Marroquin, F., et al. (2021). *Journal of Fluid Mechanics*.",
+            desc: '在离心机实验中发现 Beverloo 定律在高重力环境下失效。随着有效重力 $g_{eff}$ 增加，流量不再随 $\\sqrt{g}$ 无限增长，而是趋于饱和。\n\n> 原因：高压强下颗粒间摩擦系数 $\\mu$ 增加（压力相关摩擦），导致流变性改变 [1]。',
+            references: "Alonso-Marroquin, F., et al. (2021). Granular flow in high gravity. *Journal of Fluid Mechanics*.",
             constraints: ['离心机实验 (Centrifuge)', '高重力 (High-G > 10g)'],
-            relations: [{ targetId: 'gp2', type: 'MODIFIES', condition: '修正项' }]
+            relations: [
+              { targetId: 'gp2', type: 'CONTRADICTS', condition: '当 $g_{eff}$ 极高时，流量不再符合 Beverloo 的 $\\sqrt{g}$ 预测' },
+              { targetId: 'gp2', type: 'MODIFIES', condition: '提出了压力相关的摩擦修正项' }
+            ]
           }
         ];
-
-        // 保存初始数据
-        for (const topic of initialTopics) await dbHelper.put(topic);
-        for (const node of initialNodes) await dbHelper.put(node);
-        
-        setTopics(initialTopics);
-        setNodes(initialNodes);
+        for (const item of initialData) await dbHelper.put(item);
+        setNodes(initialData);
         setActiveNodeId('fd1');
       } else {
-        // 迁移旧数据：如果节点还有 topic 字符串，转换为 topicId
-        const migratedNodes = nodesData.map(n => {
-          if ('topic' in n && typeof n.topic === 'string' && !('topicId' in n)) {
-            // 旧格式，需要迁移
-            const topicName = (n as any).topic;
-            const topicId = `topic-${topicName}`;
-            return { ...n, topicId, topic: undefined } as NodeData;
-          }
-          return n;
-        });
-        
-        setTopics(topicsData || []);
-        setNodes(migratedNodes);
-        if (migratedNodes.length > 0) setActiveNodeId(migratedNodes[0].id);
+        // 数据迁移：确保所有节点都有 disciplines 字段
+        const migratedData = data.map(n => ({
+          ...n,
+          disciplines: n.disciplines || [],
+          topic: n.topic || '未分类'
+        }));
+        setNodes(migratedData);
+        if (migratedData.length > 0) setActiveNodeId(migratedData[0].id);
       }
     } catch (err) {
       console.error("DB Error:", err);

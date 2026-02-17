@@ -185,7 +185,6 @@ const dbHelper: IDBHelper = {
 
 interface KnowledgeGraphProps {
   nodes: NodeData[];
-  topics: TopicData[];
   activeNodeId: string | null;
   onNodeClick: (id: string) => void;
 }
@@ -195,7 +194,7 @@ interface HoveredNodeState extends NodeData {
   y?: number;
 }
 
-const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, topics, onNodeClick }) => {
+const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredNode, setHoveredNode] = useState<HoveredNodeState | null>(null);
 
@@ -438,14 +437,9 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, topics, onNodeClick })
 
     // 节点形状 - topic 填充色，type 边框色
     const typeColor = (d: D3Node) => NODE_TYPES[d.type]?.nodeColor || '#91a3b0';
-    const getTopicColor = (d: D3Node) => {
-      const topic = topics.find(t => t.id === d.topicId);
-      return TOPIC_COLORS[topic?.name] || '#cbd5e1';
-    };
-    
     node.append("path")
       .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 400)())
-      .attr("fill", getTopicColor)
+      .attr("fill", (d: D3Node) => TOPIC_COLORS[d.topic] || '#cbd5e1')
       .attr("stroke", typeColor)
       .attr("stroke-width", 1.5)
       .attr("cursor", "pointer")
@@ -498,10 +492,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, topics, onNodeClick })
 
     // Topic badge (smaller)
     node.append("text")
-      .text((d: D3Node) => {
-        const topic = topics.find(t => t.id === d.topicId);
-        return (topic?.name || '').substring(0, 4);
-      })
+      .text((d: D3Node) => d.topic.substring(0, 4))
       .attr("x", 0)
       .attr("y", 20)
       .attr("text-anchor", "middle")
@@ -1044,17 +1035,11 @@ const PhysMemosApp: FC = () => {
     await dbHelper.put(node);
   };
 
-  const saveTopic = async (topic: TopicData) => {
-    setTopics(prev => prev.map(t => t.id === topic.id ? topic : t));
-    await dbHelper.put(topic);
-  };
-
-  const handleCreateNode = async (topicId?: string) => {
-    const defaultTopic = topics.find(t => t.id === topicId) || topics[0];
+  const handleCreateNode = async () => {
     const newNode: NodeData = {
       id: crypto.randomUUID(),
       disciplines: [],
-      topicId: defaultTopic?.id || 'topic-uncategorized',
+      topic: '未分类 (Uncategorized)',
       title: '新物理概念',
       type: 'FORMULA',
       latex: '',
@@ -1066,7 +1051,6 @@ const PhysMemosApp: FC = () => {
     await dbHelper.put(newNode);
     setNodes(prev => [...prev, newNode]);
     setActiveNodeId(newNode.id);
-    setActivePanelMode('node');
   };
 
   const handleExport = () => {
@@ -1103,26 +1087,14 @@ const PhysMemosApp: FC = () => {
   };
 
   const activeNode = nodes.find(n => n.id === activeNodeId);
-  const activeTopic = topics.find(t => t.id === activeTopicId);
-  
   const filteredNodes = nodes.filter(n => {
     const q = searchQuery.toLowerCase();
-    const nodeTopic = topics.find(t => t.id === n.topicId);
     return (
       n.title.toLowerCase().includes(q) ||
       n.type.toLowerCase().includes(q) ||
-      (nodeTopic?.name || '').toLowerCase().includes(q) ||
-      (nodeTopic?.desc || '').toLowerCase().includes(q) ||
+      (n.topic || '').toLowerCase().includes(q) ||
       (n.disciplines || []).some(d => DISCIPLINES[d]?.label.toLowerCase().includes(q)) ||
       (n.constraints && n.constraints.some(c => c.toLowerCase().includes(q)))
-    );
-  });
-
-  const filteredTopics = topics.filter(t => {
-    const q = searchQuery.toLowerCase();
-    return (
-      t.name.toLowerCase().includes(q) ||
-      t.desc.toLowerCase().includes(q)
     );
   });
 
@@ -1170,92 +1142,38 @@ const PhysMemosApp: FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {/* Topics Tree Structure */}
-          {filteredTopics.map(topic => {
-            const topicNodes = nodes.filter(n => n.topicId === topic.id);
-            const hasSearchResults = searchQuery ? topicNodes.some(n => filteredNodes.includes(n)) : true;
-            
-            if (!hasSearchResults) return null;
-            
-            return (
-              <div key={topic.id} className="border-b border-slate-100 last:border-0">
-                {/* Topic Header */}
-                <div
-                  onClick={() => {
-                    setActiveTopicId(activeTopicId === topic.id ? null : topic.id);
-                    setActivePanelMode('topic');
-                    setViewMode('editor');
-                  }}
-                  className={`px-4 py-3 cursor-pointer transition-all hover:bg-slate-50/80 ${
-                    activeTopicId === topic.id ? 'bg-amber-50/60 border-l-4 border-l-amber-500' : 'border-l-4 border-l-transparent'
-                  }`}
-                >
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1 flex items-center gap-1">
-                    <Tag className="w-3 h-3 text-amber-400" />
-                    主题
-                  </div>
-                  <div className="flex justify-between items-start">
-                    <span className={`font-semibold text-sm truncate flex-1 ${
-                      activeTopicId === topic.id ? 'text-amber-900' : 'text-slate-700'
-                    }`}>
-                      {topic.name}
-                    </span>
-                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                      {topicNodes.length} 项
-                    </span>
-                  </div>
-                  {topic.desc && (
-                    <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">
-                      {topic.desc}
-                    </p>
-                  )}
-                </div>
-
-                {/* Child Nodes */}
-                <div className="bg-slate-50/30">
-                  {topicNodes.filter(n => filteredNodes.includes(n)).map(node => (
-                    <div
-                      key={node.id}
-                      onClick={() => {
-                        setActiveNodeId(node.id);
-                        setActivePanelMode('node');
-                        setViewMode('editor');
-                      }}
-                      className={`group ml-2 mr-1 my-1 px-3 py-2.5 border-b border-slate-100 cursor-pointer transition-all hover:bg-white rounded-md ${
-                        activeNodeId === node.id && activePanelMode === 'node'
-                          ? 'bg-indigo-50/80 border-l-4 border-l-indigo-500'
-                          : 'border-l-4 border-l-transparent hover:border-indigo-300'
-                      }`}
-                    >
-                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-0.5 flex items-center gap-1">
-                        <Layers className="w-2.5 h-2.5" />
-                        {node.disciplines.length > 0
-                          ? node.disciplines.map(d => DISCIPLINES[d]?.label || d).join(' · ')
-                          : '未分类'}
-                      </div>
-                      <div className="flex justify-between items-start mb-1">
-                        <span className={`font-semibold text-xs truncate flex-1 ${
-                          activeNodeId === node.id && activePanelMode === 'node' ? 'text-indigo-900' : 'text-slate-700'
-                        }`}>
-                          {node.title}
-                        </span>
-                        <span className={`text-[9px] px-1 py-0.5 rounded border ${NODE_TYPES[node.type]?.color} scale-90 origin-right origin-right`}>
-                          {NODE_TYPES[node.type]?.label.split(' ')[0]}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-0.5 opacity-60 group-hover:opacity-80 transition-opacity">
-                        {(node.constraints || []).slice(0, 2).map((c, i) => (
-                          <span key={i} className="text-[8px] bg-slate-200 text-slate-500 px-1 py-0.5 rounded-sm">
-                            {c}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          {filteredNodes.map(node => (
+            <div
+              key={node.id}
+              onClick={() => {
+                setActiveNodeId(node.id);
+                setViewMode('editor');
+              }}
+              className={`group px-4 py-3 border-b border-slate-50 cursor-pointer transition-all hover:bg-slate-50 ${activeNodeId === node.id ? 'bg-indigo-50/60 border-l-4 border-l-indigo-500' : 'border-l-4 border-l-transparent'}`}
+            >
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1 flex items-center gap-1">
+                <Layers className="w-3 h-3" />
+                {node.disciplines.length > 0
+                  ? node.disciplines.map(d => DISCIPLINES[d]?.label || d).join(' × ')
+                  : '未分类'}
               </div>
-            );
-          })}
+              <div className="flex justify-between items-start mb-1.5">
+                <span className={`font-semibold text-sm truncate w-40 ${activeNodeId === node.id ? 'text-indigo-900' : 'text-slate-700'}`}>
+                  {node.title}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded border ${NODE_TYPES[node.type]?.color} scale-95 origin-right`}>
+                  {NODE_TYPES[node.type]?.label.split(' ')[0]}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                {(node.constraints || []).slice(0, 3).map((c, i) => (
+                  <span key={i} className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-sm">
+                    {c}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Bottom Controls */}
@@ -1302,7 +1220,6 @@ const PhysMemosApp: FC = () => {
         {viewMode === 'graph' ? (
           <KnowledgeGraph
             nodes={nodes}
-            topics={topics}
             activeNodeId={activeNodeId}
             onNodeClick={(id) => {
               setActiveNodeId(id);
@@ -1319,7 +1236,7 @@ const PhysMemosApp: FC = () => {
                       <ArrowRight className="w-5 h-5" />
                     </button>
                   )}
-                  {activePanelMode === 'node' && activeNode && (
+                  {activeNode && (
                     <div className="flex items-center gap-4">
                       {/* 学科多选（圆形按钮） */}
                       <div className="flex flex-col gap-2">
@@ -1355,21 +1272,18 @@ const PhysMemosApp: FC = () => {
                         </div>
                       </div>
                       
-                      {/* Topic Selector */}
+                      {/* 主题/Topic */}
                       <div className="flex flex-col gap-2">
                         <span className="text-xs font-bold text-slate-400 flex items-center gap-2">
                           <Tag className="w-3.5 h-3.5 text-amber-400" />
-                          所属主题
+                          主题
                         </span>
-                        <select
-                          className="border border-slate-200 rounded-md px-3 py-1.5 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
-                          value={activeNode.topicId}
-                          onChange={(e: ChangeEvent<HTMLSelectElement>) => saveNode({...activeNode, topicId: e.target.value})}
-                        >
-                          {topics.map(t => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
-                        </select>
+                        <input
+                          className="border border-slate-200 rounded-md px-3 py-1.5 text-sm w-40 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+                          value={activeNode.topic}
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => saveNode({...activeNode, topic: e.target.value})}
+                          placeholder="例如: 颗粒流"
+                        />
                       </div>
                     </div>
                   )}
@@ -1384,7 +1298,7 @@ const PhysMemosApp: FC = () => {
                     <Crop className="w-3.5 h-3.5" />
                     <span>OCR 辅助阅读</span>
                   </button>
-                  {activePanelMode === 'node' && activeNode && (
+                  {activeNode && (
                     <button
                       onClick={() => {
                         if (window.confirm('确定删除吗？')) {
@@ -1398,7 +1312,7 @@ const PhysMemosApp: FC = () => {
                   )}
                 </div>
               </div>
-              {activePanelMode === 'node' && activeNode ? (
+              {activeNode ? (
                 <div className="flex items-center gap-4 w-full">
                   <input
                     type="text"
@@ -1424,25 +1338,12 @@ const PhysMemosApp: FC = () => {
                     </div>
                   </div>
                 </div>
-              ) : activePanelMode === 'topic' && activeTopic ? (
-                <div className="flex items-center gap-4 w-full">
-                  <input
-                    type="text"
-                    value={activeTopic.name}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => saveTopic({ ...activeTopic, name: e.target.value })}
-                    className="text-2xl font-bold text-slate-800 bg-transparent border-none focus:outline-none focus:ring-0 placeholder-slate-300 min-w-[200px]"
-                    placeholder="输入主题名称..."
-                  />
-                  <div className="px-3 py-1 text-xs font-medium border border-amber-200 rounded-full bg-amber-50 text-amber-700">
-                    {nodes.filter(n => n.topicId === activeTopic.id).length} 项
-                  </div>
-                </div>
               ) : (
                 <span className="text-slate-300 font-medium">请在左侧选择或新建条目</span>
               )}
             </div>
 
-            {activePanelMode === 'node' && activeNode ? (
+            {activeNode ? (
               <div className="flex-1 overflow-y-auto bg-slate-50/30">
                 <div className="max-w-4xl mx-auto p-8 space-y-6">
                   <EditableBlock
@@ -1588,153 +1489,10 @@ const PhysMemosApp: FC = () => {
                   </div>
                 </div>
               </div>
-            ) : activePanelMode === 'topic' && activeTopic ? (
-              <div className="flex-1 overflow-y-auto bg-slate-50/30">
-                <div className="max-w-4xl mx-auto p-8 space-y-6">
-                  {/* Topic 编辑控件 */}
-                  <EditableBlock
-                    label="主题概要 (Topic Description)"
-                    value={activeTopic.desc}
-                    onChange={(val: string | string[]) => saveTopic({ ...activeTopic, desc: val as string })}
-                    type="markdown"
-                    variant="core"
-                    placeholder="在此输入主题的概要和描述..."
-                  />
-
-                  {/* Topic 概览卡片 - 下属所有对象列表 */}
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Layers className="w-5 h-5 text-indigo-500" />
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        下属物理概念 ({nodes.filter(n => n.topicId === activeTopic.id).length} 项)
-                      </span>
-                    </div>
-
-                    {nodes.filter(n => n.topicId === activeTopic.id).length === 0 ? (
-                      <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                        <Plus className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                        <p className="text-slate-400 text-sm mb-4">该主题下还没有物理概念</p>
-                        <button
-                          onClick={() => handleCreateNode(activeTopic.id)}
-                          className="text-xs bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 font-medium transition"
-                        >
-                          <Plus className="w-3 h-3 inline mr-1" />
-                          新建概念
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {nodes.filter(n => n.topicId === activeTopic.id).map(node => {
-                          const typeConfig = NODE_TYPES[node.type];
-                          return (
-                            <div
-                              key={node.id}
-                              onClick={() => {
-                                setActiveNodeId(node.id);
-                                setActivePanelMode('node');
-                              }}
-                              className="group p-4 bg-slate-50/50 rounded-lg border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30 cursor-pointer transition-all"
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-semibold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition">
-                                      {node.title}
-                                    </span>
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${typeConfig?.color} flex-shrink-0`}>
-                                      {typeConfig?.label.split(' ')[0]}
-                                    </span>
-                                  </div>
-                                  
-                                  {/* LaTeX公式渲染 */}
-                                  {node.latex && (
-                                    <div className="mt-2 p-3 bg-white rounded border border-slate-100 hover:border-indigo-200 transition">
-                                      <div className="text-xs text-slate-500 mb-1">公式：</div>
-                                      <div
-                                        className="text-sm text-slate-700 overflow-x-auto"
-                                        dangerouslySetInnerHTML={{
-                                          __html: (window as any).katex
-                                            ? (window as any).katex.renderToString(node.latex, { throwOnError: false, displayMode: false })
-                                            : `<code>${node.latex}</code>`
-                                        }}
-                                      />
-                                    </div>
-                                  )}
-
-                                  {/* 学科标签 */}
-                                  {node.disciplines.length > 0 && (
-                                    <div className="mt-2 flex flex-wrap gap-1">
-                                      {node.disciplines.map(d => {
-                                        const disc = DISCIPLINES[d];
-                                        return (
-                                          <span
-                                            key={d}
-                                            className="text-[9px] px-1.5 py-0.5 rounded-sm"
-                                            style={{
-                                              backgroundColor: `${disc?.color}22`,
-                                              color: disc?.color,
-                                              border: `1px solid ${disc?.color}44`
-                                            }}
-                                          >
-                                            {disc?.label}
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-
-                                  {/* 约束条件 */}
-                                  {node.constraints && node.constraints.length > 0 && (
-                                    <div className="mt-2 flex flex-wrap gap-1">
-                                      {node.constraints.slice(0, 3).map((c, i) => (
-                                        <span key={i} className="text-[8px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded-sm">
-                                          {c}
-                                        </span>
-                                      ))}
-                                      {node.constraints.length > 3 && (
-                                        <span className="text-[8px] text-slate-500 px-1">
-                                          +{node.constraints.length - 3} 更多
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* 右侧快速操作 */}
-                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveNodeId(node.id);
-                                      setActivePanelMode('node');
-                                    }}
-                                    className="p-2 hover:bg-white rounded-md transition"
-                                  >
-                                    <Edit3 className="w-4 h-4 text-slate-500 hover:text-indigo-600" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* 新建按钮 */}
-                    <button
-                      onClick={() => handleCreateNode(activeTopic.id)}
-                      className="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-lg border border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/30 text-slate-600 hover:text-indigo-600 transition font-medium text-sm"
-                    >
-                      <Plus className="w-4 h-4" />
-                      新增概念到此主题
-                    </button>
-                  </div>
-                </div>
-              </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-300 bg-slate-50/30">
                 <Database className="w-20 h-20 mb-6 text-slate-200" />
-                <p className="text-lg font-medium text-slate-400">请在左侧选择主题或概念进行编辑</p>
+                <p className="text-lg font-medium text-slate-400">选择一个物理概念进行编辑</p>
               </div>
             )}
           </>

@@ -1633,7 +1633,7 @@ const PhysMemosApp: FC = () => {
                     <div className="bg-slate-100 rounded-xl p-6 border border-slate-200">
                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
                           <Book className="w-4 h-4" />
-                          Aggregated References
+                          文献聚合 / Aggregated References
                        </h3>
                        <ol className="list-decimal list-outside ml-4 space-y-2 text-xs text-slate-600">
                           {Array.from(new Set(
@@ -1659,7 +1659,7 @@ const PhysMemosApp: FC = () => {
               <div className="flex-1 overflow-y-auto bg-slate-50/30">
                 <div className="max-w-4xl mx-auto p-8 space-y-6">
                   <EditableBlock
-                    label="核心定义 / 数学形式 (LaTeX)"
+                    label="核心定义 · 数学形式 / DEF"
                     value={activeNode.latex}
                     onChange={(val: string | string[]) => saveNode({ ...activeNode, latex: val as string })}
                     type="latex"
@@ -1669,7 +1669,7 @@ const PhysMemosApp: FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="md:col-span-1">
                       <EditableBlock
-                        label="适用范围 / 约束域 (Strict)"
+                        label="适用域 / Fields"
                         value={activeNode.constraints}
                         onChange={(val: string | string[]) => saveNode({ ...activeNode, constraints: val as string[] })}
                         type="tags"
@@ -1680,7 +1680,7 @@ const PhysMemosApp: FC = () => {
                     </div>
                     <div className="md:col-span-2">
                       <EditableBlock
-                        label="物理内涵 / 笔记 / 摘要"
+                        label="笔记 · 摘要 / Notes"
                         value={activeNode.desc}
                         onChange={(val: string | string[]) => saveNode({ ...activeNode, desc: val as string })}
                         type="markdown"
@@ -1693,7 +1693,7 @@ const PhysMemosApp: FC = () => {
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <div className="flex items-center gap-2 mb-6">
                       <GitCommit className="w-5 h-5 text-indigo-500" />
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">逻辑关联与推演 (Relationships)</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">关联与推演 / Related</span>
                     </div>
                     <div className="flex flex-wrap gap-2 mb-6 bg-slate-50 p-3 rounded-lg border border-slate-100">
                       <select
@@ -1787,7 +1787,7 @@ const PhysMemosApp: FC = () => {
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
                       <Hash className="w-4 h-4 text-indigo-500" />
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">参考文献 (References)</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">参考文献 / References</span>
                     </div>
                     <EditableBlock
                       label=""

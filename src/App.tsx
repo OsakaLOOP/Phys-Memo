@@ -1483,59 +1483,53 @@ const PhysMemosApp: FC = () => {
                   <div className="max-w-5xl mx-auto p-8 space-y-8">
                     {/* Header Section */}
                     <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
-                      <div className="mb-6">
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">主题名称 / Topic</label>
-                        <input
-                          type="text"
-                          value={activeNode.title}
-                          onChange={async (e) => {
-                            const newTitle = e.target.value;
-                            const oldTitle = activeNode.title;
+                      <div className='flex flex-row'>
+                        <div className="mb-6 pr-4">
+                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">主题名称 / Topic</label>
+                          <input
+                            type="text"
+                            value={activeNode.title}
+                            onChange={async (e) => {
+                              const newTitle = e.target.value;
+                              const oldTitle = activeNode.title;
 
-                            // Check collision
-                            if (nodes.some(n => n.type === 'TOPIC' && n.title === newTitle && n.id !== activeNode.id)) {
-                              // Just update UI for now, validation on blur? Or prevent?
-                              // Simple: allow typing, validation on save/blur is better UX, but here we save on change usually.
-                              // Let's just update local state and handle the "move" logic.
-                            }
+                              if (nodes.some(n => n.type === 'TOPIC' && n.title === newTitle && n.id !== activeNode.id)) {
+                                // 预留防冲突
+                              }
 
-                            // Optimistic update for UI
-                            const updatedNode = { ...activeNode, title: newTitle, topic: newTitle };
+                              // Optimistic update for UI
+                              const updatedNode = { ...activeNode, title: newTitle, topic: newTitle };
 
-                            // Propagate to children
-                            const children = nodes.filter(n => n.topic === oldTitle && n.id !== activeNode.id);
-                            const updatedChildren = children.map(c => ({ ...c, topic: newTitle }));
+                              // Propagate to children
+                              const children = nodes.filter(n => n.topic === oldTitle && n.id !== activeNode.id);
+                              const updatedChildren = children.map(c => ({ ...c, topic: newTitle }));
 
-                            const newNodes = nodes.map(n => {
-                              if (n.id === activeNode.id) return updatedNode;
-                              const child = updatedChildren.find(c => c.id === n.id);
-                              return child || n;
-                            });
+                              const newNodes = nodes.map(n => {
+                                if (n.id === activeNode.id) return updatedNode;
+                                const child = updatedChildren.find(c => c.id === n.id);
+                                return child || n;
+                              });
 
-                            setNodes(newNodes);
-                            await dbHelper.put(updatedNode);
-                            for (const child of updatedChildren) await dbHelper.put(child);
-                          }}
-                          className="text-3xl font-bold text-slate-800 bg-transparent border-b-2 border-transparent hover:border-slate-200 focus:border-indigo-500 focus:outline-none w-full transition-colors"
-                          placeholder="Topic Name..."
-                        />
-                      </div>
+                              setNodes(newNodes);
+                              await dbHelper.put(updatedNode);
+                              for (const child of updatedChildren) await dbHelper.put(child);
+                            }}
+                            className="text-3xl font-bold text-slate-800 bg-transparent border-b-2 border-transparent hover:border-slate-200 focus:border-indigo-500 focus:outline-none w-full transition-colors"
+                            placeholder="Topic Name..."
+                          />
+                        </div>
+                        <div className="space-y-4 grow">
+                            
+                            <div className="p-4 bg-indigo-50/50 rounded-lg border border-indigo-100 flex flex-row">
+                               <div className='pr-8'>
+                               <div className="text-2xl font-bold text-indigo-600 mb-1 ">
+                                 {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').length}
+                               </div>
+                               <div className="text-xs text-indigo-400 font-medium uppercase tracking-wider">Entries</div>
+                               </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                         <div>
-                            <EditableBlock
-                              label="主题摘要 / Summary"
-                              value={activeNode.desc}
-                              onChange={(val) => saveNode({ ...activeNode, desc: val as string })}
-                              type="markdown"
-                              variant="subtle"
-                              placeholder="Describe this topic..."
-                              className="bg-slate-50 rounded-lg p-4 min-h-[120px]"
-                            />
-                         </div>
-                         <div className="space-y-4">
-                            <div>
-                               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">所属学科 / Disciplines (Auto-aggregated)</span>
+                               <div>
+                               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">所属学科(自动聚合) / Disciplines</span>
                                <div className="flex flex-wrap gap-2">
                                   {Array.from(new Set(nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').flatMap(n => n.disciplines))).map(disciplineKey => {
                                       const disc = DISCIPLINES[disciplineKey];
@@ -1555,14 +1549,22 @@ const PhysMemosApp: FC = () => {
                                   )}
                                </div>
                             </div>
-                            <div className="p-4 bg-indigo-50/50 rounded-lg border border-indigo-100">
-                               <div className="text-2xl font-bold text-indigo-600 mb-1">
-                                 {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').length}
-                               </div>
-                               <div className="text-xs text-indigo-400 font-medium uppercase tracking-wider">Entries</div>
                             </div>
                          </div>
                       </div>
+
+                      <div>
+                        <EditableBlock
+                          label="主题摘要 / Summary"
+                          value={activeNode.desc}
+                          onChange={(val) => saveNode({ ...activeNode, desc: val as string })}
+                          type="markdown"
+                          variant="subtle"
+                          placeholder="Describe this topic..."
+                          className="bg-slate-50 rounded-lg min-h-[120px]"
+                        />
+                      </div>
+                      
                     </div>
 
                     {/* Children Cards List */}

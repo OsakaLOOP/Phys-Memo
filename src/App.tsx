@@ -99,15 +99,6 @@ const RELATION_TYPES: Record<string, RelationTypeConfig> = {
   EXPLAINS: { label: '解释机制', icon: '?', color: 'text-purple-500' },
 };
 
-const PRESET_DOMAINS: string[] = [
-  "流体力学 (Fluid Dynamics)",
-  "颗粒物理 (Granular Physics)",
-  "量子力学 (Quantum Mechanics)",
-  "统计力学 (Statistical Mechanics)",
-  "电动力学 (Electrodynamics)",
-  "凝聚态物理 (Condensed Matter)"
-];
-
 // 学科配置（Disciplines）
 const DISCIPLINES: Record<string, { label: string; color: string; hue: number }> = {
   'Fluid Dynamics': { label: '流体力学', color: '#3b82f6', hue: 220 },
@@ -196,12 +187,21 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
 
   // Convert data to D3 format
   const graphData = useMemo((): GraphData => {
-    const d3Nodes: D3Node[] = nodes.map(n => ({ ...n }));
+    // Filter out TOPIC nodes as they shouldn't appear in the graph
+    const d3Nodes: D3Node[] = nodes
+      .filter(n => n.type !== 'TOPIC')
+      .map(n => ({ ...n }));
+
+    // Create a set of valid node IDs for fast lookup
+    const validNodeIds = new Set(d3Nodes.map(n => n.id));
+
     const d3Links: D3Link[] = [];
     nodes.forEach(source => {
-      if (source.relations) {
+      // Only process links from valid nodes
+      if (validNodeIds.has(source.id) && source.relations) {
         source.relations.forEach(rel => {
-          if (nodes.find(n => n.id === rel.targetId)) {
+          // Only add links to valid nodes
+          if (validNodeIds.has(rel.targetId)) {
             d3Links.push({
               source: source.id,
               target: rel.targetId,
@@ -284,7 +284,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
           const angle = (i / steps) * Math.PI * 2;
           circlePoints.push([x + padding * Math.cos(angle), y + padding * Math.sin(angle)]);
         }
-        return d3.line<[number, number]>().curve(d3.curveBasisClosed)(circlePoints) || "";
+        return d3.line().curve(d3.curveBasisClosed)(circlePoints) || "";
       }
 
       // 多个节点：计算凸包并扩展
@@ -350,7 +350,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
 
       // 使用 B-spline 曲线生成最平滑的贝塞尔曲线（确保圆角）
       // curveBasisClosed 提供更平滑的圆角效果
-      const pathData = d3.line<[number, number]>()
+      const pathData = d3.line()
         .curve(d3.curveBasisClosed)(smoothedHull);
 
       return pathData || "";
@@ -359,8 +359,10 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
     const bgLayer = svg.append("g").attr("class", "discipline-background");
 
     // 为每个学科创建路径和标签
-    const disciplinePaths: Record<string, d3.Selection<SVGPathElement, unknown, HTMLElement, unknown>> = {};
-    const disciplineLabels: Record<string, d3.Selection<SVGTextElement, unknown, HTMLElement, unknown>> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const disciplinePaths: Record<string, any> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const disciplineLabels: Record<string, any> = {};
 
     Array.from(disciplines).forEach(discipline => {
       const color = DISCIPLINES[discipline]?.color || '#cbd5e1';
@@ -451,7 +453,8 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
       .attr("fill", "#1e293b")
       .attr("font-weight", "600")
       .style("pointer-events", "none")
-      .each(function(d: D3Node) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .each(function(this: any, d: D3Node) {
         const el = d3.select(this);
         const maxChars = 8; // previous max per line
         const words = (d.title || '').split(/\s+/).filter(Boolean);
@@ -1350,9 +1353,9 @@ const PhysMemosApp: FC = () => {
           />
         ) : (
           <>
-            <div className={`bg-white border-b border-slate-100 flex flex-col justify-center px-8 z-10 transition-all ${activeNode?.type === 'TOPIC' ? 'h-16' : 'h-24 space-y-2'}`}>
-              <div className="flex items-center justify-between w-full h-full">
-                <div className="flex items-center gap-2 h-full">
+            <div className={`bg-white border-b border-slate-100 flex flex-col justify-center px-8 z-10 transition-all ${activeNode?.type === 'TOPIC' ? 'h-16' : 'min-h-32 py-4 space-y-4'}`}>
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
                   {!sidebarOpen && (
                     <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition mr-2">
                       <ArrowRight className="w-5 h-5" />
@@ -1532,30 +1535,24 @@ const PhysMemosApp: FC = () => {
                          </div>
                          <div className="space-y-4">
                             <div>
-                               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">所属学科 / Disciplines</span>
+                               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">所属学科 / Disciplines (Auto-aggregated)</span>
                                <div className="flex flex-wrap gap-2">
-                                  {Object.entries(DISCIPLINES).map(([key, disc]) => {
-                                    const isSelected = activeNode.disciplines.includes(key);
-                                    return (
-                                      <button
-                                        key={key}
-                                        onClick={() => {
-                                          const updated = isSelected
-                                            ? activeNode.disciplines.filter(d => d !== key)
-                                            : [...activeNode.disciplines, key];
-                                          saveNode({ ...activeNode, disciplines: updated });
-                                        }}
-                                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                                          isSelected
-                                            ? `bg-${disc.color}/10 border-${disc.color} text-${disc.color}`.replace('bg-#', 'bg-opacity-10 bg-').replace('text-#', 'text-').replace('border-#', 'border-') // Tailwind class hack won't work with hex.
-                                            : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300'
-                                        }`}
-                                        style={isSelected ? { backgroundColor: `${disc.color}20`, color: disc.color, borderColor: disc.color } : {}}
-                                      >
-                                        {disc.label}
-                                      </button>
-                                    );
+                                  {Array.from(new Set(nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').flatMap(n => n.disciplines))).map(disciplineKey => {
+                                      const disc = DISCIPLINES[disciplineKey];
+                                      if (!disc) return null;
+                                      return (
+                                          <span
+                                              key={disciplineKey}
+                                              className="px-3 py-1.5 rounded-full text-xs font-bold border cursor-default"
+                                              style={{ backgroundColor: `${disc.color}20`, color: disc.color, borderColor: disc.color }}
+                                          >
+                                              {disc.label}
+                                          </span>
+                                      );
                                   })}
+                                  {Array.from(new Set(nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').flatMap(n => n.disciplines))).length === 0 && (
+                                      <span className="text-xs text-slate-400 italic">暂无关联学科 / No disciplines found</span>
+                                  )}
                                </div>
                             </div>
                             <div className="p-4 bg-indigo-50/50 rounded-lg border border-indigo-100">

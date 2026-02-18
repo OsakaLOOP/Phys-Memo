@@ -287,6 +287,32 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
         return d3.line().curve(d3.curveBasisClosed)(circlePoints) || "";
       }
 
+      if (points.length === 2) {
+        // 两个节点：生成椭圆/胶囊形
+        const [p1, p2] = points;
+        const cx = (p1[0] + p2[0]) / 2;
+        const cy = (p1[1] + p2[1]) / 2;
+        const dist = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+        const angle = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]);
+
+        const steps = 32;
+        const ellipsePoints: [number, number][] = [];
+        const a = dist / 2 + padding; // 长半轴
+        const b = padding;            // 短半轴
+
+        for (let i = 0; i < steps; i++) {
+          const t = (i / steps) * Math.PI * 2;
+          // 标准椭圆方程
+          const x0 = a * Math.cos(t);
+          const y0 = b * Math.sin(t);
+          // 旋转和平移
+          const x = cx + x0 * Math.cos(angle) - y0 * Math.sin(angle);
+          const y = cy + x0 * Math.sin(angle) + y0 * Math.cos(angle);
+          ellipsePoints.push([x, y]);
+        }
+        return d3.line().curve(d3.curveBasisClosed)(ellipsePoints) || "";
+      }
+
       // 多个节点：计算凸包并扩展
       const hull = computeConvexHull(points);
       if (!hull || hull.length < 2) return "";

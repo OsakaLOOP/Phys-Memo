@@ -42,6 +42,14 @@ interface RelationTypeConfig {
   color: string;
 }
 
+interface DisciplineData {
+  name: string; // unique key (e.g. 'Fluid Dynamics')
+  label: string; // e.g. '流体力学'
+  abbr: string; // e.g. '流' or '流体' (1-2 chars)
+  color: string; // hex
+  hue: number; // for graph
+}
+
 interface D3Node extends NodeData {
   x?: number;
   y?: number;
@@ -100,7 +108,7 @@ const RELATION_TYPES: Record<string, RelationTypeConfig> = {
 };
 
 // 学科配置（Disciplines）
-const DISCIPLINES: Record<string, { label: string; color: string; hue: number }> = {
+const INITIAL_DISCIPLINES: Record<string, { label: string; color: string; hue: number }> = {
   'Fluid Dynamics': { label: '流体力学', color: '#3b82f6', hue: 220 },
   'Granular Physics': { label: '颗粒物理', color: '#a855f7', hue: 280 },
   'Quantum Mechanics': { label: '量子力学', color: '#06b6d4', hue: 190 },
@@ -113,13 +121,16 @@ const DISCIPLINES: Record<string, { label: string; color: string; hue: number }>
 
 const DB_NAME = 'PhysMemosDB_v6';
 const STORE_NAME = 'nodes';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 interface IDBHelper {
   open: () => Promise<IDBDatabase>;
   getAll: () => Promise<NodeData[]>;
   put: (item: NodeData) => Promise<IDBValidKey>;
   delete: (id: string) => Promise<void>;
+  getAllDisciplines: () => Promise<DisciplineData[]>;
+  putDiscipline: (item: DisciplineData) => Promise<IDBValidKey>;
+  deleteDiscipline: (name: string) => Promise<void>;
 }
 
 const dbHelper: IDBHelper = {
@@ -132,6 +143,9 @@ const dbHelper: IDBHelper = {
         const db = (event.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('disciplines')) {
+          db.createObjectStore('disciplines', { keyPath: 'name' });
         }
       };
     });
@@ -165,6 +179,36 @@ const dbHelper: IDBHelper = {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+  },
+  getAllDisciplines: async () => {
+    const db = await dbHelper.open();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction('disciplines', 'readonly');
+      const store = transaction.objectStore('disciplines');
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  },
+  putDiscipline: async (item: DisciplineData) => {
+    const db = await dbHelper.open();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction('disciplines', 'readwrite');
+      const store = transaction.objectStore('disciplines');
+      const request = store.put(item);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  },
+  deleteDiscipline: async (name: string) => {
+    const db = await dbHelper.open();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction('disciplines', 'readwrite');
+      const store = transaction.objectStore('disciplines');
+      const request = store.delete(name);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
   }
 };
 
@@ -172,6 +216,7 @@ const dbHelper: IDBHelper = {
 
 interface KnowledgeGraphProps {
   nodes: NodeData[];
+  disciplinesMap: Record<string, DisciplineData>;
   activeNodeId: string | null;
   onNodeClick: (id: string) => void;
 }
@@ -181,7 +226,7 @@ interface HoveredNodeState extends NodeData {
   y?: number;
 }
 
-const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
+const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNodeClick }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredNode, setHoveredNode] = useState<HoveredNodeState | null>(null);
   const [legendPaths, setLegendPaths] = useState<Record<string, string>>({});
@@ -393,7 +438,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
     const labelPhysics: Record<string, { x: number; y: number; vx: number; vy: number }> = {};
 
     Array.from(disciplines).forEach(discipline => {
-      const color = DISCIPLINES[discipline]?.color || '#cbd5e1';
+      const color = disciplinesMap[discipline]?.color || '#cbd5e1';
       
       // Initialize physics state
       labelPhysics[discipline] = { x: width / 2, y: height / 2, vx: 0, vy: 0 };
@@ -418,7 +463,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
         .attr("font-weight", "bold")
         .attr("text-anchor", "middle")
         .attr("pointer-events", "none")
-        .text(DISCIPLINES[discipline]?.label || discipline);
+        .text(disciplinesMap[discipline]?.label || discipline);
     });
 
 
@@ -697,7 +742,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
       subject.fy = null;
     }
 
-  }, [graphData, onNodeClick]);
+  }, [graphData, disciplinesMap, onNodeClick]);
 
   return (
     <div className="w-full h-full relative bg-slate-50/50 select-none">
@@ -737,6 +782,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
           </div>
         </div>
       )}
+
     </div>
   );
 };
@@ -980,6 +1026,7 @@ type ViewMode = AppViewMode[keyof AppViewMode];
 
 const PhysMemosApp: FC = () => {
   const [nodes, setNodes] = useState<NodeData[]>([]);
+  const [disciplines, setDisciplines] = useState<DisciplineData[]>([]);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -992,10 +1039,87 @@ const PhysMemosApp: FC = () => {
   const [newRelType, setNewRelType] = useState<Relation['type']>('DERIVES_FROM');
   const [newRelCondition, setNewRelCondition] = useState("");
 
+  // --- Discipline State & Logic ---
+  const [showDiscModal, setShowDiscModal] = useState(false);
+  const [newDiscName, setNewDiscName] = useState("");
+  const [newDiscAbbr, setNewDiscAbbr] = useState("");
+
+  const handleAddDiscipline = async () => {
+    const name = newDiscName.trim();
+    if (!name) return;
+    if (disciplines.some(d => d.name === name)) {
+      alert("Discipline already exists!");
+      return;
+    }
+
+    // Generate random hex color
+    const hue = Math.floor(Math.random() * 360);
+    // Simple HSV to RGB to Hex conversion or just random Hex
+    // Using random Hex for simplicity and variety
+    const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+
+    let abbr = newDiscAbbr.trim();
+    if (!abbr) abbr = name.substring(0, 1);
+
+    const newDisc: DisciplineData = {
+      name: name,
+      label: name,
+      abbr: abbr.substring(0, 2),
+      color: randomColor,
+      hue: hue
+    };
+
+    await dbHelper.putDiscipline(newDisc);
+    setDisciplines(prev => [...prev, newDisc]);
+
+    setShowDiscModal(false);
+    setNewDiscName("");
+    setNewDiscAbbr("");
+  };
+
+  const handleDeleteDiscipline = async (name: string) => {
+    if (!window.confirm(`确定删除学科 "${name}" 吗？\n这就从所有相关条目中移除该标签。`)) return;
+
+    await dbHelper.deleteDiscipline(name);
+    setDisciplines(prev => prev.filter(d => d.name !== name));
+
+    // Update nodes locally and in DB
+    const newNodes = nodes.map(n => {
+      if (n.disciplines.includes(name)) {
+         const newDiscs = n.disciplines.filter(d => d !== name);
+         const updatedNode = { ...n, disciplines: newDiscs };
+         dbHelper.put(updatedNode); // Fire and forget update
+         return updatedNode;
+      }
+      return n;
+    });
+    setNodes(newNodes);
+  };
+
+  const disciplinesMap = useMemo(() => {
+    return disciplines.reduce((acc, d) => ({ ...acc, [d.name]: d }), {} as Record<string, DisciplineData>);
+  }, [disciplines]);
+
   const generateTopicId = (name: string) => `topic_${name.trim().replace(/\s+/g, '_')}`;
 
   const loadData = async () => {
     try {
+      // 1. Load Disciplines
+      let loadedDisciplines = await dbHelper.getAllDisciplines();
+      if (loadedDisciplines.length === 0) {
+        const seedData: DisciplineData[] = Object.entries(INITIAL_DISCIPLINES).map(([key, val]) => ({
+          name: key,
+          label: val.label,
+          abbr: val.label.substring(0, 1),
+          color: val.color,
+          hue: val.hue
+        }));
+        for (const d of seedData) await dbHelper.putDiscipline(d);
+        loadedDisciplines = seedData;
+      }
+      setDisciplines(loadedDisciplines);
+
+      // 2. Load Nodes
       const data = await dbHelper.getAll();
       let nodesToSet: NodeData[] = [];
 
@@ -1255,7 +1379,7 @@ const PhysMemosApp: FC = () => {
       n.title.toLowerCase().includes(q) ||
       n.type.toLowerCase().includes(q) ||
       (n.topic || '').toLowerCase().includes(q) ||
-      (n.disciplines || []).some(d => DISCIPLINES[d]?.label.toLowerCase().includes(q)) ||
+      (n.disciplines || []).some(d => disciplinesMap[d]?.label.toLowerCase().includes(q)) ||
       (n.constraints && n.constraints.some(c => c.toLowerCase().includes(q)))
     );
   });
@@ -1438,6 +1562,7 @@ const PhysMemosApp: FC = () => {
         {viewMode === 'graph' ? (
           <KnowledgeGraph
             nodes={nodes}
+            disciplinesMap={disciplinesMap}
             activeNodeId={activeNodeId}
             onNodeClick={(id) => {
               setActiveNodeId(id);
@@ -1462,31 +1587,53 @@ const PhysMemosApp: FC = () => {
                           <Layers className="w-3.5 h-3.5 text-indigo-400" />
                           学科
                         </span>
-                        <div className="flex flex-wrap gap-2 items-start">
-                          {Object.entries(DISCIPLINES).map(([key, disc]) => {
-                            const isSelected = activeNode.disciplines.includes(key);
+                        <div className="flex flex-wrap gap-2 items-center">
+                          {disciplines.map((disc) => {
+                            const isSelected = activeNode.disciplines.includes(disc.name);
+                            const isCapsule = (disc.abbr || '').length > 1;
                             return (
-                              <button
-                                key={key}
-                                onClick={() => {
-                                  const updated = isSelected
-                                    ? activeNode.disciplines.filter(d => d !== key)
-                                    : [...activeNode.disciplines, key];
-                                  saveNode({ ...activeNode, disciplines: updated });
-                                }}
-                                className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 font-bold text-xs flex-shrink-0 hover:shadow-md"
-                                style={{
-                                  borderWidth: '2px',
-                                  borderColor: isSelected ? disc.color : '#e2e8f0',
-                                  backgroundColor: isSelected ? `${disc.color}12` : '#f3f4f6',
-                                  color: isSelected ? disc.color : '#94a3b8'
-                                }}
-                                title={disc.label}
-                              >
-                                {disc.label.substring(0, 1)}
-                              </button>
+                              <div key={disc.name} className="relative group">
+                                <button
+                                  onClick={() => {
+                                    const updated = isSelected
+                                      ? activeNode.disciplines.filter(d => d !== disc.name)
+                                      : [...activeNode.disciplines, disc.name];
+                                    saveNode({ ...activeNode, disciplines: updated });
+                                  }}
+                                  className={`
+                                    flex items-center justify-center transition-all duration-200 font-bold text-xs flex-shrink-0 hover:shadow-md
+                                    ${isCapsule ? 'h-8 px-3 rounded-full' : 'w-8 h-8 rounded-full'}
+                                  `}
+                                  style={{
+                                    borderWidth: '2px',
+                                    borderColor: isSelected ? disc.color : '#e2e8f0',
+                                    backgroundColor: isSelected ? `${disc.color}12` : '#f3f4f6',
+                                    color: isSelected ? disc.color : '#94a3b8'
+                                  }}
+                                  title={disc.label}
+                                >
+                                  {disc.abbr || disc.label.substring(0, 1)}
+                                </button>
+                                <button
+                                   onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteDiscipline(disc.name);
+                                   }}
+                                   className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm z-10 hover:bg-red-600 hover:scale-110"
+                                   title="全局删除此学科"
+                                >
+                                   <X className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
                             );
                           })}
+                          <button
+                             onClick={() => setShowDiscModal(true)}
+                             className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all"
+                             title="新建学科"
+                          >
+                             <Plus className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                       
@@ -1625,7 +1772,7 @@ const PhysMemosApp: FC = () => {
                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">所属学科(自动聚合) / Disciplines</span>
                                <div className="flex flex-wrap gap-2">
                                   {Array.from(new Set(nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').flatMap(n => n.disciplines))).map(disciplineKey => {
-                                      const disc = DISCIPLINES[disciplineKey];
+                                      const disc = disciplinesMap[disciplineKey];
                                       if (!disc) return null;
                                       return (
                                           <span
@@ -1954,6 +2101,66 @@ const PhysMemosApp: FC = () => {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Add Discipline Modal */}
+      {showDiscModal && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-200">
+           <div className="bg-white p-6 rounded-xl shadow-2xl border border-slate-200 w-80 space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                 <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-500" />
+                    新建学科
+                 </h3>
+                 <button onClick={() => setShowDiscModal(false)} className="text-slate-400 hover:text-slate-600">
+                    <X className="w-4 h-4" />
+                 </button>
+              </div>
+
+              <div className="space-y-1">
+                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">名称 (Name)</label>
+                 <input
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
+                    placeholder="例如: 量子光学"
+                    value={newDiscName}
+                    onChange={e => setNewDiscName(e.target.value)}
+                    autoFocus
+                 />
+              </div>
+
+              <div className="space-y-1">
+                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">缩写 (Abbr, 1-2 chars)</label>
+                 <div className="flex gap-2">
+                    <input
+                       className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
+                       placeholder="默认首字"
+                       maxLength={2}
+                       value={newDiscAbbr}
+                       onChange={e => setNewDiscAbbr(e.target.value)}
+                    />
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-indigo-50 text-indigo-600 text-xs font-bold border border-indigo-100">
+                       {newDiscAbbr || (newDiscName ? newDiscName[0] : '?')}
+                    </div>
+                 </div>
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                 <button
+                    onClick={() => setShowDiscModal(false)}
+                    className="flex-1 px-4 py-2 rounded-lg text-sm text-slate-500 hover:bg-slate-50 font-medium border border-transparent hover:border-slate-200 transition-all"
+                 >
+                    取消
+                 </button>
+                 <button
+                    onClick={handleAddDiscipline}
+                    disabled={!newDiscName.trim()}
+                    className="flex-1 px-4 py-2 rounded-lg text-sm bg-indigo-600 text-white hover:bg-indigo-700 font-medium disabled:opacity-50 shadow-sm hover:shadow-md transition-all"
+                 >
+                    创建
+                 </button>
+              </div>
+           </div>
         </div>
       )}
     </div>

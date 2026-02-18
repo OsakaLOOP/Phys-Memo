@@ -668,7 +668,7 @@ const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "" }
 
     const mathBlocks: Array<{ id: string; tex: string; display: boolean }> = [];
     const protectedText = content.replace(/\$\$(.*?)\$\$|\$(.*?)\$/gs, (_match: string, blockMath: string, inlineMath: string) => {
-      const id = `__MATH_${mathBlocks.length}__`;
+      const id = `%%%MATH_${mathBlocks.length}%%%`;
       mathBlocks.push({ id, tex: blockMath || inlineMath, display: !!blockMath });
       return id;
     });
@@ -686,7 +686,7 @@ const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "" }
     });
 
     html = html.replace(/\[(\d+)\]/g, (_match: string, num: string) => {
-      return `<a href="#ref-${num}" class="ref-link inline-block px-1 rounded text-indigo-600 bg-indigo-50 hover:bg-indigo-100 font-mono text-xs cursor-pointer select-none" onclick="event.stopPropagation(); const el = document.getElementById('ref-${num}'); if(el){ el.scrollIntoView({behavior: 'smooth'}); el.classList.add('bg-yellow-100'); setTimeout(()=>el.classList.remove('bg-yellow-100'), 2000); } return false;">[${num}]</a>`;
+      return `<sup class="ref-sup"><a href="#ref-${num}" class="ref-link inline-block px-1 rounded text-indigo-600 bg-indigo-50 hover:bg-indigo-100 font-mono text-[10px] cursor-pointer select-none no-underline" onclick="event.stopPropagation(); const el = document.getElementById('ref-${num}'); if(el){ el.scrollIntoView({behavior: 'smooth'}); el.classList.add('bg-yellow-100'); setTimeout(()=>el.classList.remove('bg-yellow-100'), 2000); } return false;">[${num}]</a></sup>`;
     });
 
     if (containerRef.current) {
@@ -789,7 +789,7 @@ const EditableBlock: FC<EditableBlockProps> = ({
           <div className="flex flex-wrap gap-2">
             {Array.isArray(value) && value.map((tag, i) => (
               <span key={i} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
-                {tag}
+                <RichTextRenderer content={tag} className="inline-block [&>p]:inline [&>p]:m-0" />
               </span>
             ))}
           </div>
@@ -1604,9 +1604,9 @@ const PhysMemosApp: FC = () => {
                                   </div>
                                 )}
 
-                                <p className="text-xs text-slate-500 line-clamp-2 mb-2">
-                                  {child.desc.replace(/[#*`]/g, '')}
-                                </p>
+                                <div className="text-xs text-slate-500 line-clamp-2 mb-2">
+                                  <RichTextRenderer content={child.desc} className="[&>p]:m-0 [&>p]:inline" />
+                                </div>
 
                                 {child.relations && child.relations.length > 0 && (
                                    <div className="flex flex-wrap gap-2 mt-2">
@@ -1614,6 +1614,7 @@ const PhysMemosApp: FC = () => {
                                          <span key={i} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
                                             <span>{RELATION_TYPES[r.type]?.icon}</span>
                                             <span className="max-w-[100px] truncate">{nodes.find(n => n.id === r.targetId)?.title}</span>
+                                            {r.condition && <span className="text-slate-400 font-serif italic max-w-[80px] truncate flex items-center gap-0.5">(<RichTextRenderer content={r.condition} className="inline-block [&>p]:inline [&>p]:m-0 align-bottom" />)</span>}
                                          </span>
                                       ))}
                                    </div>
@@ -1772,7 +1773,7 @@ const PhysMemosApp: FC = () => {
                                     <div className="mt-1 text-xs text-slate-500 flex items-start gap-1">
                                       <span className="text-indigo-400 italic font-serif">if</span>
                                       <span className="bg-yellow-50 px-1.5 rounded text-yellow-700 border border-yellow-100/50">
-                                        {rel.condition}
+                                        <RichTextRenderer content={rel.condition} className="inline-block [&>p]:inline [&>p]:m-0" />
                                       </span>
                                     </div>
                                   )}

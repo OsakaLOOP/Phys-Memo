@@ -184,6 +184,7 @@ interface HoveredNodeState extends NodeData {
 const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredNode, setHoveredNode] = useState<HoveredNodeState | null>(null);
+  const [legendPaths, setLegendPaths] = useState<Record<string, string>>({});
 
   // Convert data to D3 format
   const graphData = useMemo((): GraphData => {
@@ -465,14 +466,35 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
 
     // 节点形状 - topic 填充色，type 边框色
     const typeColor = (d: D3Node) => NODE_TYPES[d.type]?.nodeColor || '#91a3b0';
+
+    // Bottom Layer: Outline (Type Color) - Thicker
     node.append("path")
-      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 400)())
-      .attr("fill", (d: D3Node) => TOPIC_COLORS[d.topic] || '#cbd5e1')
+      .attr("class", "node-outline")
+      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 200)())
+      .attr("fill", "none")
       .attr("stroke", typeColor)
-      .attr("stroke-width", 1.5)
+      .attr("stroke-width", 2.5)
+      .attr("cursor", "pointer");
+
+    // Top Layer: Fill (Topic Color) + White Inner Stroke
+    node.append("path")
+      .attr("class", "node-fill")
+      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 200)())
+      .attr("fill", (d: D3Node) => TOPIC_COLORS[d.topic] || '#cbd5e1')
+      .attr("stroke", "#ffffff")
+      .attr("stroke-width", 1)
       .attr("cursor", "pointer")
-      .attr("opacity", 0.85)
+      .attr("opacity", 0.95)
       .on("click", (_event: MouseEvent, d: D3Node) => onNodeClick(d.id));
+
+    // Generate paths for Legend (area 200 to match nodes)
+    const newLegendPaths: Record<string, string> = {};
+    Object.keys(NODE_TYPES).forEach(type => {
+      // Mock a node object to reuse symbolType function
+      const d = { type } as D3Node;
+      newLegendPaths[type] = d3.symbol(symbolType(d), 200)();
+    });
+    setLegendPaths(newLegendPaths);
 
     // Node text with word-wrap at spaces (preserve full name across lines)
     node.append("text")
@@ -519,15 +541,16 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
         });
       });
 
-    // Topic badge (smaller)
+    // Topic badge (Larger and Colored)
     node.append("text")
-      .text((d: D3Node) => d.topic.substring(0, 4))
+      .text((d: D3Node) => d.topic) // Show full topic name
       .attr("x", 0)
       .attr("y", 45) // Push further down
       .attr("text-anchor", "middle")
-      .attr("font-size", 7)
-      .attr("fill", "#64748b")
-      .attr("opacity", 0.6)
+      .attr("font-size", 10) // Increased size
+      .attr("font-weight", "500")
+      .attr("fill", (d: D3Node) => TOPIC_COLORS[d.topic] || '#94a3b8') // Match topic color
+      .attr("opacity", 1)
       .style("pointer-events", "none");
 
     // Interaction logic
@@ -566,9 +589,10 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
         return (srcId === d.id || tgtId === d.id) ? 1 : 0;
       });
       
-      d3.select(event.currentTarget).select("path")
+      // Highlight the outline path
+      d3.select(event.currentTarget).select(".node-outline")
         .attr("stroke", "#4f46e5")
-        .attr("stroke-width", 3);
+        .attr("stroke-width", 4);
     })
       .on("mouseleave", (event: MouseEvent) => {
         setHoveredNode(null);
@@ -579,9 +603,10 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
           .style("opacity", 1);
         linkLabel.style("opacity", 1);
         
-        d3.select(event.currentTarget).select("path")
+        // Restore outline path
+        d3.select(event.currentTarget).select(".node-outline")
           .attr("stroke", (d: D3Node) => NODE_TYPES[d.type]?.nodeColor || '#91a3b0')
-          .attr("stroke-width", 1.5);
+          .attr("stroke-width", 3);
       });
 
     // Update positions on tick
@@ -680,11 +705,20 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
       {/* Legend */}
       <div className="absolute bottom-4 right-4 bg-white/90 p-3 rounded-lg border border-slate-200 shadow-sm text-xs backdrop-blur-sm">
         <div className="font-bold text-slate-500 mb-2">Node Types</div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-3">
           {Object.entries(NODE_TYPES).map(([k, v]) => (
-            <div key={k} className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: v.nodeColor }}></div>
-              <span className="text-slate-600">{v.label.split(' ')[0]}</span>
+            <div key={k} className="flex items-center gap-2">
+              <svg width="20" height="20" viewBox="-10 -10 20 20" className="overflow-visible">
+                {legendPaths[k] && (
+                  <path
+                    d={legendPaths[k]}
+                    fill="none"
+                    stroke={v.nodeColor}
+                    strokeWidth="2"
+                  />
+                )}
+              </svg>
+              <span className="text-slate-600 font-medium">{v.label.split(' ')[0]}</span>
             </div>
           ))}
         </div>

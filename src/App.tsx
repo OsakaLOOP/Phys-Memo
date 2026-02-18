@@ -470,7 +470,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
     // Bottom Layer: Outline (Type Color) - Thicker
     node.append("path")
       .attr("class", "node-outline")
-      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 200)())
+      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 310)())
       .attr("fill", "none")
       .attr("stroke", typeColor)
       .attr("stroke-width", 2.5)
@@ -479,7 +479,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
     // Top Layer: Fill (Topic Color) + White Inner Stroke
     node.append("path")
       .attr("class", "node-fill")
-      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 200)())
+      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 300)())
       .attr("fill", (d: D3Node) => TOPIC_COLORS[d.topic] || '#cbd5e1')
       .attr("stroke", "#ffffff")
       .attr("stroke-width", 1)

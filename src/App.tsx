@@ -1481,7 +1481,7 @@ const PhysMemosApp: FC = () => {
                     {/* Header Section */}
                     <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
                       <div className="mb-6">
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">主题名称 / Topic Name (Renaming moves children)</label>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">主题名称 / Topic</label>
                         <input
                           type="text"
                           value={activeNode.title}

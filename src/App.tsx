@@ -244,16 +244,12 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
       .attr("fill", "#94a3b8")
       .attr("d", "M0,-5L10,0L0,5");
 
-    // Dynamic Size Helpers
-    const getNodeArea = (title: string) => 400 + (title || '').length * 50;
-    const getNodeRadius = (title: string) => Math.sqrt(getNodeArea(title) / Math.PI);
-
     // Force simulation
     const simulation = d3.forceSimulation(graphData.nodes)
       .force("link", d3.forceLink(graphData.links).id((d: D3Node) => d.id).distance(150))
       .force("charge", d3.forceManyBody().strength(-400))
       .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collide", d3.forceCollide().radius((d: D3Node) => getNodeRadius(d.title) + 20));
+      .force("collide", d3.forceCollide().radius(40));
 
     // 绘制动态背景学科区域（贝塞尔曲线多边形 Venn图）
     const disciplines = new Set<string>();
@@ -470,7 +466,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
     // 节点形状 - topic 填充色，type 边框色
     const typeColor = (d: D3Node) => NODE_TYPES[d.type]?.nodeColor || '#91a3b0';
     node.append("path")
-      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), getNodeArea(d.title))())
+      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 400)())
       .attr("fill", (d: D3Node) => TOPIC_COLORS[d.topic] || '#cbd5e1')
       .attr("stroke", typeColor)
       .attr("stroke-width", 1.5)
@@ -481,7 +477,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
     // Node text with word-wrap at spaces (preserve full name across lines)
     node.append("text")
       .attr("x", 0)
-      .attr("y", 0)
+      .attr("y", 20)
       .attr("text-anchor", "middle")
       .attr("font-size", 10)
       .attr("fill", "#1e293b")
@@ -490,7 +486,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .each(function(this: any, d: D3Node) {
         const el = d3.select(this);
-        const maxChars = Math.max(8, Math.floor(getNodeRadius(d.title) * 0.8));
+        const maxChars = 8;
         const words = (d.title || '').split(/\s+/).filter(Boolean);
         const lines: string[] = [];
         let current = '';
@@ -513,7 +509,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
 
         // render tspans and vertically center
         const lineHeight = 1.05; // em
-        const firstDy = `-${((lines.length - 1) / 2) * lineHeight}em`;
+        const firstDy = "1.2em"; // Start below the node shape
         el.selectAll('*').remove();
         lines.forEach((ln, i) => {
           el.append('tspan')
@@ -527,7 +523,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
     node.append("text")
       .text((d: D3Node) => d.topic.substring(0, 4))
       .attr("x", 0)
-      .attr("y", 20)
+      .attr("y", 45) // Push further down
       .attr("text-anchor", "middle")
       .attr("font-size", 7)
       .attr("fill", "#64748b")
@@ -631,7 +627,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
                 const dx = label.x - node.x!;
                 const dy = label.y - node.y!;
                 const dist = Math.hypot(dx, dy);
-                const minDist = getNodeRadius(node.title) + 30; // Node radius + Label buffer
+                const minDist = 40; // Fixed buffer
 
                 if (dist < minDist && dist > 0) {
                   const force = (minDist - dist) / dist * 0.2;

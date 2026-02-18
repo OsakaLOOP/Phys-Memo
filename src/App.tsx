@@ -637,8 +637,8 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
               });
 
               // 3. Update & Damping
-              label.vx *= 0.9;
-              label.vy *= 0.9;
+              label.vx *= 0.5;
+              label.vy *= 0.5;
               label.x += label.vx;
               label.y += label.vy;
 
@@ -1509,7 +1509,7 @@ const PhysMemosApp: FC = () => {
                       type="text"
                       value={activeNode.title}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => saveNode({ ...activeNode, title: e.target.value })}
-                      className="text-2xl font-bold text-slate-800 bg-transparent border-none focus:outline-none focus:ring-0 placeholder-slate-300 min-w-[200px]"
+                      className="text-2xl font-bold text-slate-800 bg-transparent border-none focus:outline-none focus:ring-0 placeholder-slate-300 min-w-[200px] w-full"
                       placeholder="输入概念标题..."
                     />
                     <div className="relative">

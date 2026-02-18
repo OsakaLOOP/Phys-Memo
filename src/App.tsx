@@ -16,7 +16,7 @@ interface NodeData {
   disciplines: string[]; // 核心学科：流体力学、颗粒物理等
   topic: string; // 研究主题（可跨多学科）：颗粒流、湍流等
   title: string;
-  type: 'FORMULA' | 'LAW' | 'MODEL' | 'PAPER' | 'EVIDENCE' | 'TOPIC';
+  type:  'LAW' | 'FORMULA' | 'MODEL' | 'PAPER' | 'EVIDENCE' | 'TOPIC';
   latex: string;
   desc: string;
   references: string;
@@ -43,9 +43,9 @@ interface RelationTypeConfig {
 }
 
 interface DisciplineData {
-  name: string; // unique key (e.g. 'Fluid Dynamics')
+  name: string; // unique key (e.g. '流体力学')
   label: string; // e.g. '流体力学'
-  abbr: string; // e.g. '流' or '流体' (1-2 chars)
+  abbr: string; // e.g. '流体' (1-3 chars)
   color: string; // hex
   hue: number; // for graph
 }
@@ -72,8 +72,8 @@ interface GraphData {
 // --- Global Constants ---
 
 const NODE_TYPES: Record<string, NodeTypeConfig> = {
-  FORMULA: { label: '公式 (Formula)', color: 'bg-blue-50 text-blue-700 border-blue-200', nodeColor: '#3b82f6' },
-  LAW: { label: '定律 (Law)', color: 'bg-purple-50 text-purple-700 border-purple-200', nodeColor: '#a855f7' },
+  LAW: { label: '定律 (Law)', color: 'bg-blue-50 text-blue-700 border-blue-200', nodeColor: '#3b82f6' },
+  FORMULA: { label: '公式 (Formula)', color: 'bg-purple-50 text-purple-700 border-purple-200', nodeColor: '#a855f7' },
   MODEL: { label: '模型 (Model)', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', nodeColor: '#10b981' },
   PAPER: { label: '文献 (Paper)', color: 'bg-slate-100 text-slate-700 border-slate-200', nodeColor: '#64748b' },
   EVIDENCE: { label: '证据/反例 (Evidence)', color: 'bg-rose-50 text-rose-700 border-rose-200', nodeColor: '#f43f5e' },
@@ -99,22 +99,30 @@ const TOPIC_COLORS: Record<string, string> = {
 };
 
 const RELATION_TYPES: Record<string, RelationTypeConfig> = {
-  DERIVES_FROM: { label: '推导自', icon: '↳', color: 'text-slate-500' },
+  DERIVES_FROM: { label: '推导自', icon: '⇒', color: 'text-slate-500' },
   SPECIAL_CASE: { label: '特例属于', icon: '⊂', color: 'text-blue-500' },
-  EMPIRICAL_FIT: { label: '经验拟合于', icon: '≈', color: 'text-emerald-500' },
-  CONTRADICTS: { label: '矛盾/反驳', icon: '≠', color: 'text-red-500' },
+  EMPIRICAL_FIT: { label: '经验拟合于', icon: '~', color: 'text-emerald-500' },
+  CONTRADICTS: { label: '矛盾/反驳', icon: '⚠', color: 'text-red-500' },
   MODIFIES: { label: '修正了', icon: 'Δ', color: 'text-orange-500' },
   EXPLAINS: { label: '解释机制', icon: '?', color: 'text-purple-500' },
 };
 
 // 学科配置（Disciplines）
-const INITIAL_DISCIPLINES: Record<string, { label: string; color: string; hue: number }> = {
-  'Fluid Dynamics': { label: '流体力学', color: '#3b82f6', hue: 220 },
-  'Granular Physics': { label: '颗粒物理', color: '#a855f7', hue: 280 },
-  'Quantum Mechanics': { label: '量子力学', color: '#06b6d4', hue: 190 },
-  'Statistical Mechanics': { label: '统计力学', color: '#f59e0b', hue: 40 },
-  'Electrodynamics': { label: '电动力学', color: '#ef4444', hue: 0 },
-  'Condensed Matter': { label: '凝聚态物理', color: '#10b981', hue: 160 }
+const INITIAL_DISCIPLINES: Record<string, { label: string;abbr?:string; color: string; hue: number }> = {
+  '理论力学': { label:'理论力学', abbr: '理力', color: '#ffc3f9', hue: 160 },
+  '流体力学': { label:'流体力学', abbr: '流体', color: '#3b82f6', hue: 220 },
+  '颗粒物理': { label:'颗粒物理', abbr: '颗粒', color: '#ce9aff', hue: 280 },
+  '工程力学': { label:'工程力学', abbr: '工程', color: '#8c8c8c', hue: 30 },
+  '几何光学': { label:'几何光学', abbr: '几光', color: '#ffd030', hue: 50 },
+  '波动光学': { label:'波动光学', abbr: '波光', color: '#ffd030', hue: 60 },
+  '量子力学': { label:'量子力学', abbr: '量子', color: '#0fc8e8', hue: 190 },
+  '统计力学': { label:'统计力学', abbr: '统计', color: '#f59e0b', hue: 40 },
+  '热力学': { label:'热力学', abbr: '热力学', color: '#ff762c', hue: 0 },
+  '电动力学': { label:'电动力学', abbr: '电动', color: '#39c5bb', hue: 0 },
+  '相对论物理': { label:'相对论物理', abbr: '相对论', color: '#00ffea', hue: 330 },
+  '凝聚态物理': { label:'凝聚态物理', abbr: '凝聚', color: '#10b981', hue: 160 },
+  '实验物理': { label:'实验物理', abbr: '实验', color: '#f43f5e', hue: 350 },
+  '计算物理': { label:'计算物理', abbr: '计算', color: '#8b5cf6', hue: 270 },
 };
 
 // --- IndexedDB Helper Class ---
@@ -590,7 +598,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
     node.append("text")
       .text((d: D3Node) => d.topic) // Show full topic name
       .attr("x", 0)
-      .attr("y", 45) // Push further down
+      .attr("y", (d:D3Node) => (NODE_SHAPE_MAP[d.type]==="star" || NODE_SHAPE_MAP[d.type]==="polygon")? -20:-15) // Top
       .attr("text-anchor", "middle")
       .attr("font-size", 10) // Increased size
       .attr("font-weight", "500")
@@ -1110,7 +1118,7 @@ const PhysMemosApp: FC = () => {
         const seedData: DisciplineData[] = Object.entries(INITIAL_DISCIPLINES).map(([key, val]) => ({
           name: key,
           label: val.label,
-          abbr: val.label.substring(0, 1),
+          abbr: val.abbr,
           color: val.color,
           hue: val.hue
         }));
@@ -1127,7 +1135,7 @@ const PhysMemosApp: FC = () => {
         const initialData: NodeData[] = [
           {
             id: 'fd1',
-            disciplines: ['Fluid Dynamics'],
+            disciplines: ['流体力学'],
             topic: '流体流动',
             title: '伯努利原理 (Bernoulli Principle)',
             type: 'LAW',
@@ -1139,7 +1147,7 @@ const PhysMemosApp: FC = () => {
           },
           {
             id: 'fd2',
-            disciplines: ['Fluid Dynamics'],
+            disciplines: ['流体力学'],
             topic: '流体流动',
             title: '托里拆利定律 (Torricelli Law)',
             type: 'FORMULA',
@@ -1151,7 +1159,7 @@ const PhysMemosApp: FC = () => {
           },
           {
             id: 'gp1',
-            disciplines: ['Granular Physics'],
+            disciplines: ['颗粒物理'],
             topic: '颗粒流堵塞',
             title: '堵塞拱模型 (Clogging Arch)',
             type: 'MODEL',
@@ -1163,7 +1171,7 @@ const PhysMemosApp: FC = () => {
           },
           {
             id: 'gp2',
-            disciplines: ['Granular Physics'],
+            disciplines: ['颗粒物理'],
             topic: '颗粒流',
             title: 'Beverloo 流量公式',
             type: 'LAW',
@@ -1178,7 +1186,7 @@ const PhysMemosApp: FC = () => {
           },
           {
             id: 'gp3',
-            disciplines: ['Granular Physics', 'Statistical Mechanics'],
+            disciplines: ['颗粒物理', '统计力学'],
             topic: '颗粒流',
             title: 'Alonso et al. (2021)',
             type: 'EVIDENCE',

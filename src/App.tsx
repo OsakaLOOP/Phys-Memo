@@ -244,12 +244,16 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
       .attr("fill", "#94a3b8")
       .attr("d", "M0,-5L10,0L0,5");
 
+    // Dynamic Size Helpers
+    const getNodeArea = (title: string) => 400 + (title || '').length * 50;
+    const getNodeRadius = (title: string) => Math.sqrt(getNodeArea(title) / Math.PI);
+
     // Force simulation
     const simulation = d3.forceSimulation(graphData.nodes)
       .force("link", d3.forceLink(graphData.links).id((d: D3Node) => d.id).distance(150))
       .force("charge", d3.forceManyBody().strength(-400))
       .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collide", d3.forceCollide().radius(40));
+      .force("collide", d3.forceCollide().radius((d: D3Node) => getNodeRadius(d.title) + 20));
 
     // 绘制动态背景学科区域（贝塞尔曲线多边形 Venn图）
     const disciplines = new Set<string>();
@@ -389,10 +393,14 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
     const disciplinePaths: Record<string, any> = {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const disciplineLabels: Record<string, any> = {};
+    const labelPhysics: Record<string, { x: number; y: number; vx: number; vy: number }> = {};
 
     Array.from(disciplines).forEach(discipline => {
       const color = DISCIPLINES[discipline]?.color || '#cbd5e1';
       
+      // Initialize physics state
+      labelPhysics[discipline] = { x: width / 2, y: height / 2, vx: 0, vy: 0 };
+
       // 创建路径
       disciplinePaths[discipline] = bgLayer.append("path")
         .attr("id", `path-${discipline}`)
@@ -462,7 +470,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
     // 节点形状 - topic 填充色，type 边框色
     const typeColor = (d: D3Node) => NODE_TYPES[d.type]?.nodeColor || '#91a3b0';
     node.append("path")
-      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 400)())
+      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), getNodeArea(d.title))())
       .attr("fill", (d: D3Node) => TOPIC_COLORS[d.topic] || '#cbd5e1')
       .attr("stroke", typeColor)
       .attr("stroke-width", 1.5)
@@ -482,7 +490,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .each(function(this: any, d: D3Node) {
         const el = d3.select(this);
-        const maxChars = 8; // previous max per line
+        const maxChars = Math.max(8, Math.floor(getNodeRadius(d.title) * 0.8));
         const words = (d.title || '').split(/\s+/).filter(Boolean);
         const lines: string[] = [];
         let current = '';
@@ -605,14 +613,43 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, onNodeClick }) => {
         if (pathData) {
           disciplinePaths[discipline].attr("d", pathData);
 
-          // 计算标签位置（中心）
+          // 计算标签位置（物理模拟）
           const validNodes = disciplineNodes.filter(n => n.x !== undefined && n.y !== undefined);
           if (validNodes.length > 0) {
             const centerX = validNodes.reduce((sum, n) => sum + n.x!, 0) / validNodes.length;
             const centerY = validNodes.reduce((sum, n) => sum + n.y!, 0) / validNodes.length;
-            disciplineLabels[discipline]
-              .attr("x", centerX)
-              .attr("y", centerY + 5);
+
+            const label = labelPhysics[discipline];
+            if (label) {
+              // 1. Attraction to Centroid
+              const kAttract = 0.05;
+              label.vx += (centerX - label.x) * kAttract;
+              label.vy += (centerY - label.y) * kAttract;
+
+              // 2. Repulsion from Nodes (Collision Avoidance)
+              validNodes.forEach(node => {
+                const dx = label.x - node.x!;
+                const dy = label.y - node.y!;
+                const dist = Math.hypot(dx, dy);
+                const minDist = getNodeRadius(node.title) + 30; // Node radius + Label buffer
+
+                if (dist < minDist && dist > 0) {
+                  const force = (minDist - dist) / dist * 0.2;
+                  label.vx += dx * force;
+                  label.vy += dy * force;
+                }
+              });
+
+              // 3. Update & Damping
+              label.vx *= 0.9;
+              label.vy *= 0.9;
+              label.x += label.vx;
+              label.y += label.vy;
+
+              disciplineLabels[discipline]
+                .attr("x", label.x)
+                .attr("y", label.y + 5);
+            }
           }
         }
       });

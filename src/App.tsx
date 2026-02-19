@@ -921,13 +921,9 @@ const EditableBlock: FC<EditableBlockProps> = ({
 
     switch (type) {
       case 'latex': {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const katex = (window as unknown as any).katex;
         return (
-          <div className="group relative min-h-[3rem] flex items-center justify-center bg-slate-50/50 rounded border border-slate-100 hover:border-indigo-300 transition-colors cursor-pointer py-6">
-            <div dangerouslySetInnerHTML={{
-              __html: katex ? katex.renderToString(value, { displayMode: true, throwOnError: false }) : value
-            }} className="text-xl text-slate-800" />
+          <div className="group relative min-h-[3rem] bg-slate-50/50 rounded border border-slate-100 hover:border-indigo-300 transition-colors cursor-pointer py-6 px-6 text-lg">
+            <RichTextRenderer content={value as string} className="text-slate-800 [&_.katex-display]:my-0" />
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <Edit3 className="w-4 h-4 text-indigo-400" />
             </div>
@@ -968,6 +964,7 @@ const EditableBlock: FC<EditableBlockProps> = ({
     switch (type) {
       case 'markdown':
       case 'references':
+      case 'latex':
         return (
           <div className="relative">
             <textarea

@@ -5,7 +5,7 @@ import React, {
 import { 
   ArrowRight, Maximize, Crop, 
   Database, GitCommit, X, Edit3, FileText, Hash, Layers, 
-  Network, Book, Download, Plus, Trash2, Search, Tag,
+  Network, Book, Download, Upload, Plus, Trash2, Search, Tag,
   ChevronRight, ChevronDown, Folder, FolderOpen
 } from 'lucide-react';
 
@@ -105,24 +105,6 @@ const RELATION_TYPES: Record<string, RelationTypeConfig> = {
   CONTRADICTS: { label: '矛盾/反驳', icon: '⚠', color: 'text-red-500' },
   MODIFIES: { label: '修正了', icon: 'Δ', color: 'text-orange-500' },
   EXPLAINS: { label: '解释机制', icon: '?', color: 'text-purple-500' },
-};
-
-// 学科配置（Disciplines）
-const INITIAL_DISCIPLINES: Record<string, { label: string;abbr?:string; color: string; hue: number }> = {
-  '理论力学': { label:'理论力学', abbr: '理力', color: '#ffc3f9', hue: 160 },
-  '流体力学': { label:'流体力学', abbr: '流体', color: '#3b82f6', hue: 220 },
-  '颗粒物理': { label:'颗粒物理', abbr: '颗粒', color: '#ce9aff', hue: 280 },
-  '工程力学': { label:'工程力学', abbr: '工程', color: '#8c8c8c', hue: 30 },
-  '几何光学': { label:'几何光学', abbr: '几光', color: '#ffd030', hue: 50 },
-  '波动光学': { label:'波动光学', abbr: '波光', color: '#ffd030', hue: 60 },
-  '量子力学': { label:'量子力学', abbr: '量子', color: '#0fc8e8', hue: 190 },
-  '统计力学': { label:'统计力学', abbr: '统计', color: '#f59e0b', hue: 40 },
-  '热力学': { label:'热力学', abbr: '热力学', color: '#ff762c', hue: 0 },
-  '电动力学': { label:'电动力学', abbr: '电动', color: '#39c5bb', hue: 0 },
-  '相对论物理': { label:'相对论物理', abbr: '相对论', color: '#00ffea', hue: 330 },
-  '凝聚态物理': { label:'凝聚态物理', abbr: '凝聚', color: '#10b981', hue: 160 },
-  '实验物理': { label:'实验物理', abbr: '实验', color: '#f43f5e', hue: 350 },
-  '计算物理': { label:'计算物理', abbr: '计算', color: '#8b5cf6', hue: 270 },
 };
 
 // --- IndexedDB Helper Class ---
@@ -1112,103 +1094,38 @@ const PhysMemosApp: FC = () => {
 
   const loadData = async () => {
     try {
-      // 1. Load Disciplines
+      // 1. Load Disciplines & Nodes from DB
       let loadedDisciplines = await dbHelper.getAllDisciplines();
-      if (loadedDisciplines.length === 0) {
-        const seedData: DisciplineData[] = Object.entries(INITIAL_DISCIPLINES).map(([key, val]) => ({
-          name: key,
-          label: val.label,
-          abbr: val.abbr,
-          color: val.color,
-          hue: val.hue
-        }));
-        for (const d of seedData) await dbHelper.putDiscipline(d);
-        loadedDisciplines = seedData;
+      let loadedNodes = await dbHelper.getAll();
+      let isFirstLoad = false;
+
+      // If DB is empty, fetch from JSON
+      if (loadedDisciplines.length === 0 && loadedNodes.length === 0) {
+        try {
+          const res = await fetch('/default_data.json');
+          if (res.ok) {
+            const defaultData = await res.json();
+            if (defaultData.disciplines) {
+              loadedDisciplines = defaultData.disciplines;
+              for (const d of loadedDisciplines) await dbHelper.putDiscipline(d);
+            }
+            if (defaultData.nodes) {
+              loadedNodes = defaultData.nodes;
+              isFirstLoad = true;
+            }
+          }
+        } catch (error) {
+          console.error("Failed to load default data:", error);
+        }
       }
+
       setDisciplines(loadedDisciplines);
 
-      // 2. Load Nodes
-      const data = await dbHelper.getAll();
-      let nodesToSet: NodeData[] = [];
-
-      if (data.length === 0) {
-        const initialData: NodeData[] = [
-          {
-            id: 'fd1',
-            disciplines: ['流体力学'],
-            topic: '流体流动',
-            title: '伯努利原理 (Bernoulli Principle)',
-            type: 'LAW',
-            latex: 'P + \\frac{1}{2}\\rho v^2 + \\rho gh = \\text{Constant}',
-            desc: '流体动力学中的能量守恒表述。即对于不可压缩、无粘流体，沿流线的总能量密度保持不变。\n\n> 局限性：不适用于粘性流体（需考虑粘滞耗散）或可压缩流体（需考虑内能变化）。',
-            references: "Landau, L. D., & Lifshitz, E. M. (2013). *Fluid Mechanics*. Elsevier.\nBatchelor, G. K. (2000). *An introduction to fluid dynamics*.",
-            constraints: ['无粘 (Inviscid)', '不可压缩 (Incompressible)', '定常流 (Steady)'],
-            relations: []
-          },
-          {
-            id: 'fd2',
-            disciplines: ['流体力学'],
-            topic: '流体流动',
-            title: '托里拆利定律 (Torricelli Law)',
-            type: 'FORMULA',
-            latex: 'v_{out} = \\sqrt{2gh}',
-            desc: '描述敞口容器底部小孔的出流速度。本质上是重力势能完全转化为动能的理想情况 [1]。',
-            references: "Torricelli, E. (1643). *De motu gravium naturaliter descendentium*.",
-            constraints: ['敞口容器 (Open Tank)', '液面准静态 (v_top ≈ 0)'],
-            relations: [{ targetId: 'fd1', type: 'SPECIAL_CASE', condition: '假设顶部与出口压强均为大气压 $P_{atm}$' }]
-          },
-          {
-            id: 'gp1',
-            disciplines: ['颗粒物理'],
-            topic: '颗粒流堵塞',
-            title: '堵塞拱模型 (Clogging Arch)',
-            type: 'MODEL',
-            latex: 'P_{clog} \\propto \\exp\\left(-\\frac{D}{d}\\right)',
-            desc: '颗粒流流出孔口前形成的亚稳态结构。多个颗粒相互挤压形成拱桥，承担上方压力，导致流动中断。只有破坏拱结构（如振动）才能恢复流动 [1]。',
-            references: "Zuriguel, I., et al. (2005). Jamming during the discharge of granular matter from a silo. *Physical Review E*.",
-            constraints: ['干颗粒 (Dry Grains)', '拥塞状态 (Jamming)'],
-            relations: []
-          },
-          {
-            id: 'gp2',
-            disciplines: ['颗粒物理'],
-            topic: '颗粒流',
-            title: 'Beverloo 流量公式',
-            type: 'LAW',
-            latex: 'W = C \\rho_{bulk} \\sqrt{g} (D - kd)^{2.5}',
-            desc: '著名的颗粒流流量经验公式。与流体 ($D^2$) 不同，颗粒流流量遵循 $D^{2.5}$ 缩放律。\n\n**物理机制**：\n提出 **"Empty Annulus" (空环)** 概念，即由于颗粒的离散性，孔口边缘 $k \\cdot d$ 宽度的区域没有有效流量贡献 [1]。',
-            references: "Beverloo, W. A., Leniger, H. A., & Van de Velde, J. (1961). The flow of granular solids through orifices. *Chemical Engineering Science*.",
-            constraints: ['粗颗粒 (Coarse Grains)', '重力驱动 (Gravity)'],
-            relations: [
-              { targetId: 'gp1', type: 'EMPIRICAL_FIT', condition: '基于空环假设对实验数据的拟合' },
-              { targetId: 'fd2', type: 'CONTRADICTS', condition: '流体遵循 $\\sqrt{H}$ 压力依赖，而颗粒流流量与筒仓高度 $H$ 无关（Janssen 效应）' }
-            ]
-          },
-          {
-            id: 'gp3',
-            disciplines: ['颗粒物理', '统计力学'],
-            topic: '颗粒流',
-            title: 'Alonso et al. (2021)',
-            type: 'EVIDENCE',
-            latex: '\\mu(P) = \\mu_0 + \\frac{\\mu_1 - \\mu_0}{1 + P_0/P}',
-            desc: '在离心机实验中发现 Beverloo 定律在高重力环境下失效。随着有效重力 $g_{eff}$ 增加，流量不再随 $\\sqrt{g}$ 无限增长，而是趋于饱和。\n\n> 原因：高压强下颗粒间摩擦系数 $\\mu$ 增加（压力相关摩擦），导致流变性改变 [1]。',
-            references: "Alonso-Marroquin, F., et al. (2021). Granular flow in high gravity. *Journal of Fluid Mechanics*.",
-            constraints: ['离心机实验 (Centrifuge)', '高重力 (High-G > 10g)'],
-            relations: [
-              { targetId: 'gp2', type: 'CONTRADICTS', condition: '当 $g_{eff}$ 极高时，流量不再符合 Beverloo 的 $\\sqrt{g}$ 预测' },
-              { targetId: 'gp2', type: 'MODIFIES', condition: '提出了压力相关的摩擦修正项' }
-            ]
-          }
-        ];
-        // Don't save yet, will process topics below
-        nodesToSet = initialData;
-      } else {
-        nodesToSet = data.map(n => ({
-          ...n,
-          disciplines: n.disciplines || [],
-          topic: n.topic || '未分类'
+      const nodesToSet = loadedNodes.map(n => ({
+        ...n,
+        disciplines: n.disciplines || [],
+        topic: n.topic || '未分类'
         }));
-      }
 
       // --- Topic Migration Logic ---
       const allTopics = Array.from(new Set(nodesToSet.map(n => n.topic).filter(Boolean)));
@@ -1237,15 +1154,9 @@ const PhysMemosApp: FC = () => {
 
       const finalNodes = [...nodesToSet, ...newTopicNodes];
 
-      // Save all (new + old if not saved)
-      // If initialized from empty, we need to save everything.
-      // If migrated, we only need to save new topic nodes.
-      // But dbHelper.put is idempotent (upsert).
-      if (data.length === 0 || newTopicNodes.length > 0) {
-        // Optimization: only save new/changed if performance matters, but for small dataset just save needed.
-        // If data.length === 0, save all.
-        // If data.length > 0, save only newTopicNodes.
-        if (data.length === 0) {
+      // Save all if initialized from empty or if new topics created
+      if (isFirstLoad || newTopicNodes.length > 0) {
+        if (isFirstLoad) {
           for (const node of finalNodes) await dbHelper.put(node);
         } else {
           for (const node of newTopicNodes) await dbHelper.put(node);
@@ -1348,13 +1259,62 @@ const PhysMemosApp: FC = () => {
   };
 
   const handleExport = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(nodes, null, 2));
+    const exportData = {
+      disciplines,
+      nodes: nodes.filter(n => n.type !== 'TOPIC')
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
     const a = document.createElement('a');
     a.href = dataStr;
     a.download = "phys_memos_dataset.json";
     document.body.appendChild(a);
     a.click();
     a.remove();
+  };
+
+  const handleImport = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm("导入将覆盖现有所有数据，确定继续吗？")) {
+      e.target.value = ''; // Reset input
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!data.nodes || !Array.isArray(data.nodes)) {
+        alert("Invalid data format: 'nodes' array missing.");
+        return;
+      }
+
+      // Clear DB
+      const allNodes = await dbHelper.getAll();
+      for (const n of allNodes) await dbHelper.delete(n.id);
+
+      const allDisciplines = await dbHelper.getAllDisciplines();
+      for (const d of allDisciplines) await dbHelper.deleteDiscipline(d.name);
+
+      // Import Disciplines
+      if (data.disciplines && Array.isArray(data.disciplines)) {
+         for (const d of data.disciplines) await dbHelper.putDiscipline(d);
+      }
+
+      // Import Nodes
+      for (const n of data.nodes) {
+         await dbHelper.put(n);
+      }
+
+      // Reload to refresh state
+      window.location.reload();
+    } catch (err) {
+      console.error("Import failed:", err);
+      alert("Import failed: " + err);
+    } finally {
+      e.target.value = ''; // Reset input
+    }
   };
 
   const addRelation = () => {
@@ -1553,6 +1513,13 @@ const PhysMemosApp: FC = () => {
             >
               <Plus className="w-4 h-4" /> 新建
             </button>
+            <label
+              className="px-3 flex items-center justify-center cursor-pointer text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition"
+              title="导入数据集"
+            >
+              <Upload className="w-4 h-4" />
+              <input type="file" className="hidden" accept=".json" onChange={handleImport} />
+            </label>
             <button
               onClick={handleExport}
               className="px-3 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition"

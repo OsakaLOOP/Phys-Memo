@@ -114,13 +114,8 @@ const getCoreType = (node: any): string | null => {
   }
 
   if (node.type === "font") {
-    // E.g. \mathbf{x} -> Type is x? Or \mathbf{x}?
-    // User requirement: "提取所有单独!!出现的字母... 包括\mathxx样式"
-    // "对每个单独字母类型... 提取出最终的不可分割字母整体... 对象包含这些样式"
-    // Interpretation: Type is "x", Instance is "\mathbf{x}".
-    // OR: Type is "\mathbf{x}"?
-    // "字母整体依赖于类型扫描" -> usually means x is the type.
-    // Let's assume Type is the inner content for now.
+    
+    // Type is the inner content, without style or script, unless it's \mathrm{d}, special case.
     return getCoreType(node.body);
   }
 
@@ -195,11 +190,7 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
 
         // If not consumed (standalone differential), treat as variable
         if (!consumed) {
-           // const core = node.text || (node.type === "font" ? "d" : "?"); // \Delta -> \Delta, \mathrm{d} -> d
-           // Wait, user said "exclude \mathrm{d}, \delta, \Delta" from "letters" list.
-           // "1) 提取所有单独!!出现的字母... \mathrm{d}, \delta 和 \Delta 除外."
-           // "合并... 剩下还可能有单独的大小delta, 也作为单独的符号, 这时加入作为新的type."
-           // So if standalone, we DO add it.
+           // if standalone, we DO add it.
            const latex = nodeToLatex(node);
            // Special case for core name of standalone differential
            const typeName = latex; // Use the latex itself as type name for these specials

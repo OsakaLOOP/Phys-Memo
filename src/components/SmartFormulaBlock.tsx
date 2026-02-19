@@ -1,23 +1,22 @@
-import React, { useState, useRef, useEffect, type FC } from 'react';
+import React, { useState, useRef, useMemo, type FC } from 'react';
 import EditableBlock, { type EditableBlockProps } from './EditableBlock';
-import { parseFormula, type ParsedCategory } from '../utils/latexParser';
+import { parseFormula } from '../utils/latexParser';
 import RichTextRenderer from './RichTextRenderer';
 import { Info } from 'lucide-react';
 
 const SmartFormulaBlock: FC<EditableBlockProps> = (props) => {
   const [showAnalysis, setShowAnalysis] = useState(false);
-  const [parsedData, setParsedData] = useState<ParsedCategory[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Parse when value changes
-  useEffect(() => {
+  // Parse when value changes using useMemo to avoid effect/state loop
+  const parsedData = useMemo(() => {
     if (typeof props.value === 'string' && props.type === 'latex') {
-      const data = parseFormula(props.value);
-      setParsedData(data);
+      return parseFormula(props.value);
     }
+    return [];
   }, [props.value, props.type]);
 
   const handleMouseEnter = () => {

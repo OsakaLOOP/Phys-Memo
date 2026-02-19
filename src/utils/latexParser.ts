@@ -46,10 +46,6 @@ const nodeToLatex = (node: any): string => {
   }
 
   if (node.type === "genfrac") {
-    // Fractions etc: \frac{numer}{denom}
-    // Note: Genfrac usually not "letters" but could contain them.
-    // For now we might not be extracting "fractions" as variables,
-    // but if a variable IS a fraction (rare), this handles it.
     return `\\frac{${nodeToLatex(node.numer)}}{${nodeToLatex(node.denom)}}`;
   }
 
@@ -57,18 +53,17 @@ const nodeToLatex = (node: any): string => {
       return `{${node.body.map(nodeToLatex).join("")}}`;
   }
 
-  // Fallback for known "differential" like structures if they appear as simple text
   if (node.text) return node.text;
 
   return "";
 };
 
-// Check if a node is \mathrm{d}, \delta, or \Delta
+// Check if a node is \mathrm{d}, \delta, or \Delta (or similar differentials)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isDifferential = (node: any): boolean => {
   if (!node) return false;
 
-  // \delta, \Delta
+  // \delta, \Delta, \partial, \nabla
   if (node.type === "mathord" || node.type === "textord") {
     return ["\\delta", "\\Delta", "\\partial", "\\nabla"].includes(node.text);
   }
@@ -94,11 +89,11 @@ const getCoreType = (node: any): string | null => {
     if (/^[\d.,]+$/.test(text)) return null;
     // Exclude common symbols that aren't variables
     if (["+", "-", "=", "(", ")", "[", "]", "\\rightarrow", "\\Rightarrow", "\\approx", "\\sim"].includes(text)) return null;
-    // Exclude differentials (handled at higher level, but if we reach here they are Types)
+
+    // Check allow-list or pattern
     if (["\\partial", "\\nabla"].includes(text)) return text;
 
     // Standard Latin/Greek letters
-    // Check if it looks like a letter or known LaTeX command for letter
     if (/^[a-zA-Z]$/.test(text)) return text;
     if (text.startsWith("\\")) return text; // Greek etc.
 
@@ -114,13 +109,6 @@ const getCoreType = (node: any): string | null => {
   }
 
   if (node.type === "font") {
-    // E.g. \mathbf{x} -> Type is x? Or \mathbf{x}?
-    // User requirement: "提取所有单独!!出现的字母... 包括\mathxx样式"
-    // "对每个单独字母类型... 提取出最终的不可分割字母整体... 对象包含这些样式"
-    // Interpretation: Type is "x", Instance is "\mathbf{x}".
-    // OR: Type is "\mathbf{x}"?
-    // "字母整体依赖于类型扫描" -> usually means x is the type.
-    // Let's assume Type is the inner content for now.
     return getCoreType(node.body);
   }
 
@@ -149,9 +137,6 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
 
   const map = new Map<string, VariableInstance[]>();
 
-  // Flatten AST if top level is just an array.
-  // Note: KaTeX __parse returns an array of nodes.
-
   // Recursive traversal to find variables
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const traverse = (input: any[] | any) => {
@@ -170,11 +155,10 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
           const nextNode = nodes[i + 1];
           const core = getCoreType(nextNode);
           if (core) {
-            // It's a prefix! Combine them.
+            // It's a prefix! Combine them with a space for valid LaTeX
             const prefix = nodeToLatex(node);
             const variable = nodeToLatex(nextNode);
-            const fullLatex = prefix + variable; // Simplistic join.
-            // In typical latex \mathrm{d}x, spaces might matter but usually parsed ok.
+            const fullLatex = prefix + " " + variable;
 
             if (!map.has(core)) map.set(core, []);
             map.get(core)?.push({
@@ -188,27 +172,24 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
           }
         }
 
-        // If not consumed (standalone differential), treat as variable
+        // If not consumed (standalone differential)
         if (!consumed) {
-           // const core = node.text || (node.type === "font" ? "d" : "?"); // \Delta -> \Delta, \mathrm{d} -> d
-           // Wait, user said "exclude \mathrm{d}, \delta, \Delta" from "letters" list.
-           // "1) 提取所有单独!!出现的字母... \mathrm{d}, \delta 和 \Delta 除外."
-           // "合并... 剩下还可能有单独的大小delta, 也作为单独的符号, 这时加入作为新的type."
-           // So if standalone, we DO add it.
-           const latex = nodeToLatex(node);
-           // Special case for core name of standalone differential
-           const typeName = latex; // Use the latex itself as type name for these specials
-
-           if (!map.has(typeName)) map.set(typeName, []);
-           map.get(typeName)?.push({ uuid: crypto.randomUUID(), type: typeName, latex });
-           consumed = true;
+           const core = getCoreType(node);
+           // Strict exclusion: do NOT add \delta, \Delta, d as types if standalone
+           if (core && !["\\delta", "\\Delta", "d"].includes(core)) {
+              // Only add if it's a valid variable type (e.g. \nabla, \partial if treated as var)
+              const latex = nodeToLatex(node);
+              if (!map.has(core)) map.set(core, []);
+              map.get(core)?.push({ uuid: crypto.randomUUID(), type: core, latex });
+              consumed = true;
+           }
         }
       }
       // 2. Check for Standard Variable
       else {
         const core = getCoreType(node);
         if (core) {
-          // Check if it's an excluded differential symbol (in case it slipped through as mathord)
+          // Check exclusion (redundant if getCoreType filters well, but safe)
           if (!["\\delta", "\\Delta", "d"].includes(core)) {
              const latex = nodeToLatex(node);
              if (!map.has(core)) map.set(core, []);
@@ -219,18 +200,7 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
       }
 
       // 3. Recurse into children if NOT consumed
-      // If we consumed it as a variable, we treat it as atomic. We don't look inside for more variables.
-      // e.g. x_i, we want "x_i" as instance of "x". We do NOT want "i" as instance of "i" separately?
-      // "提取出最终的不可分割字母整体... 对象包含这些样式以及所属的类型"
-      // Usually in Physics context, x_i is the symbol. i is just an index.
-      // User said: "subscripts... included in instance".
-      // So yes, we do NOT recurse into consumed variables.
-
       if (!consumed) {
-        // Recurse to find variables inside non-variable structures (like fractions, sqrt, etc)
-        // Note: supsub/accent/font ARE variable structures so they would be consumed if valid.
-        // So we only recurse if getCoreType returned null (e.g. operators, relations, or complex groupings)
-
         if (node.type === "ordgroup") traverse(node.body);
         if (node.type === "genfrac") {
            traverse(node.numer);
@@ -239,14 +209,13 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
         if (node.type === "sqrt") {
            traverse(node.body);
         }
-        // Add other containers if needed
       }
     }
   };
 
   traverse(ast);
 
-  // Convert map to array
+  // Convert map to array and sort
   const result: ParsedCategory[] = [];
   map.forEach((instances, type) => {
     result.push({ type, instances });

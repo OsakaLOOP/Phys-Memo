@@ -44,7 +44,6 @@ interface RelationTypeConfig {
 
 interface DisciplineData {
   name: string; // unique key (e.g. '流体力学')
-  label: string; // e.g. '流体力学'
   abbr: string; // e.g. '流体' (1-3 chars)
   color: string; // hex
   hue: number; // for graph
@@ -453,7 +452,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
         .attr("font-weight", "bold")
         .attr("text-anchor", "middle")
         .attr("pointer-events", "none")
-        .text(disciplinesMap[discipline]?.label || discipline);
+        .text(disciplinesMap[discipline]?.name || discipline);
     });
 
 
@@ -1050,7 +1049,6 @@ const PhysMemosApp: FC = () => {
 
     const newDisc: DisciplineData = {
       name: name,
-      label: name,
       abbr: abbr.substring(0, 2),
       color: randomColor,
       hue: hue
@@ -1344,7 +1342,7 @@ const PhysMemosApp: FC = () => {
       n.title.toLowerCase().includes(q) ||
       n.type.toLowerCase().includes(q) ||
       (n.topic || '').toLowerCase().includes(q) ||
-      (n.disciplines || []).some(d => disciplinesMap[d]?.label.toLowerCase().includes(q)) ||
+      (n.disciplines || []).some(d => disciplinesMap[d]?.name.toLowerCase().includes(q)) ||
       (n.constraints && n.constraints.some(c => c.toLowerCase().includes(q)))
     );
   });
@@ -1414,7 +1412,7 @@ const PhysMemosApp: FC = () => {
 
             // If strictly searching (query not empty), always expand. Else check state.
             const isExpanded = searchQuery ? true : !collapsedTopics.has(topic);
-            const isTopicActive = topicNode && activeNodeId === topicNode.id;
+            const isTopicActive = (topicNode && activeNodeId === topicNode.id) || (activeNode?.topic === topic);
 
             return (
               <div key={topic} className="border-b border-slate-50">
@@ -1469,7 +1467,6 @@ const PhysMemosApp: FC = () => {
                             <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-indigo-400' : 'bg-slate-300'}`}></div>
                             <span className="truncate text-xs">{node.title}</span>
                           </div>
-                          {node.type === 'FORMULA' && <span className="text-[10px] font-serif italic text-slate-400 opacity-0 group-hover/item:opacity-100">f(x)</span>}
                         </div>
                       );
                     })}
@@ -1582,9 +1579,9 @@ const PhysMemosApp: FC = () => {
                                     backgroundColor: isSelected ? `${disc.color}12` : '#f3f4f6',
                                     color: isSelected ? disc.color : '#94a3b8'
                                   }}
-                                  title={disc.label}
+                                  title={disc.name}
                                 >
-                                  {disc.abbr || disc.label.substring(0, 1)}
+                                  {disc.abbr || disc.name.substring(0, 1)}
                                 </button>
                                 <button
                                    onClick={(e) => {
@@ -1752,7 +1749,7 @@ const PhysMemosApp: FC = () => {
                                               className="px-3 py-1.5 rounded-full text-xs font-bold border cursor-default"
                                               style={{ backgroundColor: `${disc.color}20`, color: disc.color, borderColor: disc.color }}
                                           >
-                                              {disc.label}
+                                              {disc.name}
                                           </span>
                                       );
                                   })}
@@ -1946,7 +1943,7 @@ const PhysMemosApp: FC = () => {
                         连接
                       </button>
                     </div>
-                    <div className="space-y-4">
+                    <div className="">
                       {(activeNode.relations || []).length === 0 ? (
                         <div className="text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">
                           <p className="text-slate-400 text-sm">暂无逻辑关联</p>
@@ -1956,8 +1953,8 @@ const PhysMemosApp: FC = () => {
                           const target = nodes.find(n => n.id === rel.targetId);
                           const typeConfig = RELATION_TYPES[rel.type] || RELATION_TYPES.DERIVES_FROM;
                           return (
-                            <div key={idx} className="group relative pl-8 pb-1 border-l-2 border-slate-200 last:border-0 hover:border-indigo-200 transition-colors">
-                              <div className={`absolute -left-[9px] top-3 w-4 h-4 bg-white rounded-full border-2 border-slate-300 group-hover:border-indigo-400 transition-colors`}></div>
+                            <div key={idx} className="group relative pl-8 pb-4 border-l-2 border-slate-200 hover:border-indigo-200 transition-colors">
+                              <div className={`absolute -left-[7px] top-3 w-4 h-4 bg-white rounded-full border-2 border-slate-300 group-hover:border-indigo-400 transition-colors`}></div>
                               <div className="flex flex-col sm:flex-row sm:items-start gap-3 bg-white p-3 rounded-lg border border-slate-100 hover:shadow-md transition-all hover:border-indigo-100">
                                 <div className={`flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-md bg-slate-50 border border-slate-100 ${typeConfig.color} min-w-fit mt-0.5`}>
                                   <span>{typeConfig.icon}</span>

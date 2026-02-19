@@ -135,10 +135,15 @@ const getCoreType = (node: any): string | null => {
 export const parseFormula = (latex: string): ParsedCategory[] => {
   if (!latex) return [];
 
+  // Strip delimiters ($$, $, \[, \])
+  const cleanLatex = latex
+    .trim()
+    .replace(/^(\$\$|\$|\\\[)(.*?)(\$\$|\$|\\\])$/s, '$2');
+
   let ast;
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ast = (katex as any).__parse(latex, {
+    ast = (katex as any).__parse(cleanLatex, {
       throwOnError: false,
       strict: false
     });
@@ -239,7 +244,17 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
         if (node.type === "sqrt") {
            traverse(node.body);
         }
-        // Add other containers if needed
+        if (node.type === "leftright") {
+           traverse(node.body);
+        }
+        if (node.type === "supsub") {
+           traverse(node.base);
+           traverse(node.sub);
+           traverse(node.sup);
+        }
+        if (node.type === "accent") {
+           traverse(node.base);
+        }
       }
     }
   };

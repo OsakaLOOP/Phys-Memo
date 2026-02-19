@@ -1,4 +1,4 @@
-import React, { 
+import {
   useState, useEffect, useRef, useMemo,
   type FC, type ChangeEvent, type MouseEvent
 } from 'react';
@@ -8,6 +8,9 @@ import {
   Network, Book, Download, Upload, Plus, Trash2, Search, Tag,
   ChevronRight, ChevronDown, Folder, FolderOpen
 } from 'lucide-react';
+import * as d3 from 'd3';
+import 'katex/dist/katex.min.css';
+
 import RichTextRenderer from './components/RichTextRenderer';
 import EditableBlock from './components/EditableBlock';
 import SmartFormulaBlock from './components/SmartFormulaBlock';
@@ -254,9 +257,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
   }, [nodes]);
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const d3 = (window as unknown as any).d3;
-    if (!d3 || !svgRef.current) return;
+    if (!svgRef.current) return;
 
     // Clear old chart
     d3.select(svgRef.current).selectAll("*").remove();
@@ -283,8 +284,8 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
       .attr("d", "M0,-5L10,0L0,5");
 
     // Force simulation
-    const simulation = d3.forceSimulation(graphData.nodes)
-      .force("link", d3.forceLink(graphData.links).id((d: D3Node) => d.id).distance(150))
+    const simulation = d3.forceSimulation<D3Node>(graphData.nodes)
+      .force("link", d3.forceLink<D3Node, D3Link>(graphData.links).id((d) => d.id).distance(150))
       .force("charge", d3.forceManyBody().strength(-400))
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force("collide", d3.forceCollide().radius(40));
@@ -484,10 +485,10 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
       .selectAll("g")
       .data(graphData.nodes)
       .join("g")
-      .call(d3.drag()
+      .call(d3.drag<SVGGElement, D3Node>()
         .on("start", dragstarted)
         .on("drag", dragged)
-        .on("end", dragended));
+        .on("end", dragended) as any);
 
     // 为不同形状的节点创建符号生成器
     const symbolType = (d: D3Node) => {
@@ -507,7 +508,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
     // Bottom Layer: Outline (Type Color) - Thicker
     node.append("path")
       .attr("class", "node-outline")
-      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 310)())
+      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 310)() || "")
       .attr("fill", "none")
       .attr("stroke", typeColor)
       .attr("stroke-width", 2.5)
@@ -516,7 +517,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
     // Top Layer: Fill (Topic Color) + White Inner Stroke
     node.append("path")
       .attr("class", "node-fill")
-      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 300)())
+      .attr("d", (d: D3Node) => d3.symbol(symbolType(d), 300)() || "")
       .attr("fill", (d: D3Node) => TOPIC_COLORS[d.topic] || '#cbd5e1')
       .attr("stroke", "#ffffff")
       .attr("stroke-width", 1)
@@ -529,7 +530,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
     Object.keys(NODE_TYPES).forEach(type => {
       // Mock a node object to reuse symbolType function
       const d = { type } as D3Node;
-      newLegendPaths[type] = d3.symbol(symbolType(d), 200)();
+      newLegendPaths[type] = d3.symbol(symbolType(d), 200)() || "";
     });
     setLegendPaths(newLegendPaths);
 
@@ -604,23 +605,23 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
         if (targetId === d.id) linkedNodeIds.add(sourceId);
       });
 
-      node.style("opacity", (n: D3Node) => linkedNodeIds.has(n.id) ? 1 : 0.1);
-      link.style("stroke", (l: D3Link) => {
+      node.style("opacity", (n: any) => linkedNodeIds.has(n.id) ? 1 : 0.1);
+      link.style("stroke", (l: any) => {
         const srcId = typeof l.source === 'string' ? l.source : (l.source as D3Node).id;
         const tgtId = typeof l.target === 'string' ? l.target : (l.target as D3Node).id;
         return (srcId === d.id || tgtId === d.id) ? "#4f46e5" : "#cbd5e1";
       })
-        .style("stroke-width", (l: D3Link) => {
+        .style("stroke-width", (l: any) => {
           const srcId = typeof l.source === 'string' ? l.source : (l.source as D3Node).id;
           const tgtId = typeof l.target === 'string' ? l.target : (l.target as D3Node).id;
           return (srcId === d.id || tgtId === d.id) ? 2.5 : 1.5;
         })
-        .style("opacity", (l: D3Link) => {
+        .style("opacity", (l: any) => {
           const srcId = typeof l.source === 'string' ? l.source : (l.source as D3Node).id;
           const tgtId = typeof l.target === 'string' ? l.target : (l.target as D3Node).id;
           return (srcId === d.id || tgtId === d.id) ? 1 : 0.1;
         });
-      linkLabel.style("opacity", (l: D3Link) => {
+      linkLabel.style("opacity", (l: any) => {
         const srcId = typeof l.source === 'string' ? l.source : (l.source as D3Node).id;
         const tgtId = typeof l.target === 'string' ? l.target : (l.target as D3Node).id;
         return (srcId === d.id || tgtId === d.id) ? 1 : 0;
@@ -642,21 +643,21 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
         
         // Restore outline path
         d3.select(event.currentTarget).select(".node-outline")
-          .attr("stroke", (d: D3Node) => NODE_TYPES[d.type]?.nodeColor || '#91a3b0')
+          .attr("stroke", (d: any) => NODE_TYPES[d.type]?.nodeColor || '#91a3b0')
           .attr("stroke-width", 3);
       });
 
     // Update positions on tick
     simulation.on("tick", () => {
       link
-        .attr("x1", (d: D3Link) => (d.source as D3Node).x)
-        .attr("y1", (d: D3Link) => (d.source as D3Node).y)
-        .attr("x2", (d: D3Link) => (d.target as D3Node).x)
-        .attr("y2", (d: D3Link) => (d.target as D3Node).y);
+        .attr("x1", (d: D3Link) => (d.source as D3Node).x || 0)
+        .attr("y1", (d: D3Link) => (d.source as D3Node).y || 0)
+        .attr("x2", (d: D3Link) => (d.target as D3Node).x || 0)
+        .attr("y2", (d: D3Link) => (d.target as D3Node).y || 0);
 
       linkLabel
-        .attr("x", (d: D3Link) => ((d.source as D3Node).x! + (d.target as D3Node).x!) / 2)
-        .attr("y", (d: D3Link) => ((d.source as D3Node).y! + (d.target as D3Node).y!) / 2);
+        .attr("x", (d: D3Link) => ((d.source as D3Node).x! + (d.target as D3Node).x!) / 2 || 0)
+        .attr("y", (d: D3Link) => ((d.source as D3Node).y! + (d.target as D3Node).y!) / 2 || 0);
 
       node
         .attr("transform", (d: D3Node) => `translate(${d.x},${d.y})`);
@@ -948,23 +949,6 @@ const PhysMemosApp: FC = () => {
   };
 
   useEffect(() => {
-    const link = document.createElement('link');
-    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
-    link.rel = "stylesheet";
-    document.head.appendChild(link);
-
-    const scriptKatex = document.createElement('script');
-    scriptKatex.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js";
-    document.head.appendChild(scriptKatex);
-
-    const scriptMarked = document.createElement('script');
-    scriptMarked.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
-    document.head.appendChild(scriptMarked);
-
-    const scriptD3 = document.createElement('script');
-    scriptD3.src = "https://d3js.org/d3.v7.min.js";
-    document.head.appendChild(scriptD3);
-
     void loadData();
   }, []);
 

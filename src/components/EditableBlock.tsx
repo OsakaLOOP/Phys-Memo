@@ -13,6 +13,7 @@ export interface EditableBlockProps {
   variant?: 'default' | 'simple' | 'core' | 'subtle';
   className?: string;
   onEditStateChange?: (isEditing: boolean) => void;
+  enableAnalysis?: boolean;
 }
 
 const EditableBlock: FC<EditableBlockProps> = ({
@@ -23,7 +24,8 @@ const EditableBlock: FC<EditableBlockProps> = ({
   placeholder = '点击编辑...',
   variant = 'default',
   className = '',
-  onEditStateChange
+  onEditStateChange,
+  enableAnalysis = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState<string | string[]>(value);
@@ -87,7 +89,7 @@ const EditableBlock: FC<EditableBlockProps> = ({
 
         return (
           <div className="group relative min-h-[3rem] bg-slate-50/50 rounded border border-slate-100 hover:border-indigo-300 transition-colors cursor-pointer py-6 px-6 text-lg">
-            <RichTextRenderer content={content} className="text-slate-800 [&_.katex-display]:my-0" />
+            <RichTextRenderer content={content} className="text-slate-800 [&_.katex-display]:my-0" enableAnalysis={enableAnalysis} />
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <Edit3 className="w-4 h-4 text-indigo-400" />
             </div>

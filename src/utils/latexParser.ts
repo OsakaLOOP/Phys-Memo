@@ -220,6 +220,18 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
           }
       }
 
+      // 0. Check for Exponential e^... (Special Case)
+      // Must have superscript, NO subscript, and base must be 'e'
+      if (node.type === "supsub" && !node.sub && node.sup) {
+          const baseTex = nodeToLatex(node.base);
+          if (baseTex === 'e') {
+              // It is e^... with no subscript.
+              // Treat as exponential function: ignore 'e', recurse into superscript.
+              traverse(node.sup);
+              consumed = true;
+          }
+      }
+
       // 1. Check for Differential Prefix
       if (!consumed && isDifferential(node)) {
         // Look ahead
@@ -257,7 +269,7 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
         }
       }
       // 2. Check for Standard Variable
-      else {
+      else if (!consumed) {
         const core = getCoreType(node);
         if (core) {
           // Check if it's an excluded differential symbol (in case it slipped through as mathord)
@@ -290,17 +302,6 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
         }
         if (node.type === "sqrt") {
            traverse(node.body);
-        }
-        if (node.type === "leftright") {
-           traverse(node.body);
-        }
-        if (node.type === "supsub") {
-           traverse(node.base);
-           traverse(node.sub);
-           traverse(node.sup);
-        }
-        if (node.type === "accent") {
-           traverse(node.base);
         }
       }
     }

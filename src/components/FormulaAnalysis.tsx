@@ -48,6 +48,8 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
         ref={buttonRef}
         className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors bg-white/80 backdrop-blur-sm rounded-bl-lg border-l border-b border-transparent hover:border-slate-200 shadow-sm"
         title="Formula Analysis"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <Info className="w-3.5 h-3.5" />
       </button>
@@ -58,6 +60,8 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
           ref={modalRef}
           className="absolute top-8 right-0 w-80 max-h-96 bg-white shadow-xl rounded-xl border border-indigo-100 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 origin-top-right"
           style={{ zIndex: 100 }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Formula Analysis</span>
@@ -85,13 +89,7 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
                     <td className="py-3 px-4">
                       <div className="flex flex-wrap gap-2">
                         {category.instances.map(inst => (
-                          <span
-                            key={inst.uuid}
-                            className="px-2 py-1 bg-white border border-slate-200 rounded shadow-sm text-slate-800 hover:border-indigo-300 transition-colors"
-                            dangerouslySetInnerHTML={{
-                              __html: katex.renderToString(inst.latex, { throwOnError: false })
-                            }}
-                          />
+                          <InstanceItem key={inst.uuid} latex={inst.latex} />
                         ))}
                       </div>
                     </td>
@@ -103,6 +101,33 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
         </div>
       )}
     </div>
+  );
+};
+
+interface InstanceItemProps {
+  latex: string;
+}
+
+const InstanceItem: FC<InstanceItemProps> = ({ latex }) => {
+  const [showSource, setShowSource] = useState(false);
+
+  return (
+    <span
+      className="px-2 py-1 bg-white border border-slate-200 rounded shadow-sm text-slate-800 hover:border-indigo-300 transition-colors cursor-pointer select-none hover:bg-slate-50"
+      onClick={(e) => {
+        e.stopPropagation();
+        setShowSource(!showSource);
+      }}
+      title={showSource ? "Click to render" : "Click to view source"}
+    >
+      {showSource ? (
+        <code className="text-[10px] font-mono text-indigo-600 bg-indigo-50 px-1 rounded">{latex}</code>
+      ) : (
+        <span dangerouslySetInnerHTML={{
+          __html: katex.renderToString(latex, { throwOnError: false })
+        }} />
+      )}
+    </span>
   );
 };
 

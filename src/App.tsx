@@ -1,13 +1,16 @@
 import React, { 
   useState, useEffect, useRef, useMemo,
-  type FC, type ChangeEvent, type MouseEvent, type KeyboardEvent, type Ref 
+  type FC, type ChangeEvent, type MouseEvent
 } from 'react';
 import { 
   ArrowRight, Maximize, Crop, 
-  Database, GitCommit, X, Edit3, FileText, Hash, Layers, 
+  Database, GitCommit, X, FileText, Hash, Layers,
   Network, Book, Download, Upload, Plus, Trash2, Search, Tag,
   ChevronRight, ChevronDown, Folder, FolderOpen
 } from 'lucide-react';
+import RichTextRenderer from './components/RichTextRenderer';
+import EditableBlock from './components/EditableBlock';
+import SmartFormulaBlock from './components/SmartFormulaBlock';
 
 // --- Type Definitions ---
 
@@ -772,231 +775,6 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
         </div>
       )}
 
-    </div>
-  );
-};
-
-// --- Rich Text Renderer Component ---
-
-interface RichTextRendererProps {
-  content: string;
-  className?: string;
-}
-
-const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "" }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const marked = (window as unknown as any).marked;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const katex = (window as unknown as any).katex;
-
-    if (!containerRef.current || !marked || !katex) {
-      if (containerRef.current) containerRef.current.innerText = content;
-      return;
-    }
-
-    const mathBlocks: Array<{ id: string; tex: string; display: boolean }> = [];
-    const protectedText = content.replace(/\$\$(.*?)\$\$|\$(.*?)\$/gs, (_match: string, blockMath: string, inlineMath: string) => {
-      const id = `%%%MATH_${mathBlocks.length}%%%`;
-      mathBlocks.push({ id, tex: blockMath || inlineMath, display: !!blockMath });
-      return id;
-    });
-
-    let html = marked.parse(protectedText);
-
-    mathBlocks.forEach(item => {
-      let renderedMath = "";
-      try {
-        renderedMath = katex.renderToString(item.tex, { throwOnError: false, displayMode: item.display });
-      } catch {
-        renderedMath = `<span class="text-red-500 error">LaTeX Error</span>`;
-      }
-      html = html.replace(item.id, renderedMath);
-    });
-
-    html = html.replace(/\[(\d+)\]/g, (_match: string, num: string) => {
-      return `<sup class="ref-sup"><a href="#ref-${num}" class="ref-link inline-block px-1 rounded text-indigo-600 bg-indigo-50 hover:bg-indigo-100 font-mono text-[10px] cursor-pointer select-none no-underline !border-none" style="border: none; text-decoration: none;" onclick="event.stopPropagation(); const el = document.getElementById('ref-${num}'); if(el){ el.scrollIntoView({behavior: 'smooth'}); el.classList.add('bg-yellow-100'); setTimeout(()=>el.classList.remove('bg-yellow-100'), 2000); } return false;">[${num}]</a></sup>`;
-    });
-
-    if (containerRef.current) {
-      containerRef.current.innerHTML = html;
-    }
-  }, [content]);
-
-  return <div ref={containerRef} className={`markdown-body ${className}`} />;
-};
-
-// --- Editable Block Component ---
-
-interface EditableBlockProps {
-  label?: string;
-  value: string | string[];
-  onChange: (value: string | string[]) => void;
-  type?: 'text' | 'tags' | 'markdown' | 'latex' | 'references';
-  placeholder?: string;
-  variant?: 'default' | 'simple' | 'core' | 'subtle';
-  className?: string;
-}
-
-const EditableBlock: FC<EditableBlockProps> = ({
-  label,
-  value,
-  onChange,
-  type = 'text',
-  placeholder = '点击编辑...',
-  variant = 'default',
-  className = ''
-}) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [tempValue, setTempValue] = useState<string | string[]>(value);
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    setTempValue(value);
-  }, [value]);
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isEditing]);
-
-  const handleSave = () => {
-    setIsEditing(false);
-    if (tempValue !== value) {
-      onChange(tempValue);
-    }
-  };
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (type === 'text' || type === 'tags') {
-      if (e.key === 'Enter') handleSave();
-    } else {
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave();
-    }
-  };
-
-  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isEditing) return;
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'A' || target.closest('a') || target.closest('.ref-link')) return;
-    const selection = window.getSelection();
-    if (selection && selection.toString().length > 0) return;
-    setIsEditing(true);
-  };
-
-  const containerStyles: Record<string, string> = {
-    core: "bg-white border-2 border-indigo-100 shadow-sm p-6 rounded-xl",
-    simple: "bg-white border border-slate-200 p-4 rounded-lg shadow-sm",
-    subtle: "bg-transparent border-b border-transparent hover:border-slate-200 p-2",
-  };
-
-  const labelStyles = "block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2";
-
-  const renderView = () => {
-    if (!value || (Array.isArray(value) && value.length === 0)) {
-      return <div className="text-slate-400 italic text-sm cursor-text hover:text-slate-500 transition-colors">{placeholder}</div>;
-    }
-
-    switch (type) {
-      case 'latex': {
-        return (
-          <div className="group relative min-h-[3rem] bg-slate-50/50 rounded border border-slate-100 hover:border-indigo-300 transition-colors cursor-pointer py-6 px-6 text-lg">
-            <RichTextRenderer content={value as string} className="text-slate-800 [&_.katex-display]:my-0" />
-            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Edit3 className="w-4 h-4 text-indigo-400" />
-            </div>
-          </div>
-        );
-      }
-      case 'tags':
-        return (
-          <div className="flex flex-wrap gap-2">
-            {Array.isArray(value) && value.map((tag, i) => (
-              <span key={i} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
-                <RichTextRenderer content={tag} className="inline-block [&>p]:inline [&>p]:m-0" />
-              </span>
-            ))}
-          </div>
-        );
-      case 'markdown':
-        return <RichTextRenderer content={value as string} className="prose prose-sm max-w-none text-slate-700" />;
-      case 'references': {
-        const refs = (value as string).split('\n').filter(r => r.trim());
-        if (refs.length === 0) return <div className="text-slate-400 italic text-sm">{placeholder}</div>;
-        return (
-          <ol className="list-decimal list-outside ml-4 space-y-2 text-sm text-slate-600">
-            {refs.map((ref, idx) => (
-              <li key={idx} id={`ref-${idx + 1}`} className="pl-2 transition-colors duration-500 rounded p-1">
-                <RichTextRenderer content={ref} className="inline-block" />
-              </li>
-            ))}
-          </ol>
-        );
-      }
-      default:
-        return <div className="text-base font-medium text-slate-800">{value}</div>;
-    }
-  };
-
-  const renderEdit = () => {
-    switch (type) {
-      case 'markdown':
-      case 'references':
-      case 'latex':
-        return (
-          <div className="relative">
-            <textarea
-              ref={inputRef as Ref<HTMLTextAreaElement>}
-              className="w-full min-h-[160px] p-3 text-sm bg-white border border-indigo-500 rounded shadow-inner focus:ring-2 focus:ring-indigo-200 outline-none resize-y font-mono leading-relaxed"
-              value={tempValue as string}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setTempValue(e.target.value)}
-              onBlur={handleSave}
-              onKeyDown={handleKeyDown}
-              placeholder={type === 'references' ? "每行输入一条参考文献..." : placeholder}
-            />
-            <div className="absolute bottom-2 right-2 text-[10px] text-slate-400 bg-white/80 px-1 rounded border border-slate-100">
-              {type === 'references' ? '每行一条 · 支持 Markdown' : '支持 Markdown & LaTeX ($...$)'}
-            </div>
-          </div>
-        );
-      case 'tags':
-        return (
-          <input
-            ref={inputRef as Ref<HTMLInputElement>}
-            type="text"
-            className="w-full p-2 text-sm bg-white border border-indigo-500 rounded shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none"
-            value={Array.isArray(tempValue) ? tempValue.join(', ') : tempValue}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setTempValue(e.target.value.split(/,\s*/).filter(Boolean))}
-            onBlur={handleSave}
-            onKeyDown={handleKeyDown}
-            placeholder="输入标签，用逗号分隔..."
-          />
-        );
-      default:
-        return (
-          <input
-            ref={inputRef as Ref<HTMLInputElement>}
-            type="text"
-            className="w-full p-2 text-sm bg-white border border-indigo-500 rounded shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none font-mono"
-            value={tempValue as string}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setTempValue(e.target.value)}
-            onBlur={handleSave}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-          />
-        );
-    }
-  };
-
-  return (
-    <div className={`${containerStyles[variant] || "bg-white p-4 border rounded"} ${className} transition-all duration-200`}>
-      {label && <label className={labelStyles}>{label}</label>}
-      <div onClick={handleContainerClick} className="cursor-pointer min-h-[20px]">
-        {isEditing ? renderEdit() : renderView()}
-      </div>
     </div>
   );
 };
@@ -1867,7 +1645,7 @@ const PhysMemosApp: FC = () => {
                 // --- STANDARD NODE EDITOR ---
               <div className="flex-1 overflow-y-auto bg-slate-50/30">
                 <div className="max-w-4xl mx-auto p-8 space-y-6">
-                  <EditableBlock
+                  <SmartFormulaBlock
                     label="核心定义 · 数学形式 / DEF"
                     value={activeNode.latex}
                     onChange={(val: string | string[]) => saveNode({ ...activeNode, latex: val as string })}

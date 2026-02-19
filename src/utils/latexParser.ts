@@ -163,8 +163,65 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
 
       let consumed = false;
 
+      // Special Check: d/dx form (genfrac)
+      if (node.type === "genfrac") {
+          // Check if numerator is just "d" or "\partial"
+          // We can reuse isDifferential but need to check if it's the ONLY thing in numerator
+          // node.numer is typically an ordgroup or list of nodes.
+          const numerBody = node.numer.type === "ordgroup" ? node.numer.body : (Array.isArray(node.numer) ? node.numer : [node.numer]);
+
+          if (numerBody.length === 1 && isDifferential(numerBody[0])) {
+             // It's likely a derivative operator like d/dt or \partial/\partial x
+             // The user wants this to be associated with the variable in denominator?
+             // "把 d/dx ... 也看成一个整体, 算到分类x里"
+             // This implies we extract 'x' from 'dx' in denominator.
+
+             // Check denominator
+             const denomBody = node.denom.type === "ordgroup" ? node.denom.body : (Array.isArray(node.denom) ? node.denom : [node.denom]);
+
+             // We expect something like 'd x' or '\partial x' in denominator
+             // Or if it's just 'dx' where d is differential
+
+             // Let's try to match the pattern in denominator:
+             // It might be [d, x] or just one node if parsed differently?
+             // Usually 'dx' is parsed as 'd' (mathord/font) and 'x' (mathord).
+
+             // Find the differential node in denominator matching the numerator's style if possible, or just any differential
+             let diffIndex = -1;
+             for(let k=0; k<denomBody.length; k++) {
+                 if (isDifferential(denomBody[k])) {
+                     diffIndex = k;
+                     break;
+                 }
+             }
+
+             if (diffIndex !== -1 && diffIndex + 1 < denomBody.length) {
+                 const varNode = denomBody[diffIndex + 1];
+                 const core = getCoreType(varNode);
+                 if (core) {
+                     const fullLatex = nodeToLatex(node); // The whole fraction \frac{d}{dx}
+
+                     if (!map.has(core)) map.set(core, []);
+                     map.get(core)?.push({
+                        uuid: crypto.randomUUID(),
+                        type: core,
+                        latex: fullLatex
+                     });
+                     consumed = true;
+
+                     // We should NOT traverse into numer/denom if we consumed the whole fraction
+                     // But we might want to check for other variables in denom?
+                     // "d/dx" is operator.
+                     // If denom was "d(x^2)", then x is variable?
+                     // User example is simple "d/dx".
+                     // Let's assume for this specific structure we consume it entirely.
+                 }
+             }
+          }
+      }
+
       // 1. Check for Differential Prefix
-      if (isDifferential(node)) {
+      if (!consumed && isDifferential(node)) {
         // Look ahead
         if (i + 1 < nodes.length) {
           const nextNode = nodes[i + 1];
@@ -173,8 +230,7 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
             // It's a prefix! Combine them.
             const prefix = nodeToLatex(node);
             const variable = nodeToLatex(nextNode);
-            const fullLatex = prefix + variable; // Simplistic join.
-            // In typical latex \mathrm{d}x, spaces might matter but usually parsed ok.
+            const fullLatex = prefix + " " + variable; // Add space to prevent rendering errors (e.g., \Delta x)
 
             if (!map.has(core)) map.set(core, []);
             map.get(core)?.push({

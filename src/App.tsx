@@ -1844,7 +1844,7 @@ const PhysMemosApp: FC = () => {
 
                                 {child.latex && (
                                   <div className="mb-3 px-3 py-2 bg-slate-50 rounded border border-slate-100 overflow-x-auto">
-                                     <RichTextRenderer content={`$${child.latex}$`} />
+                                     <RichTextRenderer content={child.latex} />
                                   </div>
                                 )}
 

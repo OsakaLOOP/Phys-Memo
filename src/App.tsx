@@ -1953,7 +1953,8 @@ const PhysMemosApp: FC = () => {
                           const target = nodes.find(n => n.id === rel.targetId);
                           const typeConfig = RELATION_TYPES[rel.type] || RELATION_TYPES.DERIVES_FROM;
                           return (
-                            <div key={idx} className="group relative pl-8 pb-4 border-l-2 border-slate-200 hover:border-indigo-200 transition-colors">
+                            <div key={idx} className="group relative pl-8 pb-4">
+                              <div className="absolute left-0 top-0 w-[2px] h-full bg-slate-200 group-last:h-[40px] group-hover:bg-indigo-200 transition-colors"></div>
                               <div className={`absolute -left-[7px] top-3 w-4 h-4 bg-white rounded-full border-2 border-slate-300 group-hover:border-indigo-400 transition-colors`}></div>
                               <div className="flex flex-col sm:flex-row sm:items-start gap-3 bg-white p-3 rounded-lg border border-slate-100 hover:shadow-md transition-all hover:border-indigo-100">
                                 <div className={`flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-md bg-slate-50 border border-slate-100 ${typeConfig.color} min-w-fit mt-0.5`}>

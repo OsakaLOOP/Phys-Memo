@@ -148,8 +148,20 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
 
       let consumed = false;
 
+      // 0. Check for Exponential e^... (Special Case)
+      // Must have superscript, NO subscript, and base must be 'e'
+      if (node.type === "supsub" && !node.sub && node.sup) {
+          const baseTex = nodeToLatex(node.base);
+          if (baseTex === 'e') {
+              // It is e^... with no subscript.
+              // Treat as exponential function: ignore 'e', recurse into superscript.
+              traverse(node.sup);
+              consumed = true;
+          }
+      }
+
       // 1. Check for Differential Prefix
-      if (isDifferential(node)) {
+      if (!consumed && isDifferential(node)) {
         // Look ahead
         if (i + 1 < nodes.length) {
           const nextNode = nodes[i + 1];
@@ -186,7 +198,7 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
         }
       }
       // 2. Check for Standard Variable
-      else {
+      else if (!consumed) {
         const core = getCoreType(node);
         if (core) {
           // Check exclusion (redundant if getCoreType filters well, but safe)
@@ -208,6 +220,24 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
         }
         if (node.type === "sqrt") {
            traverse(node.body);
+        }
+        // Add recursion for supsub if it wasn't consumed as a variable
+        // Wait, getCoreType handles supsub by extracting base.
+        // If a supsub IS a variable (e.g. x_i), it was consumed in step 2.
+        // If it was NOT consumed (e.g. base not variable?), we might need to recurse?
+        // But getCoreType logic is recursive for base.
+        // If getCoreType returned null, step 2 failed.
+        // Example: 2^x -> base 2 (null core).
+        // We should recurse into 2^x components?
+        // base=2 (no vars), sup=x (var).
+        // Yes, need to handle supsub recursion for non-variable bases!
+
+        if (node.type === "supsub") {
+            // If we are here, it wasn't a variable instance (e.g. x_i).
+            // So check base and sup/sub separately.
+            traverse(node.base);
+            if (node.sub) traverse(node.sub);
+            if (node.sup) traverse(node.sup);
         }
       }
     }

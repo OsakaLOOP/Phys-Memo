@@ -1,0 +1,219 @@
+{
+  "disciplines": [
+    {
+      "name": "理论力学",
+      "label": "理论力学",
+      "abbr": "理力",
+      "color": "#ffc3f9",
+      "hue": 160
+    },
+    {
+      "name": "流体力学",
+      "label": "流体力学",
+      "abbr": "流体",
+      "color": "#3b82f6",
+      "hue": 220
+    },
+    {
+      "name": "颗粒物理",
+      "label": "颗粒物理",
+      "abbr": "颗粒",
+      "color": "#ce9aff",
+      "hue": 280
+    },
+    {
+      "name": "工程力学",
+      "label": "工程力学",
+      "abbr": "工程",
+      "color": "#8c8c8c",
+      "hue": 30
+    },
+    {
+      "name": "几何光学",
+      "label": "几何光学",
+      "abbr": "几光",
+      "color": "#ffd030",
+      "hue": 50
+    },
+    {
+      "name": "波动光学",
+      "label": "波动光学",
+      "abbr": "波光",
+      "color": "#ffd030",
+      "hue": 60
+    },
+    {
+      "name": "量子力学",
+      "label": "量子力学",
+      "abbr": "量子",
+      "color": "#0fc8e8",
+      "hue": 190
+    },
+    {
+      "name": "统计力学",
+      "label": "统计力学",
+      "abbr": "统计",
+      "color": "#f59e0b",
+      "hue": 40
+    },
+    {
+      "name": "热力学",
+      "label": "热力学",
+      "abbr": "热力学",
+      "color": "#ff762c",
+      "hue": 0
+    },
+    {
+      "name": "电动力学",
+      "label": "电动力学",
+      "abbr": "电动",
+      "color": "#39c5bb",
+      "hue": 0
+    },
+    {
+      "name": "相对论物理",
+      "label": "相对论物理",
+      "abbr": "相对论",
+      "color": "#00ffea",
+      "hue": 330
+    },
+    {
+      "name": "凝聚态物理",
+      "label": "凝聚态物理",
+      "abbr": "凝聚",
+      "color": "#10b981",
+      "hue": 160
+    },
+    {
+      "name": "实验物理",
+      "label": "实验物理",
+      "abbr": "实验",
+      "color": "#f43f5e",
+      "hue": 350
+    },
+    {
+      "name": "计算物理",
+      "label": "计算物理",
+      "abbr": "计算",
+      "color": "#8b5cf6",
+      "hue": 270
+    }
+  ],
+  "nodes": [
+    {
+      "id": "fd1",
+      "disciplines": [
+        "流体力学"
+      ],
+      "topic": "流体流动",
+      "title": "伯努利原理 (Bernoulli Principle)",
+      "type": "LAW",
+      "latex": "P + \\frac{1}{2}\\rho v^2 + \\rho gh = \\text{Constant}",
+      "desc": "流体动力学中的能量守恒表述。即对于不可压缩、无粘流体，沿流线的总能量密度保持不变。\n\n> 局限性：不适用于粘性流体（需考虑粘滞耗散）或可压缩流体（需考虑内能变化）。",
+      "references": "Landau, L. D., & Lifshitz, E. M. (2013). *Fluid Mechanics*. Elsevier.\nBatchelor, G. K. (2000). *An introduction to fluid dynamics*.",
+      "constraints": [
+        "无粘 (Inviscid)",
+        "不可压缩 (Incompressible)",
+        "定常流 (Steady)"
+      ],
+      "relations": []
+    },
+    {
+      "id": "fd2",
+      "disciplines": [
+        "流体力学"
+      ],
+      "topic": "流体流动",
+      "title": "托里拆利定律 (Torricelli Law)",
+      "type": "FORMULA",
+      "latex": "v_{out} = \\sqrt{2gh}",
+      "desc": "描述敞口容器底部小孔的出流速度。本质上是重力势能完全转化为动能的理想情况 [1]。",
+      "references": "Torricelli, E. (1643). *De motu gravium naturaliter descendentium*.",
+      "constraints": [
+        "敞口容器 (Open Tank)",
+        "液面准静态 (v_top ≈ 0)"
+      ],
+      "relations": [
+        {
+          "targetId": "fd1",
+          "type": "SPECIAL_CASE",
+          "condition": "假设顶部与出口压强均为大气压 $P_{atm}$"
+        }
+      ]
+    },
+    {
+      "id": "gp1",
+      "disciplines": [
+        "颗粒物理"
+      ],
+      "topic": "颗粒流堵塞",
+      "title": "堵塞拱模型 (Clogging Arch)",
+      "type": "MODEL",
+      "latex": "P_{clog} \\propto \\exp\\left(-\\frac{D}{d}\\right)",
+      "desc": "颗粒流流出孔口前形成的亚稳态结构。多个颗粒相互挤压形成拱桥，承担上方压力，导致流动中断。只有破坏拱结构（如振动）才能恢复流动 [1]。",
+      "references": "Zuriguel, I., et al. (2005). Jamming during the discharge of granular matter from a silo. *Physical Review E*.",
+      "constraints": [
+        "干颗粒 (Dry Grains)",
+        "拥塞状态 (Jamming)"
+      ],
+      "relations": []
+    },
+    {
+      "id": "gp2",
+      "disciplines": [
+        "颗粒物理"
+      ],
+      "topic": "颗粒流",
+      "title": "Beverloo 流量公式",
+      "type": "LAW",
+      "latex": "W = C \\rho_{bulk} \\sqrt{g} (D - kd)^{2.5}",
+      "desc": "著名的颗粒流流量经验公式。与流体 ($D^2$) 不同，颗粒流流量遵循 $D^{2.5}$ 缩放律。\n\n**物理机制**：\n提出 **\"Empty Annulus\" (空环)** 概念，即由于颗粒的离散性，孔口边缘 $k \\cdot d$ 宽度的区域没有有效流量贡献 [1]。",
+      "references": "Beverloo, W. A., Leniger, H. A., & Van de Velde, J. (1961). The flow of granular solids through orifices. *Chemical Engineering Science*.",
+      "constraints": [
+        "粗颗粒 (Coarse Grains)",
+        "重力驱动 (Gravity)"
+      ],
+      "relations": [
+        {
+          "targetId": "gp1",
+          "type": "EMPIRICAL_FIT",
+          "condition": "基于空环假设对实验数据的拟合"
+        },
+        {
+          "targetId": "fd2",
+          "type": "CONTRADICTS",
+          "condition": "流体遵循 $\\sqrt{H}$ 压力依赖，而颗粒流流量与筒仓高度 $H$ 无关（Janssen 效应）"
+        }
+      ]
+    },
+    {
+      "id": "gp3",
+      "disciplines": [
+        "颗粒物理",
+        "统计力学"
+      ],
+      "topic": "颗粒流",
+      "title": "Alonso et al. (2021)",
+      "type": "EVIDENCE",
+      "latex": "\\mu(P) = \\mu_0 + \\frac{\\mu_1 - \\mu_0}{1 + P_0/P}",
+      "desc": "在离心机实验中发现 Beverloo 定律在高重力环境下失效。随着有效重力 $g_{eff}$ 增加，流量不再随 $\\sqrt{g}$ 无限增长，而是趋于饱和。\n\n> 原因：高压强下颗粒间摩擦系数 $\\mu$ 增加（压力相关摩擦），导致流变性改变 [1]。",
+      "references": "Alonso-Marroquin, F., et al. (2021). Granular flow in high gravity. *Journal of Fluid Mechanics*.",
+      "constraints": [
+        "离心机实验 (Centrifuge)",
+        "高重力 (High-G > 10g)"
+      ],
+      "relations": [
+        {
+          "targetId": "gp2",
+          "type": "CONTRADICTS",
+          "condition": "当 $g_{eff}$ 极高时，流量不再符合 Beverloo 的 $\\sqrt{g}$ 预测"
+        },
+        {
+          "targetId": "gp2",
+          "type": "MODIFIES",
+          "condition": "提出了压力相关的摩擦修正项"
+        }
+      ]
+    }
+  ]
+}

@@ -1542,7 +1542,7 @@ const PhysMemosApp: FC = () => {
                     <div>
                       <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
                         <Layers className="w-5 h-5 text-slate-400" />
-                        Entries in {activeNode.title}
+                        {activeNode.title} 中的条目
                       </h3>
                       <div className="space-y-3">
                         {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').map(child => (
@@ -1594,7 +1594,7 @@ const PhysMemosApp: FC = () => {
                         ))}
                         {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').length === 0 && (
                            <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 bg-slate-50/50">
-                              No entries in this topic yet.
+                              暂无下属条目
                            </div>
                         )}
                       </div>

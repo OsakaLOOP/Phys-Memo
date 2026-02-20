@@ -79,6 +79,11 @@ const isDifferential = (node: any): boolean => {
     return body === "d";
   }
 
+  // Check for supsub where base is differential (e.g. d^2, \delta^n)
+  if (node.type === "supsub") {
+     return isDifferential(node.base);
+  }
+
   return false;
 };
 
@@ -258,14 +263,16 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
 
         // If not consumed (standalone differential), treat as variable
         if (!consumed) {
-           // if standalone, we DO add it.
            const latex = nodeToLatex(node);
-           // Special case for core name of standalone differential
-           const typeName = latex; // Use the latex itself as type name for these specials
-
-           if (!map.has(typeName)) map.set(typeName, []);
-           map.get(typeName)?.push({ uuid: crypto.randomUUID(), type: typeName, latex });
-           consumed = true;
+           // Ignore isolated \mathrm{d} or d
+           if (latex !== "\\mathrm{d}" && latex !== "d") {
+              const typeName = latex; // Use the latex itself as type name for these specials
+              if (!map.has(typeName)) map.set(typeName, []);
+              map.get(typeName)?.push({ uuid: crypto.randomUUID(), type: typeName, latex });
+              consumed = true;
+           } else {
+              consumed = true; // Consumed but ignored
+           }
         }
       }
       // 2. Check for Standard Variable
@@ -302,6 +309,14 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
         }
         if (node.type === "sqrt") {
            traverse(node.body);
+        }
+        if (node.type === "supsub") {
+            traverse(node.base);
+            traverse(node.sub);
+            traverse(node.sup);
+        }
+        if (node.type === "leftright") {
+            traverse(node.body);
         }
       }
     }

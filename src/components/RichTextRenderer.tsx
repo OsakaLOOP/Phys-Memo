@@ -136,7 +136,7 @@ const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "", 
               const root = createRoot(mountPoint);
 
               root.render(
-                <div className="pointer-events-auto w-full h-full">
+                <div className="pointer-events-none w-full h-full">
                     <FormulaAnalysis latex={latex} label={label} />
                 </div>
               );

@@ -47,14 +47,18 @@ const nodeToLatex = (node: any): string => {
 
   if (node.type === "genfrac") {
     // Fractions etc: \frac{numer}{denom}
-    // Note: Genfrac usually not "letters" but could contain them.
-    // For now we might not be extracting "fractions" as variables,
-    // but if a variable IS a fraction (rare), this handles it.
     return `\\frac{${nodeToLatex(node.numer)}}{${nodeToLatex(node.denom)}}`;
   }
 
   if (node.type === "ordgroup") {
       return `{${node.body.map(nodeToLatex).join("")}}`;
+  }
+
+  // Handle styling/sizing/color wrappers by just rendering their content
+  // Note: This loses the styling command itself but preserves the variable content which is key for analysis
+  if (node.type === "styling" || node.type === "sizing" || node.type === "color") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return node.body.map((child: any) => nodeToLatex(child)).join("");
   }
 
   // Fallback for known "differential" like structures if they appear as simple text
@@ -119,12 +123,16 @@ const getCoreType = (node: any): string | null => {
   }
 
   if (node.type === "font") {
-    
     // Type is the inner content, without style or script, unless it's \mathrm{d}, special case.
     return getCoreType(node.body);
   }
 
   if (node.type === "ordgroup" && node.body.length === 1) {
+      return getCoreType(node.body[0]);
+  }
+
+  // Handle styling wrappers
+  if ((node.type === "styling" || node.type === "sizing" || node.type === "color") && node.body.length === 1) {
       return getCoreType(node.body[0]);
   }
 
@@ -316,6 +324,10 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
             traverse(node.sup);
         }
         if (node.type === "leftright") {
+            traverse(node.body);
+        }
+        // Handle styling/sizing/color wrappers
+        if (node.type === "styling" || node.type === "sizing" || node.type === "color") {
             traverse(node.body);
         }
         // Handle array environments (matrices, etc.)

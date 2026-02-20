@@ -54,7 +54,7 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex, label }) => {
   return (
     <>
       <div
-        className="absolute top-1/2 right-0 -translate-y-1/2 z-20 pr-4"
+        className="absolute top-1/2 right-0 -translate-y-1/2 z-20 align-center"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
@@ -63,7 +63,7 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex, label }) => {
           className={`
             transition-colors bg-white/80 backdrop-blur-sm
             rounded border border-transparent hover:border-slate-200 shadow-sm
-            ${label ? 'px-2 py-1' : 'p-1.5 rounded-bl-lg border-l border-b'}
+            ${label ? 'px-2 pb-1 align-center' : 'p-1.5 rounded-bl-lg border-l border-b align-center'}
             text-slate-400 hover:text-indigo-600
           `}
           title="公式模板解析"

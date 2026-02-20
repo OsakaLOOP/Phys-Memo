@@ -1628,7 +1628,7 @@ const PhysMemosApp: FC = () => {
               ) : (
                 // --- STANDARD NODE EDITOR ---
               <div className="flex-1 overflow-y-auto bg-slate-50/30">
-                <div className="max-w-4xl mx-auto p-8 space-y-6">
+                <div className="max-w-full   mx-auto p-8 space-y-6">
                   <SmartFormulaBlock
                     label="核心定义 · 数学形式 / DEF"
                     value={activeNode.latex}
@@ -1661,6 +1661,7 @@ const PhysMemosApp: FC = () => {
                       />
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <div className="flex items-center gap-2 mb-6">
                       <GitCommit className="w-5 h-5 text-indigo-500" />
@@ -1756,6 +1757,7 @@ const PhysMemosApp: FC = () => {
                       )}
                     </div>
                   </div>
+                  
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
                       <Hash className="w-4 h-4 text-indigo-500" />
@@ -1771,6 +1773,7 @@ const PhysMemosApp: FC = () => {
                       placeholder="输入参考文献列表..."
                     />
                   </div>
+                </div>
                 </div>
               </div>
             )

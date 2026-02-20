@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type FC } from 'react';
+import { createPortal } from 'react-dom';
 import { parseFormula, type ParsedCategory } from '../utils/latexParser';
 import katex from 'katex';
 import { Info } from 'lucide-react';
@@ -10,6 +11,7 @@ interface FormulaAnalysisProps {
 const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [parsedData, setParsedData] = useState<ParsedCategory[]>([]);
+  const [coords, setCoords] = useState({ top: 0, right: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -27,39 +29,57 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
       clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
     }
+
+    // Calculate position when opening
+    if (!showAnalysis && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + 8, // slight offset
+        right: window.innerWidth - rect.right
+      });
+    }
+
     setShowAnalysis(true);
   };
 
   const handleMouseLeave = () => {
     closeTimeoutRef.current = setTimeout(() => {
       setShowAnalysis(false);
-    }, 200);
+    }, 200); // Keep delay for user comfort
   };
 
   if (parsedData.length === 0) return null;
 
   return (
-    <div
-      className="absolute top-0 right-0 z-20"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      <button
-        ref={buttonRef}
-        className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors bg-white/80 backdrop-blur-sm rounded-bl-lg border-l border-b border-transparent hover:border-slate-200 shadow-sm"
-        title="公式模板解析"
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
+    <>
+      <div
+        className="absolute top-0 right-0 z-20"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
-        <Info className="w-3.5 h-3.5" />
-      </button>
+        <button
+          ref={buttonRef}
+          className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors bg-white/80 backdrop-blur-sm rounded-bl-lg border-l border-b border-transparent hover:border-slate-200 shadow-sm"
+          title="公式模板解析"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <Info className="w-3.5 h-3.5" />
+        </button>
+      </div>
 
-      {/* Modal */}
-      {showAnalysis && (
+      {/* Modal - Portaled to body */}
+      {showAnalysis && createPortal(
         <div
           ref={modalRef}
-          className="absolute top-8 right-0 w-80 max-h-96 bg-white shadow-xl rounded-xl border border-indigo-100 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 origin-top-right"
-          style={{ zIndex: 100 }}
+          className="fixed w-80 max-h-96 bg-white shadow-xl rounded-xl border border-indigo-100 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300 ease-out origin-top-right"
+          style={{
+            top: coords.top,
+            right: coords.right,
+            zIndex: 9999
+          }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -98,9 +118,10 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
               </tbody>
             </table>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 };
 

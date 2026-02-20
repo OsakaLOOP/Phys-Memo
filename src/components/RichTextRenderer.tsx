@@ -23,6 +23,48 @@ const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "", 
 
     if (!containerRef.current) return;
 
+    // --- 1. Calculate Math Labels based on Headers ---
+    const mathLabels: string[] = [];
+    if (enableAnalysis) {
+      let h2 = 0;
+      let h3 = 0;
+      let n = 0;
+
+      // Regex to find Headers (H2/H3) OR Display Math
+      // Group 1: Header markers (## or ###)
+      // Group 2: Display Math ($$...$$)
+      // We use 'm' flag for ^ matching start of line
+      const scanRegex = /(^#{2,3})(?=\s)|(\$\$[\s\S]*?\$\$)/gm;
+
+      let match;
+      while ((match = scanRegex.exec(content)) !== null) {
+        if (match[1]) {
+          // Header found
+          const level = match[1].length;
+          if (level === 2) {
+            h2++;
+            h3 = 0;
+            n = 0; // Reset formula counter
+          } else if (level === 3) {
+            h3++;
+            n = 0; // Reset formula counter
+          }
+        } else if (match[2]) {
+          // Display Math found
+          n++;
+          let label = `(${n})`;
+          if (h2 > 0) {
+            if (h3 > 0) {
+              label = `(${h2}.${h3}.${n})`;
+            } else {
+              label = `(${h2}.${n})`;
+            }
+          }
+          mathLabels.push(label);
+        }
+      }
+    }
+
     const mathBlocks: Array<{ id: string; tex: string; display: boolean }> = [];
     // Regex to capture $$...$$ (display) and $...$ (inline)
     const protectedText = content.replace(/\$\$(.*?)\$\$|\$(.*?)\$/gs, (_match: string, blockMath: string, inlineMath: string) => {
@@ -37,6 +79,8 @@ const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "", 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let html = (marked as any).parse(protectedText) as string;
 
+    let displayMathIndex = 0;
+
     mathBlocks.forEach(item => {
       let renderedMath = "";
       try {
@@ -46,18 +90,25 @@ const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "", 
       }
 
       if (enableAnalysis && item.display) {
+        const label = mathLabels[displayMathIndex] || "";
+        displayMathIndex++;
+
         // Wrap with interactive container for display math
         // We use a data attribute to store the latex for later extraction
         // The container needs relative position for the absolute button
         // We add a specific class for the mounting point
+        // Added 'pr-16' for right padding to accommodate the label
         const wrappedMath = `
-          <div class="interactive-math-container relative group/math block w-full my-4" data-latex="${encodeURIComponent(item.tex)}">
+          <div class="interactive-math-container relative group/math block w-full my-4 pr-16" data-latex="${encodeURIComponent(item.tex)}" data-label="${label}">
             ${renderedMath}
             <div class="analysis-mount-point absolute top-0 right-0 pointer-events-none w-full h-full"></div>
           </div>
         `;
         html = html.replace(item.id, wrappedMath);
       } else {
+        // Increment index even if analysis disabled, to keep logic sound if we ever use labels elsewhere?
+        // Actually mathLabels is only populated if enableAnalysis is true.
+        // If enableAnalysis is false, displayMathIndex isn't used.
         html = html.replace(item.id, renderedMath);
       }
     });
@@ -76,46 +127,17 @@ const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "", 
         containers.forEach(container => {
            const mountPoint = container.querySelector('.analysis-mount-point');
            const latexEncoded = container.getAttribute('data-latex');
+           const label = container.getAttribute('data-label') || "";
+
            if (mountPoint && latexEncoded) {
               const latex = decodeURIComponent(latexEncoded);
 
               // We create a wrapper div inside the mount point to actually hold the react root
-              // because createRoot expects a container.
-              // Actually mountPoint IS the container.
-              // Note: pointer-events-none on mountPoint allows clicking through to math if needed,
-              // but the button inside FormulaAnalysis needs pointer-events-auto.
-              // So FormulaAnalysis root div should handle pointer events.
-
               const root = createRoot(mountPoint);
-              // FormulaAnalysis handles its own positioning (absolute top right)
-              // But here we are rendering it inside an absolute div covering the whole block?
-              // Let's check FormulaAnalysis.tsx
-              // It has `absolute top-0 right-0`.
-              // So if we render it inside `analysis-mount-point` which is also `absolute top-0 right-0 w-full h-full`,
-              // The FormulaAnalysis div will be relative to that.
-
-              // Actually, simpler: just render into a div at the end of container.
-              // My HTML above has `<div class="analysis-mount-point ..."></div>`.
-              // That div is absolute, covering the whole math block.
-              // FormulaAnalysis has `absolute top-0 right-0`.
-              // So it will appear at top right of the math block. Correct.
-
-              // We need to ensure the button is clickable.
-              // The mountPoint has `pointer-events-none`.
-              // The button inside `FormulaAnalysis` needs `pointer-events-auto`.
-              // I should update FormulaAnalysis to have `pointer-events-auto` on its container or button.
-              // Or just make mountPoint specific to the button area?
-              // No, because the Modal needs to overflow/expand.
-
-              // Let's assume FormulaAnalysis components have appropriate pointer-events styling.
-              // Checking FormulaAnalysis.tsx:
-              // Root div: `absolute top-0 right-0 z-20` (onMouseEnter/Leave)
-              // It doesn't explicitly set pointer-events.
-              // If parent (mountPoint) is pointer-events-none, children are too unless overridden.
 
               root.render(
-                <div className="pointer-events-auto">
-                    <FormulaAnalysis latex={latex} />
+                <div className="pointer-events-auto w-full h-full">
+                    <FormulaAnalysis latex={latex} label={label} />
                 </div>
               );
               mountedRoots.current.push(root);

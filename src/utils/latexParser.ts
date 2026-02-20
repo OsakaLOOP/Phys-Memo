@@ -318,6 +318,17 @@ export const parseFormula = (latex: string): ParsedCategory[] => {
         if (node.type === "leftright") {
             traverse(node.body);
         }
+        // Handle array environments (matrices, etc.)
+        if (node.type === "array") {
+           // node.body is Array<Array<Node>> (rows -> cells -> content)
+           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           node.body.forEach((row: any[]) => {
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             row.forEach((cell: any[]) => {
+               traverse(cell);
+             });
+           });
+        }
       }
     }
   };

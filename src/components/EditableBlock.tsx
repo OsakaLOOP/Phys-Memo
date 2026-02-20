@@ -107,7 +107,7 @@ const EditableBlock: FC<EditableBlockProps> = ({
           </div>
         );
       case 'markdown':
-        return <RichTextRenderer content={value as string} className="prose prose-sm max-w-none text-slate-700" />;
+        return <RichTextRenderer content={value as string} className="prose prose-sm max-w-none text-slate-700" enableAnalysis={enableAnalysis} />;
       case 'references': {
         const refs = (value as string).split('\n').filter(r => r.trim());
         if (refs.length === 0) return <div className="text-slate-400 italic text-sm">{placeholder}</div>;

@@ -1650,7 +1650,7 @@ const PhysMemosApp: FC = () => {
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <EditableBlock
+                      <SmartFormulaBlock
                         label="笔记 · 摘要 / Notes"
                         value={activeNode.desc}
                         onChange={(val: string | string[]) => saveNode({ ...activeNode, desc: val as string })}

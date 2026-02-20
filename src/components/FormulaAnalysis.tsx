@@ -6,9 +6,10 @@ import { Info } from 'lucide-react';
 
 interface FormulaAnalysisProps {
   latex: string;
+  label?: string;
 }
 
-const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
+const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex, label }) => {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [parsedData, setParsedData] = useState<ParsedCategory[]>([]);
   const [coords, setCoords] = useState({ top: 0, right: 0 });
@@ -53,18 +54,27 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
   return (
     <>
       <div
-        className="absolute top-0 right-0 z-20"
+        className="absolute top-1/2 right-0 -translate-y-1/2 z-20 pr-4"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
         <button
           ref={buttonRef}
-          className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors bg-white/80 backdrop-blur-sm rounded-bl-lg border-l border-b border-transparent hover:border-slate-200 shadow-sm"
+          className={`
+            transition-colors bg-white/80 backdrop-blur-sm
+            rounded border border-transparent hover:border-slate-200 shadow-sm
+            ${label ? 'px-2 py-1' : 'p-1.5 rounded-bl-lg border-l border-b'}
+            text-slate-400 hover:text-indigo-600
+          `}
           title="公式模板解析"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <Info className="w-3.5 h-3.5" />
+          {label ? (
+            <span className="text-sm font-serif font-medium whitespace-nowrap">{label}</span>
+          ) : (
+            <Info className="w-3.5 h-3.5" />
+          )}
         </button>
       </div>
 

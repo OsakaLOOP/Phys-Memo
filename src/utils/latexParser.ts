@@ -70,7 +70,7 @@ const isDifferential = (node: any): boolean => {
 
   // \delta, \Delta
   if (node.type === "mathord" || node.type === "textord") {
-    return ["\\delta", "\\Delta", "\\partial", "\\nabla"].includes(node.text);
+    return ["\\delta", "\\Delta", "\\partial", "\\nabla", "\\partial"].includes(node.text);
   }
 
   // \mathrm{d}

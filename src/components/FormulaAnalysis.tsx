@@ -46,7 +46,7 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
     >
       <button
         ref={buttonRef}
-        className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors bg-white/80 backdrop-blur-sm rounded-bl-lg border-l border-b border-transparent hover:border-slate-200 shadow-sm"
+        className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors bg-white/80 backdrop-blur-sm rounded-bl-lg border-l border-b border-transparent hover:border-slate-200 shadow-sm z-index-30"
         title="公式模板解析"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
@@ -58,8 +58,7 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
       {showAnalysis && (
         <div
           ref={modalRef}
-          className="absolute top-8 right-0 w-80 max-h-96 bg-white shadow-xl rounded-xl border border-indigo-100 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 origin-top-right"
-          style={{ zIndex: 100 }}
+          className="absolute top-8 right-0 w-80 max-h-96 bg-white shadow-xl rounded-xl border border-indigo-100 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 origin-top-right z-index-100"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >

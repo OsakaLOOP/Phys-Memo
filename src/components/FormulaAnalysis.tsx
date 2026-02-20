@@ -47,7 +47,7 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
       <button
         ref={buttonRef}
         className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors bg-white/80 backdrop-blur-sm rounded-bl-lg border-l border-b border-transparent hover:border-slate-200 shadow-sm"
-        title="Formula Analysis"
+        title="公式模板解析"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -64,15 +64,15 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex }) => {
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Formula Analysis</span>
-            <span className="text-[10px] text-slate-400">{parsedData.reduce((acc, c) => acc + c.instances.length, 0)} vars detected</span>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">公式模板解析 / PARSING</span>
+            <span className="text-[10px] text-slate-400">已解析共 {parsedData.reduce((acc, c) => acc + c.instances.length, 0)} 个变量</span>
           </div>
           <div className="overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-white sticky top-0 z-10 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100">
-                  <th className="py-2 px-4 w-1/4">Type</th>
-                  <th className="py-2 px-4">Instances (Context)</th>
+                  <th className="py-2 px-4 w-1/5 text-nowrap">基/BASE</th>
+                  <th className="py-2 px-4">变体实例 / INSTANCES</th>
                 </tr>
               </thead>
               <tbody className="text-sm text-slate-700 divide-y divide-slate-50">

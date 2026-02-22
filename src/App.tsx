@@ -956,6 +956,53 @@ const PhysMemosApp: FC = () => {
          // Prefer selecting the first Topic if available, else first node
          const firstTopic = finalNodes.find(n => n.type === 'TOPIC');
          setActiveNodeId(firstTopic ? firstTopic.id : finalNodes[0].id);
+      } else if (finalNodes.length === 0) {
+          // If no data, create a default "Sandpile Model" concept
+          const defaultNode: NodeData = {
+              id: 'sandpile-model-1',
+              title: 'Sandpile Model',
+              type: 'MODEL',
+              topic: 'Self-Organized Criticality',
+              disciplines: ['Physics', 'Complexity'],
+              latex: 'S \to S - 4, \quad S_{neighbors} \to S_{neighbors} + 1',
+              desc: 'The **Abelian Sandpile Model** is a cellular automaton used to demonstrate _self-organized criticality_.\n\nWhen the height of a pile exceeds a critical threshold, it collapses, distributing grains to neighbors.',
+              references: '[1] Bak, P., Tang, C., & Wiesenfeld, K. (1987). Self-organized criticality: An explanation of the 1/f noise. Physical review letters, 59(4), 381.',
+              constraints: ['Grid Lattice', 'Conservative (in bulk)'],
+              relations: []
+          };
+          await dbHelper.put(defaultNode);
+
+          // Seed AttrStrand
+          const initialData: Record<ContentAtomField, AtomSubmission[]> = {
+            doc: splitContent(defaultNode.desc, 'markdown').map(c => ({ content: c, field: 'doc', type: 'markdown' })),
+            core: splitContent(defaultNode.latex, 'latex').map(c => ({ content: c, field: 'core', type: 'latex' })),
+            tags: defaultNode.constraints.map(c => ({ content: c, field: 'tags', type: 'inline' })),
+            refs: splitContent(defaultNode.references, 'sources').map(c => ({ content: c, field: 'refs', type: 'sources' })),
+            rels: []
+          };
+
+          // Ensure disciplines exist
+          await dbHelper.putDiscipline({ name: 'Physics', abbr: 'Ph', color: '#3b82f6', hue: 210 });
+          await dbHelper.putDiscipline({ name: 'Complexity', abbr: 'Cx', color: '#a855f7', hue: 270 });
+          setDisciplines([{ name: 'Physics', abbr: 'Ph', color: '#3b82f6', hue: 210 }, { name: 'Complexity', abbr: 'Cx', color: '#a855f7', hue: 270 }]);
+
+          const concept = await core.createConcept(defaultNode.title, 'admin', initialData, defaultNode.topic, defaultNode.disciplines);
+          // Force overwrite concept ID to match legacy node ID for sync
+          const conceptData = await storage.getConcept(concept.id);
+          if (conceptData) {
+              // Delete auto-generated ID concept
+              // Actually we can't easily delete from storage mock without expose
+              // But we can just create a NEW one with correct ID
+              // Wait, `createConcept` generates ID.
+              // We need `createConcept` to accept ID or we manually fix it.
+              // Or better: update the NodeData ID to match the generated Concept ID.
+              await dbHelper.delete(defaultNode.id);
+              defaultNode.id = concept.id;
+              await dbHelper.put(defaultNode);
+          }
+
+          setNodes([defaultNode]);
+          setActiveNodeId(defaultNode.id);
       }
     } catch (err) {
       console.error("DB Error:", err);
@@ -996,6 +1043,17 @@ const PhysMemosApp: FC = () => {
     };
     await dbHelper.put(newNode);
     setNodes(prev => [...prev, newNode]);
+
+    // Initialize AttrStrand concept for new node
+    const initialData: Record<ContentAtomField, AtomSubmission[]> = {
+        doc: [],
+        core: [],
+        tags: [],
+        refs: [],
+        rels: []
+    };
+    await core.createConcept(newNode.title, 'admin', initialData, newNode.topic, newNode.disciplines);
+
     setActiveNodeId(newNode.id);
   };
 

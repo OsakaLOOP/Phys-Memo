@@ -1,0 +1,118 @@
+{
+  "disciplines": [
+    {
+      "name": "凝聚态物理",
+      "label": "凝聚态物理",
+      "abbr": "凝聚",
+      "color": "#10b981",
+      "hue": 160
+    },
+    {
+      "name": "几何光学",
+      "label": "几何光学",
+      "abbr": "几光",
+      "color": "#ffd030",
+      "hue": 50
+    },
+    {
+      "name": "实验物理",
+      "label": "实验物理",
+      "abbr": "实验",
+      "color": "#f43f5e",
+      "hue": 350
+    },
+    {
+      "name": "工程力学",
+      "label": "工程力学",
+      "abbr": "工程",
+      "color": "#8c8c8c",
+      "hue": 30
+    },
+    {
+      "name": "波动光学",
+      "label": "波动光学",
+      "abbr": "波光",
+      "color": "#ffd030",
+      "hue": 60
+    },
+    {
+      "name": "流体力学",
+      "label": "流体力学",
+      "abbr": "流体",
+      "color": "#3b82f6",
+      "hue": 220
+    },
+    {
+      "name": "热力学",
+      "label": "热力学",
+      "abbr": "热力学",
+      "color": "#ff762c",
+      "hue": 0
+    },
+    {
+      "name": "理论力学",
+      "label": "理论力学",
+      "abbr": "理力",
+      "color": "#ffc3f9",
+      "hue": 160
+    },
+    {
+      "name": "电动力学",
+      "label": "电动力学",
+      "abbr": "电动",
+      "color": "#39c5bb",
+      "hue": 0
+    },
+    {
+      "name": "相对论物理",
+      "label": "相对论物理",
+      "abbr": "相对论",
+      "color": "#00ffea",
+      "hue": 330
+    },
+    {
+      "name": "统计力学",
+      "label": "统计力学",
+      "abbr": "统计",
+      "color": "#f59e0b",
+      "hue": 40
+    },
+    {
+      "name": "计算物理",
+      "label": "计算物理",
+      "abbr": "计算",
+      "color": "#8b5cf6",
+      "hue": 270
+    },
+    {
+      "name": "量子力学",
+      "label": "量子力学",
+      "abbr": "量子",
+      "color": "#0fc8e8",
+      "hue": 190
+    },
+    {
+      "name": "颗粒物理",
+      "label": "颗粒物理",
+      "abbr": "颗粒",
+      "color": "#ce9aff",
+      "hue": 280
+    }
+  ],
+  "nodes": [
+    {
+      "id": "5e6b235f-d221-4d98-b3b8-13fb6b7e267a",
+      "disciplines": [
+        "统计力学"
+      ],
+      "topic": "颗粒流",
+      "title": "测试节点",
+      "type": "FORMULA",
+      "latex": "$$\\text{test} \\ \\int \\hat{\\vec{\\mathcal{L}}^{2^{2_2a}}_\\pi} \\ \\frac{\\mathrm{d}}{\\mathrm{d}y} \\ \\ \\Delta \\ \\Delta x (\\alpha_1) \\epsilon' e^{-E/kT} e_1 \\partial t$$\n\n$$\\mathcal{Z}_{eff}^{(n)}[\\phi] = \\oint_{\\partial \\Omega} \\sqrt{-g} \\cdot e^{-\\frac{i}{\\hbar} \\int_{t_0}^{t_1} \\left[ \\frac{1}{2} m \\left( \\frac{\\mathrm{d}^2 \\vec{x}_a}{\\mathrm{d}s^2} \\right)^2 - V(x_a, \\dot{x}_a, \\vec{p}^{(i)}) \\right] \\mathrm{d}s} \\cdot \\frac{\\delta^2 S}{\\delta \\phi^* \\delta \\phi}$$\n\n$$\\mathbb{W}_{ext} = \\int \\mathrm{d}^4x \\left\\{ \\bar{\\psi}_{\\alpha} (i \\gamma^{\\mu} \\nabla_{\\mu} - m) \\psi^{\\alpha} + \\sum_{j=1}^{N} \\det \\left( \\begin{matrix} \\hat{A}_{ij} & \\delta_{ij} \\Phi \\\\ \\Phi^{\\dagger} & \\partial^2 \\hat{B}_{ij} \\end{matrix} \\right) \\right\\} + \\Delta \\mathcal{L}_{int}$$\n\n## 1\n\n$$\\chi_{i j}^{(3)}(\\omega_p; \\omega_1, \\omega_2) = \\frac{N e^4}{\\epsilon_0 \\hbar^3} \\sum_{a,b,c} \\frac{\\rho_{aa}^{(0)} - \\rho_{bb}^{(0)}}{(\\omega_{ba} - \\omega_1 - i\\Gamma_{ba}) (\\omega_{ca} - \\omega_p - i\\Gamma_{ca})} \\hat{r}_{ab} \\hat{r}_{bc} \\hat{r}_{ca}$$",
+      "desc": "",
+      "references": "",
+      "constraints": [],
+      "relations": []
+    }
+  ]
+}

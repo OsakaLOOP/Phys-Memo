@@ -40,12 +40,16 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
     };
 
     // Attribution display with adjustment: (Val + 0.1/n) / 1.1
-    const authors = Object.entries(atom.attr);
+    const authors = Object.entries(atom.attr || {});
     const n = authors.length;
     const adjustedAuthors = authors.map(([author, share]) => {
         const adjustedShare = (share + (n > 0 ? (0.1 / n) : 0)) / 1.1;
         return { author, share: adjustedShare };
     }).sort((a, b) => b.share - a.share);
+
+    if (!atom.contentJson && atom.contentJson !== '') {
+        return <div className="text-red-400 text-xs p-2 border border-red-200 rounded">Invalid Atom Data</div>;
+    }
 
     return (
         <div className={`group relative mb-4 transition-all ${className}`}>
@@ -99,7 +103,8 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
                         ${!readOnly ? 'hover:bg-slate-50 hover:border-slate-200 cursor-pointer' : ''}
                     `}
                 >
-                   <RichTextRenderer content={atom.contentJson} enableAnalysis={true} />
+                   {/* Disable analysis temporarily to prevent freeze on complex math if any */}
+                   <RichTextRenderer content={atom.contentJson} enableAnalysis={false} />
 
                    {!readOnly && (
                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">

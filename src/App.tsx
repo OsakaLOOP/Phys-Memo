@@ -1229,10 +1229,12 @@ const PhysMemosApp: FC = () => {
 
   // Sync AttrStrand when activeNode changes
   useEffect(() => {
+    // Reset state immediately to prevent rendering old data or race conditions
+    setActiveEdition(null);
+    setActiveAtoms({ doc: [], core: [], tags: [], refs: [], rels: [] });
+
     if (activeNodeId) {
         void loadEditionForNode(activeNodeId);
-    } else {
-        setActiveEdition(null);
     }
   }, [activeNodeId]);
 
@@ -1875,6 +1877,7 @@ const PhysMemosApp: FC = () => {
                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">核心定义 · 数学形式 / DEF</label>
                      <div className="bg-white border-2 border-indigo-100 shadow-sm p-6 rounded-xl">
                         <AtomListEditor
+                            key={activeNodeId + '-core'}
                             atoms={activeAtoms.core}
                             field="core"
                             defaultAtomType="latex"
@@ -1888,6 +1891,7 @@ const PhysMemosApp: FC = () => {
                       <div className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm h-full">
                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">适用域 / Fields</label>
                          <AtomListEditor
+                            key={activeNodeId + '-tags'}
                             atoms={activeAtoms.tags}
                             field="tags"
                             defaultAtomType="inline"
@@ -1899,6 +1903,7 @@ const PhysMemosApp: FC = () => {
                        <div className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm h-full">
                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">笔记 · 摘要 / Notes</label>
                          <AtomListEditor
+                            key={activeNodeId + '-doc'}
                             atoms={activeAtoms.doc}
                             field="doc"
                             defaultAtomType="markdown"
@@ -2010,6 +2015,7 @@ const PhysMemosApp: FC = () => {
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">参考文献 / References</span>
                     </div>
                     <AtomListEditor
+                        key={activeNodeId + '-refs'}
                         atoms={activeAtoms.refs}
                         field="refs"
                         defaultAtomType="sources"

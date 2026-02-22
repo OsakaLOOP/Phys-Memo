@@ -1,0 +1,47 @@
+  const handleCreateNode = async () => {
+    let initialTopic = '未分类 (Uncategorized)';
+    const activeNode = nodes.find(n => n.id === activeNodeId);
+    if (activeNode) {
+       if (activeNode.type === 'TOPIC') {
+          initialTopic = activeNode.title;
+       } else {
+          initialTopic = activeNode.topic;
+       }
+    }
+
+    const newNode: NodeData = {
+      id: crypto.randomUUID(),
+      disciplines: [],
+      topic: initialTopic,
+      title: '新物理概念',
+      type: 'FORMULA',
+      latex: '',
+      desc: '',
+      references: '',
+      constraints: [],
+      relations: []
+    };
+
+    // 1. Initialize AttrStrand concept FIRST
+    const initialData: Record<ContentAtomField, AtomSubmission[]> = {
+        doc: [],
+        core: [],
+        tags: [],
+        refs: [],
+        rels: []
+    };
+    // Ensure we await this so storage is ready
+    const concept = await core.createConcept(newNode.title, 'admin', initialData, newNode.topic, newNode.disciplines);
+
+    // 2. Sync ID to match concept ID (Critical for mapping)
+    // The previous implementation relied on randomUUID which mismatch concept.id
+    // We should use the concept.id as the node.id to ensure 1:1 mapping
+    newNode.id = concept.id;
+
+    // 3. Save to Legacy DB
+    await dbHelper.put(newNode);
+    setNodes(prev => [...prev, newNode]);
+
+    // 4. Set Active (triggers sync)
+    setActiveNodeId(newNode.id);
+  };

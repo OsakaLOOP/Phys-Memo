@@ -1,0 +1,85 @@
+  // Explicitly load edition for a node
+  const loadEditionForNode = async (nodeId: string) => {
+      // Find node data
+      // If not in state, try DB (though state should be source of truth)
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node || node.type === 'TOPIC') {
+          setActiveEdition(null);
+          return;
+      }
+
+      // Check concept
+      let concept = await storage.getConcept(nodeId);
+
+      // Auto-migrate if missing
+      if (!concept) {
+          console.log("Migrating node to AttrStrand (lazy):", node.title);
+          const initialData: Record<ContentAtomField, AtomSubmission[]> = {
+            doc: splitContent(node.desc, 'markdown').map(c => ({ content: c, field: 'doc', type: 'markdown' })),
+            core: splitContent(node.latex, 'latex').map(c => ({ content: c, field: 'core', type: 'latex' })),
+            tags: node.constraints.map(c => ({ content: c, field: 'tags', type: 'inline' })),
+            refs: splitContent(node.references, 'sources').map(c => ({ content: c, field: 'refs', type: 'sources' })),
+            rels: []
+          };
+          concept = await core.createConcept(node.title, 'system', initialData, node.topic, node.disciplines);
+
+          // Concept ID might differ if we let core generate it.
+          // But `createConcept` generates ID based on content hash.
+          // To maintain link, we must either update node ID or force concept ID.
+          // Since this is migration of EXISTING node, we should ideally keep Node ID.
+          // But `core` generates ID.
+          // We can't change concept ID easily.
+          // We must update Node ID in DB? That breaks relations.
+          // Better: Create concept, then store a mapping? Or just use the generated ID and update Node.
+          // For now, let's assume Migration updates the Node ID to match Concept ID if possible,
+          // OR we modify `createConcept` to accept an ID.
+          // `createConcept` uses `generateContentHash`.
+          // Let's rely on the `syncAttrStrand` logic which just creates it.
+          // Wait, if `concept.id` != `node.id`, next time we load `node.id` we won't find concept!
+          // We need to persist the relationship.
+          // Hack: Duplicate the concept under the `node.id` key in storage?
+          // Or update the node's ID.
+
+          // Let's update the Node's ID to match Concept ID?
+          // Too risky for relations.
+          // Let's FORCE the concept to have the node's ID.
+          // We need to modify `storage` to allow saving concept with specific ID?
+          // `storage.saveConcept` takes `IConceptRoot`. We can just overwrite the ID field?
+
+          // Update: Just overwrite ID locally before saving.
+          const fixedConcept = { ...concept, id: node.id };
+          // We also need to update the edition's conceptId
+          const headId = Object.keys(concept.currentHeads)[0];
+          const edition = await storage.getEdition(headId);
+          if (edition) {
+              edition.conceptId = node.id;
+              await storage.saveEdition(edition);
+          }
+          await storage.saveConcept(fixedConcept);
+          concept = fixedConcept;
+      }
+
+      // Load Head
+      const heads = Object.entries(concept.currentHeads).sort((a, b) => b[1] - a[1]);
+      if (heads.length > 0) {
+          const headId = heads[0][0];
+          const edition = await storage.getEdition(headId);
+          if (edition) {
+              setActiveEdition(edition);
+              const docs = await storage.getAtoms(edition.docAtomIds);
+              const cores = await storage.getAtoms(edition.coreAtomIds);
+              const tags = await storage.getAtoms(edition.tagsAtomIds);
+              const refs = await storage.getAtoms(edition.refsAtomIds);
+              setActiveAtoms({ doc: docs, core: cores, tags: tags, refs: refs, rels: [] });
+          }
+      }
+  };
+
+  // Sync AttrStrand when activeNode changes
+  useEffect(() => {
+    if (activeNodeId) {
+        void loadEditionForNode(activeNodeId);
+    } else {
+        setActiveEdition(null);
+    }
+  }, [activeNodeId]);

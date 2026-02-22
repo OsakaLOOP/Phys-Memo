@@ -952,32 +952,17 @@ const PhysMemosApp: FC = () => {
       }
 
       setNodes(finalNodes);
-      if (finalNodes.length > 0 && !activeNodeId) {
-         // Prefer selecting the first Topic if available, else first node
-         const firstTopic = finalNodes.find(n => n.type === 'TOPIC');
-         setActiveNodeId(firstTopic ? firstTopic.id : finalNodes[0].id);
-      } else if (finalNodes.length === 0) {
+      // Force seed if no nodes OR if specific debug flag (optional, skipped)
+      // Actually, if we have nodes but they might be broken, we can't easily tell.
+      // But user said "at least one concept". If list is empty, we seed.
+      if (finalNodes.length === 0) {
           // If no data, create a default "Sandpile Model" concept
-          const defaultNode: NodeData = {
-              id: 'sandpile-model-1',
-              title: 'Sandpile Model',
-              type: 'MODEL',
-              topic: 'Self-Organized Criticality',
-              disciplines: ['Physics', 'Complexity'],
-              latex: 'S \to S - 4, \quad S_{neighbors} \to S_{neighbors} + 1',
-              desc: 'The **Abelian Sandpile Model** is a cellular automaton used to demonstrate _self-organized criticality_.\n\nWhen the height of a pile exceeds a critical threshold, it collapses, distributing grains to neighbors.',
-              references: '[1] Bak, P., Tang, C., & Wiesenfeld, K. (1987). Self-organized criticality: An explanation of the 1/f noise. Physical review letters, 59(4), 381.',
-              constraints: ['Grid Lattice', 'Conservative (in bulk)'],
-              relations: []
-          };
-          await dbHelper.put(defaultNode);
-
-          // Seed AttrStrand
+          // 1. Create Concept FIRST
           const initialData: Record<ContentAtomField, AtomSubmission[]> = {
-            doc: splitContent(defaultNode.desc, 'markdown').map(c => ({ content: c, field: 'doc', type: 'markdown' })),
-            core: splitContent(defaultNode.latex, 'latex').map(c => ({ content: c, field: 'core', type: 'latex' })),
-            tags: defaultNode.constraints.map(c => ({ content: c, field: 'tags', type: 'inline' })),
-            refs: splitContent(defaultNode.references, 'sources').map(c => ({ content: c, field: 'refs', type: 'sources' })),
+            doc: splitContent('The **Abelian Sandpile Model** is a cellular automaton used to demonstrate _self-organized criticality_.\n\nWhen the height of a pile exceeds a critical threshold, it collapses, distributing grains to neighbors.', 'markdown').map(c => ({ content: c, field: 'doc', type: 'markdown' })),
+            core: splitContent('S \\to S - 4, \\quad S_{neighbors} \\to S_{neighbors} + 1', 'latex').map(c => ({ content: c, field: 'core', type: 'latex' })),
+            tags: ['Grid Lattice', 'Conservative (in bulk)'].map(c => ({ content: c, field: 'tags', type: 'inline' })),
+            refs: splitContent('[1] Bak, P., Tang, C., & Wiesenfeld, K. (1987). Self-organized criticality: An explanation of the 1/f noise. Physical review letters, 59(4), 381.', 'sources').map(c => ({ content: c, field: 'refs', type: 'sources' })),
             rels: []
           };
 
@@ -986,23 +971,27 @@ const PhysMemosApp: FC = () => {
           await dbHelper.putDiscipline({ name: 'Complexity', abbr: 'Cx', color: '#a855f7', hue: 270 });
           setDisciplines([{ name: 'Physics', abbr: 'Ph', color: '#3b82f6', hue: 210 }, { name: 'Complexity', abbr: 'Cx', color: '#a855f7', hue: 270 }]);
 
-          const concept = await core.createConcept(defaultNode.title, 'admin', initialData, defaultNode.topic, defaultNode.disciplines);
-          // Force overwrite concept ID to match legacy node ID for sync
-          const conceptData = await storage.getConcept(concept.id);
-          if (conceptData) {
-              // Delete auto-generated ID concept
-              // Actually we can't easily delete from storage mock without expose
-              // But we can just create a NEW one with correct ID
-              // Wait, `createConcept` generates ID.
-              // We need `createConcept` to accept ID or we manually fix it.
-              // Or better: update the NodeData ID to match the generated Concept ID.
-              await dbHelper.delete(defaultNode.id);
-              defaultNode.id = concept.id;
-              await dbHelper.put(defaultNode);
-          }
+          const concept = await core.createConcept('Sandpile Model', 'admin', initialData, 'Self-Organized Criticality', ['Physics', 'Complexity']);
+
+          const defaultNode: NodeData = {
+              id: concept.id, // Use generated ID
+              title: 'Sandpile Model',
+              type: 'MODEL',
+              topic: 'Self-Organized Criticality',
+              disciplines: ['Physics', 'Complexity'],
+              latex: 'S \\to S - 4, \\quad S_{neighbors} \\to S_{neighbors} + 1',
+              desc: 'The **Abelian Sandpile Model** is a cellular automaton used to demonstrate _self-organized criticality_.\n\nWhen the height of a pile exceeds a critical threshold, it collapses, distributing grains to neighbors.',
+              references: '[1] Bak, P., Tang, C., & Wiesenfeld, K. (1987). Self-organized criticality: An explanation of the 1/f noise. Physical review letters, 59(4), 381.',
+              constraints: ['Grid Lattice', 'Conservative (in bulk)'],
+              relations: []
+          };
+          await dbHelper.put(defaultNode);
 
           setNodes([defaultNode]);
           setActiveNodeId(defaultNode.id);
+      } else if (finalNodes.length > 0 && !activeNodeId) {
+         const firstTopic = finalNodes.find(n => n.type === 'TOPIC');
+         setActiveNodeId(firstTopic ? firstTopic.id : finalNodes[0].id);
       }
     } catch (err) {
       console.error("DB Error:", err);
@@ -1029,8 +1018,19 @@ const PhysMemosApp: FC = () => {
        }
     }
 
+    // 1. Initialize AttrStrand concept FIRST
+    const initialData: Record<ContentAtomField, AtomSubmission[]> = {
+        doc: [],
+        core: [],
+        tags: [],
+        refs: [],
+        rels: []
+    };
+    // Create concept with temp title, getting a Hash ID
+    const concept = await core.createConcept('新物理概念', 'admin', initialData, initialTopic, []);
+
     const newNode: NodeData = {
-      id: crypto.randomUUID(),
+      id: concept.id, // Use the Concept ID as the Node ID
       disciplines: [],
       topic: initialTopic,
       title: '新物理概念',
@@ -1041,19 +1041,12 @@ const PhysMemosApp: FC = () => {
       constraints: [],
       relations: []
     };
+
+    // 3. Save to Legacy DB
     await dbHelper.put(newNode);
     setNodes(prev => [...prev, newNode]);
 
-    // Initialize AttrStrand concept for new node
-    const initialData: Record<ContentAtomField, AtomSubmission[]> = {
-        doc: [],
-        core: [],
-        tags: [],
-        refs: [],
-        rels: []
-    };
-    await core.createConcept(newNode.title, 'admin', initialData, newNode.topic, newNode.disciplines);
-
+    // 4. Set Active (triggers sync)
     setActiveNodeId(newNode.id);
   };
 
@@ -1171,61 +1164,77 @@ const PhysMemosApp: FC = () => {
 
   const activeNode = nodes.find(n => n.id === activeNodeId);
 
-  // Sync AttrStrand when activeNode changes
-  useEffect(() => {
-    const syncAttrStrand = async () => {
-      if (!activeNode || activeNode.type === 'TOPIC') {
-        setActiveEdition(null);
-        return;
+  // Explicitly load edition for a node
+  const loadEditionForNode = async (nodeId: string) => {
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node || node.type === 'TOPIC') {
+          setActiveEdition(null);
+          return;
       }
 
-      // Check if concept exists
-      // We assume concept ID matches node ID for simplicity in migration
-      let concept = await storage.getConcept(activeNode.id);
+      // Check concept
+      let concept = await storage.getConcept(nodeId);
 
+      // Auto-migrate if missing
       if (!concept) {
-        // Migration: Create Concept from existing Node
-        console.log("Migrating node to AttrStrand:", activeNode.title);
+          console.log("Migrating node to AttrStrand (lazy):", node.title);
+          const initialData: Record<ContentAtomField, AtomSubmission[]> = {
+            doc: splitContent(node.desc, 'markdown').map(c => ({ content: c, field: 'doc', type: 'markdown' })),
+            core: splitContent(node.latex, 'latex').map(c => ({ content: c, field: 'core', type: 'latex' })),
+            tags: node.constraints.map(c => ({ content: c, field: 'tags', type: 'inline' })),
+            refs: splitContent(node.references, 'sources').map(c => ({ content: c, field: 'refs', type: 'sources' })),
+            rels: []
+          };
+          concept = await core.createConcept(node.title, 'system', initialData, node.topic, node.disciplines);
 
-        const initialData: Record<ContentAtomField, AtomSubmission[]> = {
-          doc: splitContent(activeNode.desc, 'markdown').map(c => ({ content: c, field: 'doc', type: 'markdown' })),
-          core: splitContent(activeNode.latex, 'latex').map(c => ({ content: c, field: 'core', type: 'latex' })),
-          tags: activeNode.constraints.map(c => ({ content: c, field: 'tags', type: 'inline' })),
-          refs: splitContent(activeNode.references, 'sources').map(c => ({ content: c, field: 'refs', type: 'sources' })),
-          rels: [] // Relations handled separately? Or as atoms? Assuming handled by legacy system for now or need atomizing.
-        };
+          // Force overwrite concept ID to match legacy node ID for consistency during migration
+          // This ensures next load finds it
+          const fixedConcept = { ...concept, id: nodeId };
+          // Update the edition's conceptId link
+          const headId = Object.keys(concept.currentHeads)[0];
+          const edition = await storage.getEdition(headId);
+          if (edition) {
+              const fixedEdition = { ...edition, conceptId: nodeId };
+              await storage.saveEdition(fixedEdition);
 
-        concept = await core.createConcept(activeNode.title, 'system', initialData, activeNode.topic, activeNode.disciplines);
+              // Also need to update the concept's heads pointer if head ID was derived from concept ID?
+              // No, edition ID is derived from concept ID + timestamp.
+              // But createEdition uses conceptId.
+              // If we change concept ID, we technically break the hash integrity of the edition ID if we re-hashed it,
+              // but we are just storing it.
+
+              // Re-save concept with correct ID
+              // We need to remove the old auto-generated one? Storage mock doesn't support deleteConcept easily exposed,
+              // but it's a mock.
+              await storage.saveConcept(fixedConcept);
+              concept = fixedConcept;
+          }
       }
 
-      // Load latest head
-      // For now, just pick the most recent head
+      // Load Head
       const heads = Object.entries(concept.currentHeads).sort((a, b) => b[1] - a[1]);
       if (heads.length > 0) {
-        const headId = heads[0][0];
-        const edition = await storage.getEdition(headId);
-        if (edition) {
-          setActiveEdition(edition);
-
-          // Load Atoms
-          const docs = await storage.getAtoms(edition.docAtomIds);
-          const cores = await storage.getAtoms(edition.coreAtomIds);
-          const tags = await storage.getAtoms(edition.tagsAtomIds);
-          const refs = await storage.getAtoms(edition.refsAtomIds);
-
-          setActiveAtoms({
-            doc: docs,
-            core: cores,
-            tags: tags,
-            refs: refs,
-            rels: []
-          });
-        }
+          const headId = heads[0][0];
+          const edition = await storage.getEdition(headId);
+          if (edition) {
+              setActiveEdition(edition);
+              const docs = await storage.getAtoms(edition.docAtomIds);
+              const cores = await storage.getAtoms(edition.coreAtomIds);
+              const tags = await storage.getAtoms(edition.tagsAtomIds);
+              const refs = await storage.getAtoms(edition.refsAtomIds);
+              setActiveAtoms({ doc: docs, core: cores, tags: tags, refs: refs, rels: [] });
+          }
       }
-    };
+  };
 
-    syncAttrStrand();
-  }, [activeNodeId]); // Depend on ID, not object to avoid loops if object ref changes but ID same
+  // Sync AttrStrand when activeNode changes
+  useEffect(() => {
+    if (activeNodeId) {
+        void loadEditionForNode(activeNodeId);
+    } else {
+        setActiveEdition(null);
+    }
+  }, [activeNodeId]);
 
   const handleAttrUpdate = async (field: ContentAtomField, submissions: AtomSubmission[]) => {
      if (!activeNode || !activeEdition) return;

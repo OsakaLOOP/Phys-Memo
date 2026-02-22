@@ -15,6 +15,14 @@ import RichTextRenderer from './components/RichTextRenderer';
 import EditableBlock from './components/EditableBlock';
 import SmartFormulaBlock from './components/SmartFormulaBlock';
 
+// AttrStrand Imports
+import { core, AtomSubmission } from './attrstrand/core';
+import { storage } from './attrstrand/storage';
+import { IEdition, IContentAtom, ContentAtomField } from './attrstrand/types';
+import { AtomListEditor } from './components/AttrStrand/AtomListEditor';
+import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
+import { splitContent } from './attrstrand/utils';
+
 // --- Type Definitions ---
 
 interface NodeData {
@@ -785,6 +793,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
 interface AppViewMode {
   editor: 'editor';
   graph: 'graph';
+  history: 'history';
 }
 
 type ViewMode = AppViewMode[keyof AppViewMode];
@@ -799,6 +808,11 @@ const PhysMemosApp: FC = () => {
   const [showOcrPanel, setShowOcrPanel] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
   
+  // AttrStrand State
+  const [activeEdition, setActiveEdition] = useState<IEdition | null>(null);
+  const [activeAtoms, setActiveAtoms] = useState<Record<ContentAtomField, IContentAtom[]>>({ doc: [], core: [], tags: [], refs: [], rels: [] });
+  const [historyParentId, setHistoryParentId] = useState<string | null>(null); // For history view navigation
+
   const [ocrText, setOcrText] = useState("");
   const [newRelTargetId, setNewRelTargetId] = useState("");
   const [newRelType, setNewRelType] = useState<Relation['type']>('DERIVES_FROM');
@@ -1098,6 +1112,131 @@ const PhysMemosApp: FC = () => {
   };
 
   const activeNode = nodes.find(n => n.id === activeNodeId);
+
+  // Sync AttrStrand when activeNode changes
+  useEffect(() => {
+    const syncAttrStrand = async () => {
+      if (!activeNode || activeNode.type === 'TOPIC') {
+        setActiveEdition(null);
+        return;
+      }
+
+      // Check if concept exists
+      // We assume concept ID matches node ID for simplicity in migration
+      let concept = await storage.getConcept(activeNode.id);
+
+      if (!concept) {
+        // Migration: Create Concept from existing Node
+        console.log("Migrating node to AttrStrand:", activeNode.title);
+
+        const initialData: Record<ContentAtomField, AtomSubmission[]> = {
+          doc: splitContent(activeNode.desc, 'markdown').map(c => ({ content: c, field: 'doc', type: 'markdown' })),
+          core: splitContent(activeNode.latex, 'latex').map(c => ({ content: c, field: 'core', type: 'latex' })),
+          tags: activeNode.constraints.map(c => ({ content: c, field: 'tags', type: 'inline' })),
+          refs: splitContent(activeNode.references, 'sources').map(c => ({ content: c, field: 'refs', type: 'sources' })),
+          rels: [] // Relations handled separately? Or as atoms? Assuming handled by legacy system for now or need atomizing.
+        };
+
+        concept = await core.createConcept(activeNode.title, 'system', initialData, activeNode.topic, activeNode.disciplines);
+      }
+
+      // Load latest head
+      // For now, just pick the most recent head
+      const heads = Object.entries(concept.currentHeads).sort((a, b) => b[1] - a[1]);
+      if (heads.length > 0) {
+        const headId = heads[0][0];
+        const edition = await storage.getEdition(headId);
+        if (edition) {
+          setActiveEdition(edition);
+
+          // Load Atoms
+          const docs = await storage.getAtoms(edition.docAtomIds);
+          const cores = await storage.getAtoms(edition.coreAtomIds);
+          const tags = await storage.getAtoms(edition.tagsAtomIds);
+          const refs = await storage.getAtoms(edition.refsAtomIds);
+
+          setActiveAtoms({
+            doc: docs,
+            core: cores,
+            tags: tags,
+            refs: refs,
+            rels: []
+          });
+        }
+      }
+    };
+
+    syncAttrStrand();
+  }, [activeNodeId]); // Depend on ID, not object to avoid loops if object ref changes but ID same
+
+  const handleAttrUpdate = async (field: ContentAtomField, submissions: AtomSubmission[]) => {
+     if (!activeNode || !activeEdition) return;
+
+     // Prepare full data for createEdition
+     // We need to preserve other fields' atoms if they are not being updated
+     // createEdition takes `Record<Field, AtomSubmission[]>`.
+     // If we only pass one field, others are empty? No, we need to pass ALL fields to maintain state,
+     // OR createEdition logic needs to support partial updates (inherit from parent).
+     // My `createEdition` implementation: `atomIds` starts empty. It iterates `data` keys.
+     // If a key is missing in `data`, `atomIds[field]` remains empty.
+     // Then `edition` is created with those empty lists.
+     // SO: We MUST pass all fields, either as submissions (new/derived) or reuse IDs?
+     // `createEdition` expects `AtomSubmission`.
+     // To reuse existing atoms, we pass `AtomSubmission` with `derivedFromId` = existing ID and `content` = existing content.
+
+     const prepareField = (f: ContentAtomField, currentAtoms: IContentAtom[], newSubmissions?: AtomSubmission[]) => {
+         if (newSubmissions && f === field) return newSubmissions;
+         return currentAtoms.map(a => ({
+             content: a.contentJson,
+             derivedFromId: a.id,
+             field: f,
+             type: a.type
+         } as AtomSubmission));
+     };
+
+     const allData: Record<ContentAtomField, AtomSubmission[]> = {
+         doc: prepareField('doc', activeAtoms.doc, field === 'doc' ? submissions : undefined),
+         core: prepareField('core', activeAtoms.core, field === 'core' ? submissions : undefined),
+         tags: prepareField('tags', activeAtoms.tags, field === 'tags' ? submissions : undefined),
+         refs: prepareField('refs', activeAtoms.refs, field === 'refs' ? submissions : undefined),
+         rels: [] // Ignore for now
+     };
+
+     const newEdition = await core.createEdition(
+         activeNode.id,
+         activeEdition.id,
+         allData,
+         'user', // Mock user
+         'autosave'
+     );
+
+     setActiveEdition(newEdition);
+
+     // Reload atoms for UI
+     const loadAtoms = async (ids: string[]) => await storage.getAtoms(ids);
+     const newAtomsState = {
+         doc: await loadAtoms(newEdition.docAtomIds),
+         core: await loadAtoms(newEdition.coreAtomIds),
+         tags: await loadAtoms(newEdition.tagsAtomIds),
+         refs: await loadAtoms(newEdition.refsAtomIds),
+         rels: []
+     };
+     setActiveAtoms(newAtomsState);
+
+     // Sync back to Legacy NodeData for compatibility
+     // Join atoms with newlines
+     const updatedNode = { ...activeNode };
+     if (field === 'doc') updatedNode.desc = newAtomsState.doc.map(a => a.contentJson).join('\n\n');
+     if (field === 'core') updatedNode.latex = newAtomsState.core.map(a => a.contentJson).join('\n\n'); // Usually one
+     if (field === 'tags') updatedNode.constraints = newAtomsState.tags.map(a => a.contentJson);
+     if (field === 'refs') updatedNode.references = newAtomsState.refs.map(a => a.contentJson).join('\n');
+
+     saveNode(updatedNode);
+
+     // Schedule cleanup
+     storage.runCleanup(Date.now() - 24 * 60 * 60 * 1000); // Clean older than 24h? Or just run it.
+  };
+
   const filteredNodes = nodes.filter(n => {
     const q = searchQuery.toLowerCase();
     return (
@@ -1261,6 +1400,14 @@ const PhysMemosApp: FC = () => {
             >
               <Network className="w-4 h-4" /> 图谱
             </button>
+            <button
+              onClick={() => { setViewMode('history'); setHistoryParentId(null); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
+                viewMode === 'history' ? 'bg-white border border-indigo-200 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'
+              }`}
+            >
+              <GitCommit className="w-4 h-4" /> 版本
+            </button>
           </div>
           <div className="flex gap-2">
             <button
@@ -1300,6 +1447,31 @@ const PhysMemosApp: FC = () => {
               setViewMode('editor');
             }}
           />
+        ) : viewMode === 'history' && activeNodeId ? (
+            <div className="flex-1 p-8 bg-slate-50 overflow-hidden flex flex-col">
+                <h2 className="text-xl font-bold mb-4 text-slate-700">Concept History: {activeNode?.title}</h2>
+                <ConceptNetworkView
+                    conceptId={activeNodeId}
+                    currentEditionId={activeEdition?.id}
+                    onSelectEdition={async (edition) => {
+                        // Switch to this edition
+                        setActiveEdition(edition);
+                        // Load atoms
+                        const docs = await storage.getAtoms(edition.docAtomIds);
+                        const cores = await storage.getAtoms(edition.coreAtomIds);
+                        const tags = await storage.getAtoms(edition.tagsAtomIds);
+                        const refs = await storage.getAtoms(edition.refsAtomIds);
+                        setActiveAtoms({ doc: docs, core: cores, tags: tags, refs: refs, rels: [] });
+
+                        // Update legacy node preview?
+                        // Maybe user just wants to view history.
+                        // If they click "Edit" in sidebar, they edit the activeEdition.
+                    }}
+                    onCreateBranch={(parent) => {
+                        alert("Branch creation not implemented in UI demo yet, but core supports it!");
+                    }}
+                />
+            </div>
         ) : (
           <>
             <div className={`bg-white border-b border-slate-100 flex flex-col justify-center px-8 z-10 transition-all ${activeNode?.type === 'TOPIC' ? 'h-16' : 'min-h-32 py-4 space-y-4'}`}>
@@ -1629,36 +1801,43 @@ const PhysMemosApp: FC = () => {
                 // --- STANDARD NODE EDITOR ---
               <div className="flex-1 overflow-y-auto bg-slate-50/30">
                 <div className="max-w-full   mx-auto p-8 space-y-6">
-                  <SmartFormulaBlock
-                    label="核心定义 · 数学形式 / DEF"
-                    value={activeNode.latex}
-                    onChange={(val: string | string[]) => saveNode({ ...activeNode, latex: val as string })}
-                    type="latex"
-                    variant="core"
-                    placeholder="在此输入 LaTeX 公式..."
-                  />
+                  {/* Replace SmartFormulaBlock and EditableBlock with AtomListEditor */}
+                  {/* We use activeAtoms state which is synced with activeEdition */}
+
+                  <div className="mb-2">
+                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">核心定义 · 数学形式 / DEF</label>
+                     <div className="bg-white border-2 border-indigo-100 shadow-sm p-6 rounded-xl">
+                        <AtomListEditor
+                            atoms={activeAtoms.core}
+                            field="core"
+                            defaultAtomType="latex"
+                            onUpdate={(subs) => handleAttrUpdate('core', subs)}
+                        />
+                     </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="md:col-span-1">
-                      <EditableBlock
-                        label="适用域 / Fields"
-                        value={activeNode.constraints}
-                        onChange={(val: string | string[]) => saveNode({ ...activeNode, constraints: val as string[] })}
-                        type="tags"
-                        variant="simple"
-                        className="h-full"
-                        placeholder="添加约束条件..."
-                      />
+                      <div className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm h-full">
+                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">适用域 / Fields</label>
+                         <AtomListEditor
+                            atoms={activeAtoms.tags}
+                            field="tags"
+                            defaultAtomType="inline"
+                            onUpdate={(subs) => handleAttrUpdate('tags', subs)}
+                        />
+                      </div>
                     </div>
                     <div className="md:col-span-2">
-                      <SmartFormulaBlock
-                        label="笔记 · 摘要 / Notes"
-                        value={activeNode.desc}
-                        onChange={(val: string | string[]) => saveNode({ ...activeNode, desc: val as string })}
-                        type="markdown"
-                        variant="simple"
-                        className="h-full"
-                        placeholder="记录推导思路... (支持 Markdown)"
-                      />
+                       <div className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm h-full">
+                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">笔记 · 摘要 / Notes</label>
+                         <AtomListEditor
+                            atoms={activeAtoms.doc}
+                            field="doc"
+                            defaultAtomType="markdown"
+                            onUpdate={(subs) => handleAttrUpdate('doc', subs)}
+                        />
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1763,14 +1942,12 @@ const PhysMemosApp: FC = () => {
                       <Hash className="w-4 h-4 text-indigo-500" />
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">参考文献 / References</span>
                     </div>
-                    <EditableBlock
-                      label=""
-                      value={activeNode.references}
-                      onChange={(val: string | string[]) => saveNode({ ...activeNode, references: val as string })}
-                      type="references"
-                      variant="subtle"
-                      className="bg-slate-50/50 rounded-lg border border-slate-100"
-                      placeholder="输入参考文献列表..."
+                    <AtomListEditor
+                        atoms={activeAtoms.refs}
+                        field="refs"
+                        defaultAtomType="sources"
+                        onUpdate={(subs) => handleAttrUpdate('refs', subs)}
+                        className="bg-slate-50/50 rounded-lg border border-slate-100 p-2"
                     />
                   </div>
                 </div>

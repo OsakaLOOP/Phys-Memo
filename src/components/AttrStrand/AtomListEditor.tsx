@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { IContentAtom, ContentAtomField, ContentAtomType } from '../../attrstrand/types';
 import type { AtomSubmission } from '../../attrstrand/core';
 import { AtomBlock } from './AtomBlock';
@@ -33,6 +33,9 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 
     useEffect(() => {
         // Initialize local state from props
+        // We only update if the IDs or length have changed to avoid disrupting active edits if possible
+        // But since App.tsx updates atoms on save, we must sync.
+        // The loop is broken by removing the reverse useEffect.
         setLocalAtoms(atoms.map(a => ({
             id: a.id,
             content: a.contentJson,
@@ -40,39 +43,30 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
         })));
     }, [atoms]);
 
-    // Propagate changes to parent
-    useEffect(() => {
+    const triggerUpdate = useCallback((newAtoms: EditableAtom[]) => {
         if (readOnly) return;
 
-        const submissions: AtomSubmission[] = localAtoms.map(a => ({
+        const submissions: AtomSubmission[] = newAtoms.map(a => ({
             content: a.content,
-            // If it has an original atom, it's derived from it.
-            // If content matches original, core logic handles reuse.
-            // If content changed, core logic handles new atom + attribution.
-            // If it's a new block (originalAtom null), derivedFromId is undefined (fresh content).
             derivedFromId: a.originalAtom ? a.originalAtom.id : undefined,
             field: field,
-            type: defaultAtomType // Assuming all atoms in this list share type (e.g. all markdown notes)
+            type: defaultAtomType
         }));
-        // We debounce this or just rely on parent to handle it?
-        // Parent might save on explicit action.
-        // For now, we just call onUpdate whenever local state changes.
-        // But preventing infinite loop if parent re-renders `atoms` prop?
-        // We only call onUpdate. We don't want parent to pass back new atoms immediately unless saved.
-        // So this is fine.
         onUpdate(submissions);
-    }, [localAtoms, field, defaultAtomType, readOnly]); // Warning: onUpdate dependency?
+    }, [field, defaultAtomType, onUpdate, readOnly]);
 
     const handleAtomUpdate = (index: number, newContent: string) => {
         const newAtoms = [...localAtoms];
         newAtoms[index].content = newContent;
         setLocalAtoms(newAtoms);
+        triggerUpdate(newAtoms);
     };
 
     const handleDelete = (index: number) => {
         const newAtoms = [...localAtoms];
         newAtoms.splice(index, 1);
         setLocalAtoms(newAtoms);
+        triggerUpdate(newAtoms);
     };
 
     const handleAdd = (index: number) => {
@@ -84,6 +78,11 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
         };
         newAtoms.splice(index + 1, 0, newAtom); // Insert after index
         setLocalAtoms(newAtoms);
+        // We do NOT trigger update immediately on add, to let user type first?
+        // But if we don't, the new block is just local.
+        // If we trigger, it creates a blank atom.
+        // Let's trigger to persist the structure change.
+        triggerUpdate(newAtoms);
     };
 
     return (
@@ -111,7 +110,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                                 attr: {}, // New blocks have no history yet
                                 field,
                                 type: defaultAtomType,
-                                creatorId: '', createdAt: '', contentHash: '', contentSimHash: '', frontMeta: {}, backMeta: {}
+                                creatorId: 'system', createdAt: '', contentHash: '', contentSimHash: '', frontMeta: {}, backMeta: {}
                             } as IContentAtom}
                             onUpdate={(content) => handleAtomUpdate(index, content)}
                             readOnly={readOnly}

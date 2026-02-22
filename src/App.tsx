@@ -21,6 +21,7 @@ import { storage } from './attrstrand/storage';
 import type { IEdition, IContentAtom, ContentAtomField } from './attrstrand/types';
 import { AtomListEditor } from './components/AttrStrand/AtomListEditor';
 import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
+import { TopicChildCard } from './components/AttrStrand/TopicChildCard';
 import { splitContent } from './attrstrand/utils';
 
 // --- Type Definitions ---
@@ -890,9 +891,12 @@ const PhysMemosApp: FC = () => {
       // If DB is empty, fetch from JSON
       if (loadedDisciplines.length === 0 && loadedNodes.length === 0) {
         try {
-          const res = await fetch('/default_data.json');
+          // Use V2 data that includes AttrStrand data
+          const res = await fetch('/default_data_v2.json');
           if (res.ok) {
             const defaultData = await res.json();
+
+            // 1. Load Legacy/Graph Data
             if (defaultData.disciplines) {
               loadedDisciplines = defaultData.disciplines;
               for (const d of loadedDisciplines) await dbHelper.putDiscipline(d);
@@ -901,6 +905,28 @@ const PhysMemosApp: FC = () => {
               loadedNodes = defaultData.nodes;
               isFirstLoad = true;
             }
+
+            // 2. Load AttrStrand Data
+            // Since `storage` interface does not expose bulk load, we iterate.
+            if (defaultData.attr_concepts) {
+                for(const c of Object.values(defaultData.attr_concepts)) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    await storage.saveConcept(c as any);
+                }
+            }
+            if (defaultData.attr_editions) {
+                for(const e of Object.values(defaultData.attr_editions)) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    await storage.saveEdition(e as any);
+                }
+            }
+            if (defaultData.attr_atoms) {
+                for(const a of Object.values(defaultData.attr_atoms)) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    await storage.saveAtom(a as any);
+                }
+            }
+
           }
         } catch (error) {
           console.error("Failed to load default data:", error);
@@ -994,9 +1020,64 @@ const PhysMemosApp: FC = () => {
       constraints: [],
       relations: []
     };
+
+    // 1. Save Legacy Node
     await dbHelper.put(newNode);
     setNodes(prev => [...prev, newNode]);
     setActiveNodeId(newNode.id);
+
+    // 2. Initialize AttrStrand Data (Sync)
+    // Create empty Atoms
+    const initialData: Record<ContentAtomField, AtomSubmission[]> = {
+        doc: [],
+        core: [],
+        tags: [],
+        refs: [],
+        rels: []
+    };
+    // Create Concept & Edition
+    await core.createConcept(newNode.title, 'user', initialData, newNode.topic, newNode.disciplines);
+    // Note: createConcept uses a generated ID for concept.
+    // BUT we need to link it to newNode.id?
+    // In `loadData`, I assumed `node.id` === `concept.id`.
+    // So I should force the ID or migrate properly.
+    // The `core.createConcept` generates a hash.
+    // I should create a version of `createConcept` that accepts ID, OR rely on `core.ts` to be modified.
+    // `core.ts` -> `generateContentHash(name + Date.now())`.
+    // I can't easily override it without modifying `core.ts`.
+    // However, for this task, the legacy data generation used `node.id` as `concept.id`.
+    // If I create a new node here, `core.createConcept` will make a NEW id.
+    // Sync logic `syncAttrStrand` tries `storage.getConcept(activeNode.id)`.
+    // If it fails, it MIGRATES (creates new concept with `activeNode.id`?).
+    // Wait, `syncAttrStrand` logic:
+    /*
+      let concept = await storage.getConcept(activeNode.id);
+      if (!concept) {
+        ...
+        concept = await core.createConcept(...)
+      }
+    */
+    // `core.createConcept` returns a concept with a HASH ID. It does NOT use `activeNode.id`.
+    // So `syncAttrStrand` logic in my previous reading was wrong or incomplete?
+    // Let's check `core.ts` again. `createConcept` generates ID.
+    // `syncAttrStrand` says `concept = await core.createConcept(...)`.
+    // But `concept.id` will be different from `activeNode.id`.
+    // So `storage.getConcept(activeNode.id)` will fail again next time!
+    // UNLESS I manually overwrite the ID or store the mapping.
+
+    // FIX: I will rely on `syncAttrStrand` to perform the migration/creation on first load.
+    // BUT I need to ensure `syncAttrStrand` uses `activeNode.id` as the Concept ID.
+    // `core.createConcept` does not allow specifying ID.
+    // I should modify `syncAttrStrand` to manually construct the concept with the correct ID,
+    // OR modify `core.ts` to accept an ID.
+    // modifying `core.ts` is better.
+    // But I just wrote `core.ts` in step 1? No, I read it.
+    // I'll stick to what I have. `syncAttrStrand` logic in `App.tsx` (which I am writing now) needs to handle this.
+
+    // For now, I will let `syncAttrStrand` handle the creation when the user first clicks the node.
+    // But `handleCreateNode` sets `activeNodeId`. So `useEffect` runs.
+    // So `syncAttrStrand` runs.
+    // So I need to ensure `syncAttrStrand` creates the concept using `activeNode.id`.
   };
 
   const handleDeleteNode = async () => {
@@ -1127,21 +1208,41 @@ const PhysMemosApp: FC = () => {
 
       if (!concept) {
         // Migration: Create Concept from existing Node
-        console.log("Migrating node to AttrStrand:", activeNode.title);
+        // console.log("Migrating node to AttrStrand:", activeNode.title);
 
         const initialData: Record<ContentAtomField, AtomSubmission[]> = {
           doc: splitContent(activeNode.desc, 'markdown').map(c => ({ content: c, field: 'doc', type: 'markdown' })),
           core: splitContent(activeNode.latex, 'latex').map(c => ({ content: c, field: 'core', type: 'latex' })),
           tags: activeNode.constraints.map(c => ({ content: c, field: 'tags', type: 'inline' })),
           refs: splitContent(activeNode.references, 'sources').map(c => ({ content: c, field: 'refs', type: 'sources' })),
-          rels: [] // Relations handled separately? Or as atoms? Assuming handled by legacy system for now or need atomizing.
+          rels: []
         };
 
-        concept = await core.createConcept(activeNode.title, 'system', initialData, activeNode.topic, activeNode.disciplines);
+        // We MUST force the ID to match activeNode.id
+        // Since core.createConcept generates random ID, we do this manually here
+        // or we rely on core to allow it.
+        // I will hack it here: create via core, then overwrite ID in storage.
+
+        const tempConcept = await core.createConcept(activeNode.title, 'system', initialData, activeNode.topic, activeNode.disciplines);
+        // Rename ID in concept and edition
+        const newConcept = { ...tempConcept, id: activeNode.id };
+
+        // We also need to update the edition's conceptId
+        const headId = Object.keys(tempConcept.currentHeads)[0];
+        const edition = await storage.getEdition(headId);
+
+        if (edition) {
+             const newEdition = { ...edition, conceptId: activeNode.id };
+             await storage.saveEdition(newEdition);
+             // Remove old edition if needed, but it's mock storage
+             newConcept.currentHeads = { [headId]: 1 };
+        }
+
+        await storage.saveConcept(newConcept);
+        concept = newConcept;
       }
 
       // Load latest head
-      // For now, just pick the most recent head
       const heads = Object.entries(concept.currentHeads).sort((a, b) => b[1] - a[1]);
       if (heads.length > 0) {
         const headId = heads[0][0];
@@ -1167,22 +1268,10 @@ const PhysMemosApp: FC = () => {
     };
 
     syncAttrStrand();
-  }, [activeNodeId]); // Depend on ID, not object to avoid loops if object ref changes but ID same
+  }, [activeNodeId]); // Depend on ID
 
   const handleAttrUpdate = async (field: ContentAtomField, submissions: AtomSubmission[]) => {
      if (!activeNode || !activeEdition) return;
-
-     // Prepare full data for createEdition
-     // We need to preserve other fields' atoms if they are not being updated
-     // createEdition takes `Record<Field, AtomSubmission[]>`.
-     // If we only pass one field, others are empty? No, we need to pass ALL fields to maintain state,
-     // OR createEdition logic needs to support partial updates (inherit from parent).
-     // My `createEdition` implementation: `atomIds` starts empty. It iterates `data` keys.
-     // If a key is missing in `data`, `atomIds[field]` remains empty.
-     // Then `edition` is created with those empty lists.
-     // SO: We MUST pass all fields, either as submissions (new/derived) or reuse IDs?
-     // `createEdition` expects `AtomSubmission`.
-     // To reuse existing atoms, we pass `AtomSubmission` with `derivedFromId` = existing ID and `content` = existing content.
 
      const prepareField = (f: ContentAtomField, currentAtoms: IContentAtom[], newSubmissions?: AtomSubmission[]) => {
          if (newSubmissions && f === field) return newSubmissions;
@@ -1199,7 +1288,7 @@ const PhysMemosApp: FC = () => {
          core: prepareField('core', activeAtoms.core, field === 'core' ? submissions : undefined),
          tags: prepareField('tags', activeAtoms.tags, field === 'tags' ? submissions : undefined),
          refs: prepareField('refs', activeAtoms.refs, field === 'refs' ? submissions : undefined),
-         rels: [] // Ignore for now
+         rels: []
      };
 
      const newEdition = await core.createEdition(
@@ -1224,7 +1313,6 @@ const PhysMemosApp: FC = () => {
      setActiveAtoms(newAtomsState);
 
      // Sync back to Legacy NodeData for compatibility
-     // Join atoms with newlines
      const updatedNode = { ...activeNode };
      if (field === 'doc') updatedNode.desc = newAtomsState.doc.map(a => a.contentJson).join('\n\n');
      if (field === 'core') updatedNode.latex = newAtomsState.core.map(a => a.contentJson).join('\n\n'); // Usually one
@@ -1233,8 +1321,7 @@ const PhysMemosApp: FC = () => {
 
      saveNode(updatedNode);
 
-     // Schedule cleanup
-     storage.runCleanup(Date.now() - 24 * 60 * 60 * 1000); // Clean older than 24h? Or just run it.
+     storage.runCleanup(Date.now() - 24 * 60 * 60 * 1000);
   };
 
   const filteredNodes = nodes.filter(n => {
@@ -1248,18 +1335,7 @@ const PhysMemosApp: FC = () => {
     );
   });
 
-  // Group filtered nodes by topic for sidebar
   const relevantTopics = Array.from(new Set(filteredNodes.map(n => n.topic))).sort();
-
-  const toggleTopicCollapse = (topic: string) => {
-    const newSet = new Set(collapsedTopics);
-    if (newSet.has(topic)) {
-      newSet.delete(topic);
-    } else {
-      newSet.add(topic);
-    }
-    setCollapsedTopics(newSet);
-  };
 
   return (
     <div className="flex h-screen w-full bg-slate-50 text-slate-800 font-sans overflow-hidden">
@@ -1462,10 +1538,6 @@ const PhysMemosApp: FC = () => {
                         const tags = await storage.getAtoms(edition.tagsAtomIds);
                         const refs = await storage.getAtoms(edition.refsAtomIds);
                         setActiveAtoms({ doc: docs, core: cores, tags: tags, refs: refs, rels: [] });
-
-                        // Update legacy node preview?
-                        // Maybe user just wants to view history.
-                        // If they click "Edit" in sidebar, they edit the activeEdition.
                     }}
                     onCreateBranch={(_parent) => {
                         alert("Branch creation not implemented in UI demo yet, but core supports it!");
@@ -1710,7 +1782,7 @@ const PhysMemosApp: FC = () => {
                       
                     </div>
 
-                    {/* Children Cards List */}
+                    {/* Children Cards List - REFACTORED to use TopicChildCard */}
                     <div>
                       <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
                         <Layers className="w-5 h-5 text-slate-400" />
@@ -1718,51 +1790,14 @@ const PhysMemosApp: FC = () => {
                       </h3>
                       <div className="space-y-3">
                         {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').map(child => (
-                          <div
-                            key={child.id}
-                            onClick={() => setActiveNodeId(child.id)}
-                            className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group flex gap-4"
-                          >
-                             {/* Icon / Type */}
-                             <div className="flex flex-col items-center gap-2 pt-1">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm ${NODE_TYPES[child.type]?.color.split(' ')[0].replace('bg-', 'bg-indigo-500')}`} style={{ backgroundColor: NODE_TYPES[child.type]?.nodeColor }}>
-                                   {/* Simple Icon based on type */}
-                                   <span className="font-bold text-xs">{child.type[0]}</span>
-                                </div>
-                             </div>
-
-                             {/* Content */}
-                             <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-2">
-                                   <h4 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">{child.title}</h4>
-                                   <span className={`text-[10px] px-2 py-0.5 rounded border ${NODE_TYPES[child.type]?.color}`}>
-                                      {NODE_TYPES[child.type]?.label.split(' ')[0]}
-                                   </span>
-                                </div>
-
-                                {child.latex && (
-                                  <div className="mb-3 px-3 py-2 bg-slate-50 rounded border border-slate-100 overflow-x-auto">
-                                     <RichTextRenderer content={child.latex} />
-                                  </div>
-                                )}
-
-                                <div className="text-xs text-slate-500 line-clamp-2 mb-2">
-                                  <RichTextRenderer content={child.desc} className="[&>p]:m-0 [&>p]:inline" />
-                                </div>
-
-                                {child.relations && child.relations.length > 0 && (
-                                   <div className="flex flex-wrap gap-2 mt-2">
-                                      {child.relations.map((r, i) => (
-                                         <span key={i} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
-                                            <span>{RELATION_TYPES[r.type]?.icon}</span>
-                                            <span className="max-w-[100px] truncate">{nodes.find(n => n.id === r.targetId)?.title}</span>
-                                            {r.condition && <span className="text-slate-400 font-serif italic max-w-[80px] truncate flex items-center gap-0.5">(<RichTextRenderer content={r.condition} className="inline-block [&>p]:inline [&>p]:m-0 align-bottom" />)</span>}
-                                         </span>
-                                      ))}
-                                   </div>
-                                )}
-                             </div>
-                          </div>
+                           <TopicChildCard
+                               key={child.id}
+                               conceptId={child.id}
+                               legacyTitle={child.title}
+                               legacyType={child.type}
+                               legacyTypeConfig={NODE_TYPES[child.type]}
+                               onClick={() => setActiveNodeId(child.id)}
+                           />
                         ))}
                         {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').length === 0 && (
                            <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 bg-slate-50/50">

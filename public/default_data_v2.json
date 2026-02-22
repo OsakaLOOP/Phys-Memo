@@ -1,0 +1,313 @@
+{
+  "disciplines": [
+    {
+      "name": "凝聚态物理",
+      "label": "凝聚态物理",
+      "abbr": "凝聚",
+      "color": "#10b981",
+      "hue": 160
+    },
+    {
+      "name": "几何光学",
+      "label": "几何光学",
+      "abbr": "几光",
+      "color": "#ffd030",
+      "hue": 50
+    },
+    {
+      "name": "实验物理",
+      "label": "实验物理",
+      "abbr": "实验",
+      "color": "#f43f5e",
+      "hue": 350
+    },
+    {
+      "name": "工程力学",
+      "label": "工程力学",
+      "abbr": "工程",
+      "color": "#8c8c8c",
+      "hue": 30
+    },
+    {
+      "name": "波动光学",
+      "label": "波动光学",
+      "abbr": "波光",
+      "color": "#ffd030",
+      "hue": 60
+    },
+    {
+      "name": "流体力学",
+      "label": "流体力学",
+      "abbr": "流体",
+      "color": "#3b82f6",
+      "hue": 220
+    },
+    {
+      "name": "热力学",
+      "label": "热力学",
+      "abbr": "热力学",
+      "color": "#ff762c",
+      "hue": 0
+    },
+    {
+      "name": "理论力学",
+      "label": "理论力学",
+      "abbr": "理力",
+      "color": "#ffc3f9",
+      "hue": 160
+    },
+    {
+      "name": "电动力学",
+      "label": "电动力学",
+      "abbr": "电动",
+      "color": "#39c5bb",
+      "hue": 0
+    },
+    {
+      "name": "相对论物理",
+      "label": "相对论物理",
+      "abbr": "相对论",
+      "color": "#00ffea",
+      "hue": 330
+    },
+    {
+      "name": "统计力学",
+      "label": "统计力学",
+      "abbr": "统计",
+      "color": "#f59e0b",
+      "hue": 40
+    },
+    {
+      "name": "计算物理",
+      "label": "计算物理",
+      "abbr": "计算",
+      "color": "#8b5cf6",
+      "hue": 270
+    },
+    {
+      "name": "量子力学",
+      "label": "量子力学",
+      "abbr": "量子",
+      "color": "#0fc8e8",
+      "hue": 190
+    },
+    {
+      "name": "颗粒物理",
+      "label": "颗粒物理",
+      "abbr": "颗粒",
+      "color": "#ce9aff",
+      "hue": 280
+    }
+  ],
+  "nodes": [
+    {
+      "id": "5e6b235f-d221-4d98-b3b8-13fb6b7e267a",
+      "disciplines": [
+        "统计力学"
+      ],
+      "topic": "颗粒流",
+      "title": "测试节点",
+      "type": "FORMULA",
+      "latex": "$$\\text{test} \\ \\int \\hat{\\vec{\\mathcal{L}}^{2^{2_2a}}_\\pi} \\ \\frac{\\mathrm{d}}{\\mathrm{d}y} \\ \\ \\Delta \\ \\Delta x (\\alpha_1) \\epsilon' e^{-E/kT} e_1 \\partial t$$\n\n$$\\mathcal{Z}_{eff}^{(n)}[\\phi] = \\oint_{\\partial \\Omega} \\sqrt{-g} \\cdot e^{-\\frac{i}{\\hbar} \\int_{t_0}^{t_1} \\left[ \\frac{1}{2} m \\left( \\frac{\\mathrm{d}^2 \\vec{x}_a}{\\mathrm{d}s^2} \\right)^2 - V(x_a, \\dot{x}_a, \\vec{p}^{(i)}) \\right] \\mathrm{d}s} \\cdot \\frac{\\delta^2 S}{\\delta \\phi^* \\delta \\phi}$$\n\n$$\\mathbb{W}_{ext} = \\int \\mathrm{d}^4x \\left\\{ \\bar{\\psi}_{\\alpha} (i \\gamma^{\\mu} \\nabla_{\\mu} - m) \\psi^{\\alpha} + \\sum_{j=1}^{N} \\det \\left( \\begin{matrix} \\hat{A}_{ij} & \\delta_{ij} \\Phi \\\\ \\Phi^{\\dagger} & \\partial^2 \\hat{B}_{ij} \\end{matrix} \\right) \\right\\} + \\Delta \\mathcal{L}_{int}$$\n\n## 1\n\n$$\\chi_{i j}^{(3)}(\\omega_p; \\omega_1, \\omega_2) = \\frac{N e^4}{\\epsilon_0 \\hbar^3} \\sum_{a,b,c} \\frac{\\rho_{aa}^{(0)} - \\rho_{bb}^{(0)}}{(\\omega_{ba} - \\omega_1 - i\\Gamma_{ba}) (\\omega_{ca} - \\omega_p - i\\Gamma_{ca})} \\hat{r}_{ab} \\hat{r}_{bc} \\hat{r}_{ca}$$",
+      "desc": "",
+      "references": "",
+      "constraints": [],
+      "relations": []
+    }
+  ],
+  "attr_concepts": {
+    "5e6b235f-d221-4d98-b3b8-13fb6b7e267a": {
+      "id": "5e6b235f-d221-4d98-b3b8-13fb6b7e267a",
+      "name": "测试节点",
+      "topic": "颗粒流",
+      "disciplines": [
+        "统计力学"
+      ],
+      "creatorId": "system",
+      "createdAt": "2026-02-22T13:29:57.974088",
+      "currentHeads": {
+        "931a8e28ca39fb28e5de2ab089383585": 2,
+        "7b43060cc946ac01fdb91d96fa928a03": 3
+      },
+      "frontMeta": {},
+      "backMeta": {}
+    }
+  },
+  "attr_editions": {
+    "00231f7080ef0a80cc0fc0aa7fec6b3f": {
+      "id": "00231f7080ef0a80cc0fc0aa7fec6b3f",
+      "conceptId": "5e6b235f-d221-4d98-b3b8-13fb6b7e267a",
+      "saveType": "save",
+      "coreAtomIds": [
+        "9fc518640631a3685215b11e67dbac78",
+        "d3a595e0ec70f443e2afdf4301608c5d",
+        "31e929e7f93f0cf7238abdab87d48ea7",
+        "c6ab3f14a30cc8a1958dcc248b5a5238",
+        "0eb7e1c17cbaf7be19b32cbc0c9f3366"
+      ],
+      "docAtomIds": [],
+      "tagsAtomIds": [],
+      "refsAtomIds": [],
+      "relsAtomIds": [],
+      "creator": "system",
+      "createdAt": "2026-02-22T13:29:57.974809",
+      "parentEditionId": null,
+      "frontMeta": {},
+      "backMeta": {}
+    },
+    "931a8e28ca39fb28e5de2ab089383585": {
+      "id": "931a8e28ca39fb28e5de2ab089383585",
+      "conceptId": "5e6b235f-d221-4d98-b3b8-13fb6b7e267a",
+      "saveType": "save",
+      "coreAtomIds": [
+        "9fc518640631a3685215b11e67dbac78",
+        "d3a595e0ec70f443e2afdf4301608c5d",
+        "31e929e7f93f0cf7238abdab87d48ea7",
+        "c6ab3f14a30cc8a1958dcc248b5a5238",
+        "0eb7e1c17cbaf7be19b32cbc0c9f3366"
+      ],
+      "docAtomIds": [
+        "552f3286945d4b3a6216ffd2981e491c"
+      ],
+      "tagsAtomIds": [],
+      "refsAtomIds": [],
+      "relsAtomIds": [],
+      "creator": "user_branch",
+      "createdAt": "2026-02-22T13:29:57.974872",
+      "parentEditionId": "00231f7080ef0a80cc0fc0aa7fec6b3f",
+      "frontMeta": {},
+      "backMeta": {}
+    },
+    "7b43060cc946ac01fdb91d96fa928a03": {
+      "id": "7b43060cc946ac01fdb91d96fa928a03",
+      "conceptId": "5e6b235f-d221-4d98-b3b8-13fb6b7e267a",
+      "saveType": "save",
+      "coreAtomIds": [
+        "2d4a20f2051b0ecdfb49e0b19de73913"
+      ],
+      "docAtomIds": [],
+      "tagsAtomIds": [],
+      "refsAtomIds": [],
+      "relsAtomIds": [],
+      "creator": "user_branch_2",
+      "createdAt": "2026-02-22T13:29:57.974888",
+      "parentEditionId": "00231f7080ef0a80cc0fc0aa7fec6b3f",
+      "frontMeta": {},
+      "backMeta": {}
+    }
+  },
+  "attr_atoms": {
+    "9fc518640631a3685215b11e67dbac78": {
+      "id": "9fc518640631a3685215b11e67dbac78",
+      "field": "core",
+      "type": "latex",
+      "contentJson": "$$\\text{test} \\ \\int \\hat{\\vec{\\mathcal{L}}^{2^{2_2a}}_\\pi} \\ \\frac{\\mathrm{d}}{\\mathrm{d}y} \\ \\ \\Delta \\ \\Delta x (\\alpha_1) \\epsilon' e^{-E/kT} e_1 \\partial t$$",
+      "contentHash": "f80ade8fdfb595c0070a30b0be3a1968",
+      "contentSimHash": "f80ade8fdfb595c0070a30b0be3a1968",
+      "creatorId": "system",
+      "createdAt": "2026-02-22T13:29:57.974748",
+      "attr": {
+        "system": 1
+      },
+      "derivedFromId": null,
+      "frontMeta": {},
+      "backMeta": {}
+    },
+    "d3a595e0ec70f443e2afdf4301608c5d": {
+      "id": "d3a595e0ec70f443e2afdf4301608c5d",
+      "field": "core",
+      "type": "latex",
+      "contentJson": "$$\\mathcal{Z}_{eff}^{(n)}[\\phi] = \\oint_{\\partial \\Omega} \\sqrt{-g} \\cdot e^{-\\frac{i}{\\hbar} \\int_{t_0}^{t_1} \\left[ \\frac{1}{2} m \\left( \\frac{\\mathrm{d}^2 \\vec{x}_a}{\\mathrm{d}s^2} \\right)^2 - V(x_a, \\dot{x}_a, \\vec{p}^{(i)}) \\right] \\mathrm{d}s} \\cdot \\frac{\\delta^2 S}{\\delta \\phi^* \\delta \\phi}$$",
+      "contentHash": "90cfdd53a84ce87045ee9328040ee148",
+      "contentSimHash": "90cfdd53a84ce87045ee9328040ee148",
+      "creatorId": "system",
+      "createdAt": "2026-02-22T13:29:57.974770",
+      "attr": {
+        "system": 1
+      },
+      "derivedFromId": null,
+      "frontMeta": {},
+      "backMeta": {}
+    },
+    "31e929e7f93f0cf7238abdab87d48ea7": {
+      "id": "31e929e7f93f0cf7238abdab87d48ea7",
+      "field": "core",
+      "type": "latex",
+      "contentJson": "$$\\mathbb{W}_{ext} = \\int \\mathrm{d}^4x \\left\\{ \\bar{\\psi}_{\\alpha} (i \\gamma^{\\mu} \\nabla_{\\mu} - m) \\psi^{\\alpha} + \\sum_{j=1}^{N} \\det \\left( \\begin{matrix} \\hat{A}_{ij} & \\delta_{ij} \\Phi \\\\ \\Phi^{\\dagger} & \\partial^2 \\hat{B}_{ij} \\end{matrix} \\right) \\right\\} + \\Delta \\mathcal{L}_{int}$$",
+      "contentHash": "0e13aadfb19b09c50bcd60538c5315ab",
+      "contentSimHash": "0e13aadfb19b09c50bcd60538c5315ab",
+      "creatorId": "system",
+      "createdAt": "2026-02-22T13:29:57.974780",
+      "attr": {
+        "system": 1
+      },
+      "derivedFromId": null,
+      "frontMeta": {},
+      "backMeta": {}
+    },
+    "c6ab3f14a30cc8a1958dcc248b5a5238": {
+      "id": "c6ab3f14a30cc8a1958dcc248b5a5238",
+      "field": "core",
+      "type": "latex",
+      "contentJson": "## 1",
+      "contentHash": "c6da6de7330bd8b82823c0bd3ea7b8b8",
+      "contentSimHash": "c6da6de7330bd8b82823c0bd3ea7b8b8",
+      "creatorId": "system",
+      "createdAt": "2026-02-22T13:29:57.974787",
+      "attr": {
+        "system": 1
+      },
+      "derivedFromId": null,
+      "frontMeta": {},
+      "backMeta": {}
+    },
+    "0eb7e1c17cbaf7be19b32cbc0c9f3366": {
+      "id": "0eb7e1c17cbaf7be19b32cbc0c9f3366",
+      "field": "core",
+      "type": "latex",
+      "contentJson": "$$\\chi_{i j}^{(3)}(\\omega_p; \\omega_1, \\omega_2) = \\frac{N e^4}{\\epsilon_0 \\hbar^3} \\sum_{a,b,c} \\frac{\\rho_{aa}^{(0)} - \\rho_{bb}^{(0)}}{(\\omega_{ba} - \\omega_1 - i\\Gamma_{ba}) (\\omega_{ca} - \\omega_p - i\\Gamma_{ca})} \\hat{r}_{ab} \\hat{r}_{bc} \\hat{r}_{ca}$$",
+      "contentHash": "31ef0bc3706ad96ae400fc4011830b3a",
+      "contentSimHash": "31ef0bc3706ad96ae400fc4011830b3a",
+      "creatorId": "system",
+      "createdAt": "2026-02-22T13:29:57.974796",
+      "attr": {
+        "system": 1
+      },
+      "derivedFromId": null,
+      "frontMeta": {},
+      "backMeta": {}
+    },
+    "552f3286945d4b3a6216ffd2981e491c": {
+      "id": "552f3286945d4b3a6216ffd2981e491c",
+      "field": "doc",
+      "type": "markdown",
+      "contentJson": "This is a new note added in branch v2.",
+      "contentHash": "552f3286945d4b3a6216ffd2981e491c",
+      "contentSimHash": "552f3286945d4b3a6216ffd2981e491c",
+      "creatorId": "user_branch",
+      "createdAt": "2026-02-22T13:29:57.974822",
+      "attr": {
+        "user_branch": 1
+      },
+      "derivedFromId": null,
+      "frontMeta": {},
+      "backMeta": {}
+    },
+    "2d4a20f2051b0ecdfb49e0b19de73913": {
+      "id": "2d4a20f2051b0ecdfb49e0b19de73913",
+      "field": "core",
+      "type": "latex",
+      "contentJson": "$$ E = mc^2 + \\text{correction} $$",
+      "contentHash": "2d4a20f2051b0ecdfb49e0b19de73913",
+      "contentSimHash": "2d4a20f2051b0ecdfb49e0b19de73913",
+      "creatorId": "user_branch_2",
+      "createdAt": "2026-02-22T13:29:57.974884",
+      "attr": {
+        "user_branch_2": 1
+      },
+      "derivedFromId": null,
+      "frontMeta": {},
+      "backMeta": {}
+    }
+  }
+}

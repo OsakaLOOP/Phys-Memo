@@ -31,48 +31,66 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 }) => {
     const [localAtoms, setLocalAtoms] = useState<EditableAtom[]>([]);
 
+    // We use a ref to track if local changes are pending update, to avoid responding to parent updates that we triggered ourselves?
+    // Or simpler: Only update local state from props if the prop atoms are DIFFERENT from what our local state implies.
+    // However, atoms prop changes to new objects on every save.
+
+    // Better strategy: Initialize local state from props.
+    // When user edits local state, trigger onUpdate.
+    // When onUpdate completes, parent re-renders with new atoms.
+    // We need to distinguish "new atoms from parent due to our save" vs "new atoms from parent due to external change".
+    // Actually, simply relying on parent to drive state is safer but requires `AtomListEditor` to not have local state for *content*.
+    // But we need local state for *list structure* (adding/removing items before save).
+
+    // Solution:
+    // 1. Initialize `localAtoms` from `atoms`.
+    // 2. When `atoms` prop changes, check if it matches our `localAtoms` structure/content. If so, do nothing. If different (e.g. initial load, or external sync), update `localAtoms`.
+    // 3. When user edits, update `localAtoms` AND call `onUpdate` immediately (or debounced).
+
+    // To prevent loop:
+    // If `useEffect` updates `localAtoms`, do NOT trigger `onUpdate`.
+    // `onUpdate` should only be triggered by USER ACTIONS (handlers).
+
     useEffect(() => {
-        // Initialize local state from props
-        setLocalAtoms(atoms.map(a => ({
+        // Compare incoming atoms with local state to see if update is needed
+        // For simplicity, just checking IDs might be enough if we trust the flow,
+        // but content might change too.
+        // Let's just blindly sync for now, BUT remove the effect that calls onUpdate automatically.
+        const mappedAtoms = atoms.map(a => ({
             id: a.id,
             content: a.contentJson,
             originalAtom: a
-        })));
+        }));
+
+        // Only update if length differs or IDs differ (optimization)
+        // For now, simple set.
+        setLocalAtoms(mappedAtoms);
     }, [atoms]);
 
-    // Propagate changes to parent
-    useEffect(() => {
+    const notifyUpdate = (currentAtoms: EditableAtom[]) => {
         if (readOnly) return;
 
-        const submissions: AtomSubmission[] = localAtoms.map(a => ({
+        const submissions: AtomSubmission[] = currentAtoms.map(a => ({
             content: a.content,
-            // If it has an original atom, it's derived from it.
-            // If content matches original, core logic handles reuse.
-            // If content changed, core logic handles new atom + attribution.
-            // If it's a new block (originalAtom null), derivedFromId is undefined (fresh content).
             derivedFromId: a.originalAtom ? a.originalAtom.id : undefined,
             field: field,
-            type: defaultAtomType // Assuming all atoms in this list share type (e.g. all markdown notes)
+            type: defaultAtomType
         }));
-        // We debounce this or just rely on parent to handle it?
-        // Parent might save on explicit action.
-        // For now, we just call onUpdate whenever local state changes.
-        // But preventing infinite loop if parent re-renders `atoms` prop?
-        // We only call onUpdate. We don't want parent to pass back new atoms immediately unless saved.
-        // So this is fine.
         onUpdate(submissions);
-    }, [localAtoms, field, defaultAtomType, readOnly]); // Warning: onUpdate dependency?
+    };
 
     const handleAtomUpdate = (index: number, newContent: string) => {
         const newAtoms = [...localAtoms];
         newAtoms[index].content = newContent;
         setLocalAtoms(newAtoms);
+        notifyUpdate(newAtoms); // Call onUpdate explicitly
     };
 
     const handleDelete = (index: number) => {
         const newAtoms = [...localAtoms];
         newAtoms.splice(index, 1);
         setLocalAtoms(newAtoms);
+        notifyUpdate(newAtoms); // Call onUpdate explicitly
     };
 
     const handleAdd = (index: number) => {
@@ -82,8 +100,13 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
             content: '',
             originalAtom: null
         };
-        newAtoms.splice(index + 1, 0, newAtom); // Insert after index
+        newAtoms.splice(index + 1, 0, newAtom);
         setLocalAtoms(newAtoms);
+        // Do NOT notify update yet? Or yes?
+        // If we add an empty block, maybe we don't save yet until they type?
+        // If we save, it creates an empty atom.
+        // Let's notify to keep state in sync.
+        notifyUpdate(newAtoms);
     };
 
     return (
@@ -108,14 +131,14 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                             atom={atom.originalAtom || {
                                 id: atom.id,
                                 contentJson: atom.content,
-                                attr: {}, // New blocks have no history yet
+                                attr: {},
                                 field,
                                 type: defaultAtomType,
                                 creatorId: '', createdAt: '', contentHash: '', contentSimHash: '', frontMeta: {}, backMeta: {}
                             } as IContentAtom}
                             onUpdate={(content) => handleAtomUpdate(index, content)}
                             readOnly={readOnly}
-                            className={!readOnly ? "pr-8" : ""} // Make room for delete button
+                            className={!readOnly ? "pr-8" : ""}
                         />
 
                         {!readOnly && (

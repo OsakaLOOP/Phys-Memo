@@ -123,7 +123,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             .attr("cursor", "pointer")
             .on("click", (_event, d) => onSelectEdition(d.edition))
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .call(d3.drag<SVGCircleElement, GraphNode>()
+            .call(d3.drag<any, GraphNode>()
                 .on("start", (event) => {
                     if (!event.active) simulation.alphaTarget(0.3).restart();
                     event.subject.fx = event.subject.x;
@@ -137,7 +137,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
                     if (!event.active) simulation.alphaTarget(0);
                     event.subject.fx = null;
                     event.subject.fy = null;
-                }) as any
+                })
             );
 
         node.append("title")

@@ -1,4 +1,4 @@
-import { ContentAtomType } from './types';
+import type { ContentAtomType } from './types';
 
 // Simple hash function for string to 32-bit integer
 function stringHash(str: string): number {

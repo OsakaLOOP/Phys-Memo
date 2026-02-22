@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IContentAtom, ContentAtomField, ContentAtomType } from '../../attrstrand/types';
+import type { IContentAtom, ContentAtomField, ContentAtomType } from '../../attrstrand/types';
 import type { AtomSubmission } from '../../attrstrand/core';
 import { AtomBlock } from './AtomBlock';
 import { Plus, Trash2 } from 'lucide-react';

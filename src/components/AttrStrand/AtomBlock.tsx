@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IContentAtom } from '../../attrstrand/types';
+import type { IContentAtom } from '../../attrstrand/types';
 import RichTextRenderer from '../RichTextRenderer';
 import { Edit3, Check, X } from 'lucide-react';
 

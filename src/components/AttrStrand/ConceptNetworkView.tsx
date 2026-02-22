@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { IConceptRoot, IEdition } from '../../attrstrand/types';
+import type { IConceptRoot, IEdition } from '../../attrstrand/types';
 import { storage } from '../../attrstrand/storage';
 
 interface ConceptNetworkViewProps {
@@ -26,7 +26,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
     conceptId,
     currentEditionId,
     onSelectEdition,
-    onCreateBranch
+    // onCreateBranch
 }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const [editions, setEditions] = useState<IEdition[]>([]);
@@ -78,9 +78,9 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
 
         // 2. Simulation
         // Force Y based on time?
-        const timeScale = d3.scaleTime()
-            .domain(d3.extent(editions, e => new Date(e.createdAt)) as [Date, Date])
-            .range([50, width - 50]);
+        // const timeScale = d3.scaleTime()
+        //     .domain(d3.extent(editions, e => new Date(e.createdAt)) as [Date, Date])
+        //     .range([50, width - 50]);
 
         const simulation = d3.forceSimulation<GraphNode>(nodes)
             .force("link", d3.forceLink<GraphNode, GraphLink>(links).id((d) => d.id).distance(50))
@@ -121,7 +121,8 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             .attr("r", d => d.isCurrent ? 12 : (d.isHead ? 8 : 5))
             .attr("fill", d => d.isCurrent ? "#6366f1" : (d.isHead ? "#10b981" : "#94a3b8"))
             .attr("cursor", "pointer")
-            .on("click", (event, d) => onSelectEdition(d.edition))
+            .on("click", (_event, d) => onSelectEdition(d.edition))
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .call(d3.drag<SVGCircleElement, GraphNode>()
                 .on("start", (event) => {
                     if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -136,7 +137,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
                     if (!event.active) simulation.alphaTarget(0);
                     event.subject.fx = null;
                     event.subject.fy = null;
-                })
+                }) as any
             );
 
         node.append("title")

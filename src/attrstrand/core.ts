@@ -1,8 +1,8 @@
-import {
+import type {
     IConceptRoot, IEdition, IContentAtom, ContentAtomField, ContentAtomType, ContentAtomAttr
 } from './types';
 import { storage } from './storage';
-import { simhash, splitContent, generateContentHash } from './utils';
+import { simhash, generateContentHash } from './utils';
 
 export interface AtomSubmission {
     content: string;

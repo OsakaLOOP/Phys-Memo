@@ -1,4 +1,4 @@
-import { IConceptRoot, IEdition, IContentAtom } from './types';
+import type { IConceptRoot, IEdition, IContentAtom } from './types';
 
 export interface IStorage {
     // Concept Operations
@@ -93,7 +93,7 @@ export class LocalStorageMock implements IStorage {
     //    - Older than threshold?
 
     // For this mock, we'll implement a simple ref-count based GC logic.
-    async runCleanup(thresholdTimestamp: number): Promise<number> {
+    async runCleanup(_thresholdTimestamp: number): Promise<number> {
         const concepts = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
         const editions = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
         const atoms = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);

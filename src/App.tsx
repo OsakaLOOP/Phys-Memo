@@ -13,12 +13,12 @@ import 'katex/dist/katex.min.css';
 
 import RichTextRenderer from './components/RichTextRenderer';
 import EditableBlock from './components/EditableBlock';
-import SmartFormulaBlock from './components/SmartFormulaBlock';
+// import SmartFormulaBlock from './components/SmartFormulaBlock';
 
 // AttrStrand Imports
-import { core, AtomSubmission } from './attrstrand/core';
+import { core, type AtomSubmission } from './attrstrand/core';
 import { storage } from './attrstrand/storage';
-import { IEdition, IContentAtom, ContentAtomField } from './attrstrand/types';
+import type { IEdition, IContentAtom, ContentAtomField } from './attrstrand/types';
 import { AtomListEditor } from './components/AttrStrand/AtomListEditor';
 import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
 import { splitContent } from './attrstrand/utils';
@@ -811,7 +811,7 @@ const PhysMemosApp: FC = () => {
   // AttrStrand State
   const [activeEdition, setActiveEdition] = useState<IEdition | null>(null);
   const [activeAtoms, setActiveAtoms] = useState<Record<ContentAtomField, IContentAtom[]>>({ doc: [], core: [], tags: [], refs: [], rels: [] });
-  const [historyParentId, setHistoryParentId] = useState<string | null>(null); // For history view navigation
+  // const [historyParentId, setHistoryParentId] = useState<string | null>(null); // For history view navigation
 
   const [ocrText, setOcrText] = useState("");
   const [newRelTargetId, setNewRelTargetId] = useState("");
@@ -1401,7 +1401,7 @@ const PhysMemosApp: FC = () => {
               <Network className="w-4 h-4" /> 图谱
             </button>
             <button
-              onClick={() => { setViewMode('history'); setHistoryParentId(null); }}
+              onClick={() => { setViewMode('history'); /* setHistoryParentId(null); */ }}
               className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
                 viewMode === 'history' ? 'bg-white border border-indigo-200 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'
               }`}
@@ -1467,7 +1467,7 @@ const PhysMemosApp: FC = () => {
                         // Maybe user just wants to view history.
                         // If they click "Edit" in sidebar, they edit the activeEdition.
                     }}
-                    onCreateBranch={(parent) => {
+                    onCreateBranch={(_parent) => {
                         alert("Branch creation not implemented in UI demo yet, but core supports it!");
                     }}
                 />

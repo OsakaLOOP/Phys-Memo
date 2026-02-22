@@ -973,17 +973,34 @@ const PhysMemosApp: FC = () => {
 
           const concept = await core.createConcept('Sandpile Model', 'admin', initialData, 'Self-Organized Criticality', ['Physics', 'Complexity']);
 
+          // Create v2 edition to show history
+          const headId = Object.keys(concept.currentHeads)[0];
+          const v1Edition = await storage.getEdition(headId);
+          if (v1Edition) {
+              const v1Atoms = await storage.getAtoms(v1Edition.docAtomIds);
+              const newDocContent = v1Atoms[0].contentJson.replace('demonstrate _self-organized criticality_', 'demonstrate **Self-Organized Criticality (SOC)**');
+
+              const v2Data: Record<ContentAtomField, AtomSubmission[]> = {
+                  doc: [{ content: newDocContent, derivedFromId: v1Atoms[0].id, field: 'doc', type: 'markdown' }, ...v1Atoms.slice(1).map(a => ({ content: a.contentJson, derivedFromId: a.id, field: 'doc', type: 'markdown' } as AtomSubmission))],
+                  core: (await storage.getAtoms(v1Edition.coreAtomIds)).map(a => ({ content: a.contentJson, derivedFromId: a.id, field: 'core', type: 'latex' } as AtomSubmission)),
+                  tags: (await storage.getAtoms(v1Edition.tagsAtomIds)).map(a => ({ content: a.contentJson, derivedFromId: a.id, field: 'tags', type: 'inline' } as AtomSubmission)),
+                  refs: (await storage.getAtoms(v1Edition.refsAtomIds)).map(a => ({ content: a.contentJson, derivedFromId: a.id, field: 'refs', type: 'sources' } as AtomSubmission)),
+                  rels: []
+              };
+              await core.createEdition(concept.id, v1Edition.id, v2Data, 'editor_alice', 'save');
+          }
+
           const defaultNode: NodeData = {
-              id: concept.id, // Use generated ID
+              id: concept.id,
               title: 'Sandpile Model',
-              type: 'MODEL',
-              topic: 'Self-Organized Criticality',
-              disciplines: ['Physics', 'Complexity'],
               latex: 'S \\to S - 4, \\quad S_{neighbors} \\to S_{neighbors} + 1',
-              desc: 'The **Abelian Sandpile Model** is a cellular automaton used to demonstrate _self-organized criticality_.\n\nWhen the height of a pile exceeds a critical threshold, it collapses, distributing grains to neighbors.',
+              desc: 'The **Abelian Sandpile Model** is a cellular automaton used to demonstrate **Self-Organized Criticality (SOC)**.\n\nWhen the height of a pile exceeds a critical threshold, it collapses, distributing grains to neighbors.',
               references: '[1] Bak, P., Tang, C., & Wiesenfeld, K. (1987). Self-organized criticality: An explanation of the 1/f noise. Physical review letters, 59(4), 381.',
               constraints: ['Grid Lattice', 'Conservative (in bulk)'],
-              relations: []
+              relations: [],
+              type: 'MODEL',
+              topic: 'Self-Organized Criticality',
+              disciplines: ['Physics', 'Complexity']
           };
           await dbHelper.put(defaultNode);
 

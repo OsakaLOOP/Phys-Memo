@@ -17,7 +17,7 @@ export interface IStorage {
     getAtoms(ids: string[]): Promise<IContentAtom[]>;
 
     // Worker Interface
-    runCleanup(thresholdTimestamp: number): Promise<number>; // Returns number of deleted items
+    runCleanup(_thresholdTimestamp: number): Promise<number>; // Returns number of deleted items
 }
 
 const STORAGE_KEYS = {
@@ -27,12 +27,20 @@ const STORAGE_KEYS = {
 };
 
 export class LocalStorageMock implements IStorage {
+    private cache: Record<string, any> = {};
+
     private load<T>(key: string): Record<string, T> {
+        if (this.cache[key]) {
+            return this.cache[key];
+        }
         const raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : {};
+        const data = raw ? JSON.parse(raw) : {};
+        this.cache[key] = data;
+        return data;
     }
 
     private save<T>(key: string, data: Record<string, T>) {
+        this.cache[key] = data;
         localStorage.setItem(key, JSON.stringify(data));
     }
 
@@ -85,15 +93,10 @@ export class LocalStorageMock implements IStorage {
     }
 
     // Worker Functionality: Cleanup unreferenced atoms and old editions
-    // Rules:
-    // 1. Delete atoms not referenced by any Edition (unless very recent) -> Actually atoms are immutable content blocks. If no edition points to them, they are garbage.
-    // 2. Delete Editions that are:
-    //    - Not the latest head of any branch (in ConceptRoot.currentHeads)
-    //    - Not referenced as a parent by another edition (unless we want to keep full history? Prompt says: "Clean and merge... only delete specified records... note not to delete if referenced by other branch or is latest")
-    //    - Older than threshold?
-
-    // For this mock, we'll implement a simple ref-count based GC logic.
     async runCleanup(_thresholdTimestamp: number): Promise<number> {
+        // Force reload to ensure fresh data for GC
+        this.cache = {};
+
         const concepts = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
         const editions = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
         const atoms = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
@@ -105,27 +108,6 @@ export class LocalStorageMock implements IStorage {
         Object.values(concepts).forEach(c => {
             Object.keys(c.currentHeads).forEach(headId => activeEditionIds.add(headId));
         });
-
-        // 2. Mark reachable editions (traverse parents)
-        // Actually, prompt says: "Clean and collapse... delete non-referenced non-latest... merge subsequent parent pointers".
-        // This implies we might delete intermediate history nodes?
-        // "Non-referenced and non-latest automatically deleted... and migrate subsequent node parents."
-        // Meaning: A -> B -> C. If B is not useful (not a head, not explicitly saved?), delete B and make C.parent = A.
-        // But for now, let's just delete unreferenced *atoms* and maybe editions that are strictly "autosave" and old?
-        // Let's stick to safe GC: Delete if not reachable from any Head.
-
-        // Wait, "Cherry-pick... history must be linear...".
-        // If I delete B, history is broken? "Migrate subsequent node parent". So A -> C.
-
-        // Let's implement a simpler version:
-        // Collect all atoms referenced by *any* edition that is still in storage.
-        // Delete atoms that are not in that set.
-
-        // Filter editions to keep:
-        // Keep if:
-        // - Is a Head (in concepts.currentHeads)
-        // - Is referenced by another kept edition (parent pointer) -- this requires traversing from heads down.
-        // - Is 'save' or 'publish' type (user explicitly saved). 'autosave' can be GC'd if not a head.
 
         const keptEditionIds = new Set<string>();
         const queue = [...activeEditionIds];
@@ -160,11 +142,13 @@ export class LocalStorageMock implements IStorage {
         // Now Collect referenced atoms from KEPT editions
         const referencedAtomIds = new Set<string>();
         Object.values(editions).forEach(e => {
-            e.coreAtomIds.forEach(id => referencedAtomIds.add(id));
-            e.docAtomIds.forEach(id => referencedAtomIds.add(id));
-            e.tagsAtomIds.forEach(id => referencedAtomIds.add(id));
-            e.refsAtomIds.forEach(id => referencedAtomIds.add(id));
-            e.relsAtomIds.forEach(id => referencedAtomIds.add(id));
+            if (keptEditionIds.has(e.id)) {
+                e.coreAtomIds.forEach(id => referencedAtomIds.add(id));
+                e.docAtomIds.forEach(id => referencedAtomIds.add(id));
+                e.tagsAtomIds.forEach(id => referencedAtomIds.add(id));
+                e.refsAtomIds.forEach(id => referencedAtomIds.add(id));
+                e.relsAtomIds.forEach(id => referencedAtomIds.add(id));
+            }
         });
 
         // Delete unreferenced atoms

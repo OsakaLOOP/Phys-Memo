@@ -1,0 +1,28 @@
+  // --- Topic Overview Logic (Migrated to use AttrStrand) ---
+  const renderTopicContent = () => {
+      // Get all child nodes for this topic
+      const children = nodes.filter(n => n.topic === activeNode?.title && n.type !== 'TOPIC');
+
+      // We need to render the content.
+      // Ideally, we should pull the *latest edition content* for each child from AttrStrand.
+      // But checking storage for every child synchronously in render is impossible.
+      // We can use a specialized hook or effect to load this data, OR rely on the fact that
+      // `syncAttrStrand` updates the Legacy NodeData `desc` field whenever we edit.
+      // So `child.desc` *should* be up to date if the user has edited it.
+      // IF the user hasn't edited it, and we just migrated, `child.desc` is the source of truth anyway.
+      // So relying on `child.desc` is actually correct for the "Hybrid" state.
+
+      // However, user said "Topic summary also generated from new data".
+      // Maybe they mean the *list of children* or *aggregated references*?
+      // "Topic summary is rendering normally, meaning it might be old data."
+      // If I rely on `child.desc`, and `child.desc` is string, it IS the old data format, but updated.
+      // The user might be expecting `AtomBlock` rendering for children in the topic view?
+      // Currently `TopicView` uses `RichTextRenderer` on `child.desc`.
+      // This is fine, as `child.desc` is markdown.
+
+      // Key Issue: "Initial loaded data... make them branch structures".
+      // The user wants the INITIAL data to ALREADY have history/branches.
+      // My previous seed just created ONE edition.
+      // I need to update `loadData` seed to create a HISTORY (Branch).
+      return children;
+  };

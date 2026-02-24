@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { IContentAtom } from '../../attrstrand/types';
 import RichTextRenderer from '../RichTextRenderer';
 import { Edit3, Check, X } from 'lucide-react';
@@ -16,9 +17,56 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(atom.contentJson);
 
+    // Tooltip state
+    const [showTooltip, setShowTooltip] = useState(false);
+    const [tooltipPos, setTooltipPos] = useState({ top: 0, right: 0 });
+    const indicatorRef = useRef<HTMLDivElement>(null);
+    const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     useEffect(() => {
         setEditValue(atom.contentJson);
     }, [atom.contentJson]);
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (tooltipTimeoutRef.current) {
+                clearTimeout(tooltipTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    // Handle tooltip interactions
+    const handleIndicatorEnter = () => {
+        if (tooltipTimeoutRef.current) {
+            clearTimeout(tooltipTimeoutRef.current);
+            tooltipTimeoutRef.current = null;
+        }
+
+        if (indicatorRef.current) {
+            const rect = indicatorRef.current.getBoundingClientRect();
+            // Position: top aligns with indicator, right edge aligns with indicator's left edge
+            // Add a small gap (e.g., 8px) so it doesn't touch the indicator
+            setTooltipPos({
+                top: rect.top,
+                right: window.innerWidth - rect.left + 8
+            });
+            setShowTooltip(true);
+        }
+    };
+
+    const handleMouseLeave = () => {
+        tooltipTimeoutRef.current = setTimeout(() => {
+            setShowTooltip(false);
+        }, 200);
+    };
+
+    const handleTooltipEnter = () => {
+        if (tooltipTimeoutRef.current) {
+            clearTimeout(tooltipTimeoutRef.current);
+            tooltipTimeoutRef.current = null;
+        }
+    };
 
     const handleSave = () => {
         if (editValue !== atom.contentJson) {
@@ -122,12 +170,27 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
     return (
         <div className={`group relative mb-2 transition-all ${atom.field === 'tags' ? 'inline-block mr-2 mb-2' : ''} ${className}`}>
             {/* Attribution Indicator (Left Sidebar) - REPOSITIONED */}
-            {/* Instead of absolute left-0, we move it entirely to the left of the container */}
-            <div className="absolute right-full top-0 bottom-0 w-1 mr-2 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-200 cursor-help z-50">
-                {/* Tooltip positioned to the right of the indicator (so back towards content but floating) or further left? */}
-                {/* "ensure it appears on left side, not blocking input". So tooltip should go LEFT of the indicator. */}
-                <div className="absolute right-2 top-0 bg-white shadow-lg border rounded p-2 text-xs w-48 hidden group-hover:block pointer-events-auto">
-                    <div className="font-bold mb-1 text-slate-600 border-b pb-1">Copyright Distribution</div>
+            <div
+                ref={indicatorRef}
+                className="absolute right-full top-0 bottom-0 w-1 mr-2 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-200 cursor-help z-50"
+                onMouseEnter={handleIndicatorEnter}
+                onMouseLeave={handleMouseLeave}
+            >
+                {/* Tooltip content removed from here, now rendered via Portal */}
+            </div>
+
+            {/* Portal Tooltip */}
+            {showTooltip && createPortal(
+                <div
+                    className="fixed bg-white shadow-lg border rounded p-2 text-xs w-48 z-[9999] pointer-events-auto"
+                    style={{
+                        top: tooltipPos.top,
+                        right: tooltipPos.right
+                    }}
+                    onMouseEnter={handleTooltipEnter}
+                    onMouseLeave={handleMouseLeave}
+                >
+                    <div className="font-bold mb-1 text-slate-600 border-b pb-1">版权分布</div>
                     {adjustedAuthors.map(({ author, share }) => (
                         <div key={author} className="flex justify-between text-slate-500 py-0.5">
                             <span className="truncate max-w-[100px]">{author}</span>
@@ -137,8 +200,9 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
                     <div className="mt-1 pt-1 border-t text-[10px] text-slate-400 font-mono truncate">
                         ID: {atom.id}
                     </div>
-                </div>
-            </div>
+                </div>,
+                document.body
+            )}
 
             {isEditing ? (
                 <div className="relative min-w-[200px]">

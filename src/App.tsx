@@ -816,9 +816,7 @@ const PhysMemosApp: FC = () => {
   // const [historyParentId, setHistoryParentId] = useState<string | null>(null); // For history view navigation
 
   const [ocrText, setOcrText] = useState("");
-  const [newRelTargetId, setNewRelTargetId] = useState("");
-  const [newRelType, setNewRelType] = useState<Relation['type']>('DERIVES_FROM');
-  const [newRelCondition, setNewRelCondition] = useState("");
+  // Relation State Logic Removed in favor of AtomListEditor
 
   // --- Discipline State & Logic ---
   const [showDiscModal, setShowDiscModal] = useState(false);
@@ -879,6 +877,10 @@ const PhysMemosApp: FC = () => {
   const disciplinesMap = useMemo(() => {
     return disciplines.reduce((acc, d) => ({ ...acc, [d.name]: d }), {} as Record<string, DisciplineData>);
   }, [disciplines]);
+
+  const nodesMap = useMemo(() => {
+    return nodes.reduce((acc, n) => ({ ...acc, [n.id]: { title: n.title } }), {} as Record<string, { title: string }>);
+  }, [nodes]);
 
   const generateTopicId = (name: string) => `topic_${name.trim().replace(/\s+/g, '_')}`;
 
@@ -1173,21 +1175,7 @@ const PhysMemosApp: FC = () => {
     }
   };
 
-  const addRelation = () => {
-    if (!newRelTargetId || !activeNode) return;
-    const newRel: Relation = {
-      targetId: newRelTargetId,
-      type: newRelType,
-      condition: newRelCondition
-    };
-    saveNode({ ...activeNode, relations: [...(activeNode.relations || []), newRel] });
-    setNewRelCondition("");
-  };
-
-  const removeRelation = (idx: number) => {
-    const newRels = activeNode?.relations.filter((_, i) => i !== idx) || [];
-    if (activeNode) saveNode({ ...activeNode, relations: newRels });
-  };
+  // Relation helper functions removed in favor of direct AtomListEditor usage
 
   const simulateOCR = () => {
     setOcrText("识别中...");
@@ -1219,7 +1207,12 @@ const PhysMemosApp: FC = () => {
           core: splitContent(activeNode.latex, 'latex').map(c => ({ content: c, field: 'core', type: 'latex' })),
           tags: activeNode.constraints.map(c => ({ content: c, field: 'tags', type: 'inline' })),
           refs: splitContent(activeNode.references, 'sources').map(c => ({ content: c, field: 'refs', type: 'sources' })),
-          rels: []
+          // Migrate Relations
+          rels: (activeNode.relations || []).map(r => ({
+              content: JSON.stringify(r),
+              field: 'rels',
+              type: 'inline' // Treat as inline for now, or specific type
+          }))
         };
 
         // We MUST force the ID to match activeNode.id
@@ -1259,13 +1252,14 @@ const PhysMemosApp: FC = () => {
           const cores = await storage.getAtoms(edition.coreAtomIds);
           const tags = await storage.getAtoms(edition.tagsAtomIds);
           const refs = await storage.getAtoms(edition.refsAtomIds);
+          const rels = await storage.getAtoms(edition.relsAtomIds);
 
           setActiveAtoms({
             doc: docs,
             core: cores,
             tags: tags,
             refs: refs,
-            rels: []
+            rels: rels
           });
         }
       }
@@ -1292,7 +1286,7 @@ const PhysMemosApp: FC = () => {
          core: prepareField('core', activeAtoms.core, field === 'core' ? submissions : undefined),
          tags: prepareField('tags', activeAtoms.tags, field === 'tags' ? submissions : undefined),
          refs: prepareField('refs', activeAtoms.refs, field === 'refs' ? submissions : undefined),
-         rels: []
+         rels: prepareField('rels', activeAtoms.rels, field === 'rels' ? submissions : undefined),
      };
 
      const newEdition = await core.createEdition(
@@ -1312,7 +1306,7 @@ const PhysMemosApp: FC = () => {
          core: await loadAtoms(newEdition.coreAtomIds),
          tags: await loadAtoms(newEdition.tagsAtomIds),
          refs: await loadAtoms(newEdition.refsAtomIds),
-         rels: []
+         rels: await loadAtoms(newEdition.relsAtomIds),
      };
      setActiveAtoms(newAtomsState);
 
@@ -1322,6 +1316,15 @@ const PhysMemosApp: FC = () => {
      if (field === 'core') updatedNode.latex = newAtomsState.core.map(a => a.contentJson).join('\n\n'); // Usually one
      if (field === 'tags') updatedNode.constraints = newAtomsState.tags.map(a => a.contentJson);
      if (field === 'refs') updatedNode.references = newAtomsState.refs.map(a => a.contentJson).join('\n');
+     if (field === 'rels') {
+         updatedNode.relations = newAtomsState.rels.map(a => {
+             try {
+                 return JSON.parse(a.contentJson);
+             } catch {
+                 return null;
+             }
+         }).filter(Boolean);
+     }
 
      saveNode(updatedNode);
 
@@ -1885,95 +1888,24 @@ const PhysMemosApp: FC = () => {
                       <GitCommit className="w-5 h-5 text-indigo-500" />
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">关联与推演 / Related</span>
                     </div>
-                    <div className="flex flex-wrap gap-2 mb-6 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                      <select
-                        value={newRelType}
-                        onChange={(e: ChangeEvent<HTMLSelectElement>) => setNewRelType(e.target.value as Relation['type'])}
-                        className="text-xs border-slate-200 rounded shadow-sm py-1.5 px-2 font-medium bg-white focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                      >
-                        {Object.entries(RELATION_TYPES).map(([k, v]) => (
-                          <option key={k} value={k}>
-                            {v.label}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={newRelTargetId}
-                        onChange={(e: ChangeEvent<HTMLSelectElement>) => setNewRelTargetId(e.target.value)}
-                        className="text-xs border-slate-200 rounded shadow-sm py-1.5 px-2 flex-1 bg-white focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                      >
-                        <option value="">选择关联对象...</option>
-                        {nodes.filter(n => n.id !== activeNode.id).map(n => (
-                          <option key={n.id} value={n.id}>
-                            {n.title}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="条件说明..."
-                        value={newRelCondition}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => setNewRelCondition(e.target.value)}
-                        className="text-xs border-slate-200 rounded shadow-sm py-1.5 px-3 flex-[1.5] focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                      />
-                      <button
-                        onClick={addRelation}
-                        disabled={!newRelTargetId}
-                        className="text-xs bg-indigo-600 text-white px-4 py-1.5 rounded font-medium hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition"
-                      >
-                        连接
-                      </button>
+                    {/* Migrated Relation Editor */}
+                    <div className="mb-4">
+                       <AtomListEditor
+                            atoms={activeAtoms.rels}
+                            field="rels"
+                            defaultAtomType="inline"
+                            onUpdate={(subs) => handleAttrUpdate('rels', subs)}
+                            nodesMap={nodesMap}
+                            relationTypes={RELATION_TYPES}
+                            className="space-y-4"
+                        />
                     </div>
-                    <div className="">
-                      {(activeNode.relations || []).length === 0 ? (
-                        <div className="text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                          <p className="text-slate-400 text-sm">暂无逻辑关联</p>
+                    {/* Fallback Empty State if needed (Handled by AtomListEditor 'Add' button mostly, but nice to have instructions) */}
+                    {activeAtoms.rels.length === 0 && (
+                        <div className="text-center py-4 bg-slate-50/50 rounded-lg border border-dashed border-slate-200 mb-4">
+                          <p className="text-slate-400 text-xs">暂无逻辑关联，点击下方添加</p>
                         </div>
-                      ) : (
-                        (activeNode.relations || []).map((rel, idx) => {
-                          const target = nodes.find(n => n.id === rel.targetId);
-                          const typeConfig = RELATION_TYPES[rel.type] || RELATION_TYPES.DERIVES_FROM;
-                          return (
-                            <div key={idx} className="group relative pl-8 pb-4">
-                              <div className="absolute left-0 top-0 w-[2px] h-full bg-slate-200 group-last:h-[40px] group-hover:bg-indigo-200 transition-colors"></div>
-                              <div className={`absolute -left-[7px] top-3 w-4 h-4 bg-white rounded-full border-2 border-slate-300 group-hover:border-indigo-400 transition-colors`}></div>
-                              <div className="flex flex-col sm:flex-row sm:items-start gap-3 bg-white p-3 rounded-lg border border-slate-100 hover:shadow-md transition-all hover:border-indigo-100">
-                                <div className={`flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-md bg-slate-50 border border-slate-100 ${typeConfig.color} min-w-fit mt-0.5`}>
-                                  <span>{typeConfig.icon}</span>
-                                  <span>{typeConfig.label}</span>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-baseline justify-between">
-                                    <span
-                                      className="text-sm font-semibold text-slate-700 hover:text-indigo-600 cursor-pointer truncate"
-                                      onClick={() => {
-                                        if (target) setActiveNodeId(target.id);
-                                      }}
-                                    >
-                                      {target ? target.title : '未知对象'}
-                                    </span>
-                                    <button
-                                      onClick={() => removeRelation(idx)}
-                                      className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 p-1 transition-all"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                  {rel.condition && (
-                                    <div className="mt-1 text-xs text-slate-500 flex items-start gap-1">
-                                      <span className="text-indigo-400 italic font-serif">if</span>
-                                      <span className="bg-yellow-50 px-1.5 rounded text-yellow-700 border border-yellow-100/50">
-                                        <RichTextRenderer content={rel.condition} className="inline-block [&>p]:inline [&>p]:m-0" />
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
+                    )}
                   </div>
                   
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">

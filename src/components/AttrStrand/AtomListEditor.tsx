@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { IContentAtom, ContentAtomField, ContentAtomType } from '../../attrstrand/types';
 import type { AtomSubmission } from '../../attrstrand/core';
 import { AtomBlock } from './AtomBlock';
+import { RelationBlock } from './RelationBlock'; // New import
 import { Plus, Trash2 } from 'lucide-react';
 
 interface AtomListEditorProps {
@@ -11,6 +12,9 @@ interface AtomListEditorProps {
     onUpdate: (submissions: AtomSubmission[]) => void;
     readOnly?: boolean;
     className?: string;
+    // Props for relation handling
+    nodesMap?: Record<string, { title: string }>;
+    relationTypes?: Record<string, { label: string; icon: string; color: string }>;
 }
 
 // Internal state representation
@@ -27,15 +31,14 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
     defaultAtomType,
     onUpdate,
     readOnly = false,
-    className = ''
+    className = '',
+    nodesMap,
+    relationTypes
 }) => {
     const [localAtoms, setLocalAtoms] = useState<EditableAtom[]>([]);
 
     useEffect(() => {
         // Initialize local state from props
-        // We only update if the IDs or length have changed to avoid disrupting active edits if possible
-        // But since App.tsx updates atoms on save, we must sync.
-        // The loop is broken by removing the reverse useEffect.
         setLocalAtoms(atoms.map(a => ({
             id: a.id,
             content: a.contentJson,
@@ -73,24 +76,26 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
         const newAtoms = [...localAtoms];
         const newAtom: EditableAtom = {
             id: `temp-${Date.now()}-${Math.random()}`,
-            content: '',
+            content: '', // Empty content for default
             originalAtom: null
         };
+        // For relations, content should be valid JSON structure if possible, but empty string is handled
+        if (field === 'rels') {
+            newAtom.content = JSON.stringify({ targetId: '', type: 'DERIVES_FROM', condition: '' });
+        }
+
         newAtoms.splice(index + 1, 0, newAtom); // Insert after index
         setLocalAtoms(newAtoms);
-        // We do NOT trigger update immediately on add, to let user type first?
-        // But if we don't, the new block is just local.
-        // If we trigger, it creates a blank atom.
-        // Let's trigger to persist the structure change.
         triggerUpdate(newAtoms);
     };
 
     const isInline = field === 'tags';
+    const isRelation = field === 'rels';
 
     return (
-        <div className={`${isInline ? 'flex flex-wrap items-start gap-2' : 'space-y-2'} ${className}`}>
+        <div className={`${isInline ? 'flex flex-wrap items-start gap-2' : isRelation ? 'space-y-0' : 'space-y-2'} ${className}`}>
             {localAtoms.map((atom, index) => (
-                <div key={atom.id} className={`relative group/list-item ${isInline ? 'inline-block' : ''}`}>
+                <div key={atom.id} className={`relative group/list-item ${isInline ? 'inline-block' : ''} ${isRelation ? 'pb-4' : ''}`}>
                      {/* Add Button (Top, only for first item or empty list) - Disabled for inline to keep it simple, or adjust pos */}
                      {!readOnly && !isInline && index === 0 && (
                         <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 opacity-0 group-hover/list-item:opacity-100 transition-opacity z-10">
@@ -105,20 +110,39 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                     )}
 
                     <div className="relative">
-                        <AtomBlock
-                            atom={atom.originalAtom || {
-                                id: atom.id,
-                                contentJson: atom.content,
-                                attr: {}, // New blocks have no history yet
-                                field,
-                                type: defaultAtomType,
-                                creatorId: 'system', createdAt: '', contentHash: '', contentSimHash: '', frontMeta: {}, backMeta: {}
-                            } as IContentAtom}
-                            onUpdate={(content) => handleAtomUpdate(index, content)}
-                            readOnly={readOnly}
-                            className={!readOnly && !isInline ? "pr-8" : ""} // Make room for delete button only in block mode
-                            index={index}
-                        />
+                        {isRelation ? (
+                            <div className="relative pl-4 border-l-2 border-slate-200 ml-2 group-last:border-transparent min-h-[40px]"> {/* Main timeline line */}
+                                 <RelationBlock
+                                    atom={atom.originalAtom || {
+                                        id: atom.id,
+                                        contentJson: atom.content,
+                                        attr: {},
+                                        field,
+                                        type: defaultAtomType,
+                                        creatorId: 'system', createdAt: '', contentHash: '', contentSimHash: '', frontMeta: {}, backMeta: {}
+                                    } as IContentAtom}
+                                    onUpdate={(content) => handleAtomUpdate(index, content)}
+                                    readOnly={readOnly}
+                                    nodesMap={nodesMap || {}}
+                                    relationTypes={relationTypes || {}}
+                                />
+                            </div>
+                        ) : (
+                            <AtomBlock
+                                atom={atom.originalAtom || {
+                                    id: atom.id,
+                                    contentJson: atom.content,
+                                    attr: {}, // New blocks have no history yet
+                                    field,
+                                    type: defaultAtomType,
+                                    creatorId: 'system', createdAt: '', contentHash: '', contentSimHash: '', frontMeta: {}, backMeta: {}
+                                } as IContentAtom}
+                                onUpdate={(content) => handleAtomUpdate(index, content)}
+                                readOnly={readOnly}
+                                className={!readOnly && !isInline ? "pr-8" : ""} // Make room for delete button only in block mode
+                                index={index}
+                            />
+                        )}
 
                         {!readOnly && (
                             <button
@@ -126,6 +150,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                                 className={`
                                     opacity-0 group-hover/list-item:opacity-100 text-slate-300 hover:text-red-400 transition-colors p-1
                                     ${isInline ? 'absolute -top-2 -right-2 bg-white rounded-full shadow border z-20 hover:bg-red-50' : 'absolute top-2 right-0'}
+                                    ${isRelation ? 'top-3 right-2' : ''}
                                 `}
                                 title="Delete block"
                             >
@@ -162,20 +187,15 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                     localAtoms.length === 0 && (
                         <div
                             onClick={() => handleAdd(-1)}
-                            className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center text-slate-400 hover:border-indigo-300 hover:text-indigo-500 cursor-pointer transition-colors"
+                            className={`border-2 border-dashed border-slate-200 rounded-lg p-4 text-center text-slate-400 hover:border-indigo-300 hover:text-indigo-500 cursor-pointer transition-colors ${isRelation ? 'ml-8' : ''}`}
                         >
                             <Plus className="mx-auto mb-1" size={20} />
-                            <span className="text-sm">Add Content Block</span>
+                            <span className="text-sm">Add {isRelation ? 'Relation' : 'Content Block'}</span>
                         </div>
                     )
                 )
             )}
 
-            {/* Add button at the bottom for normal lists if not empty to make it easier to append?
-                Current logic has hover buttons between items.
-                If list is long, maybe a bottom button is good.
-                But for now, sticking to hover logic for block lists.
-            */}
         </div>
     );
 };

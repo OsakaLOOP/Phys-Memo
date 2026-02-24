@@ -1,27 +1,34 @@
 import type { ContentAtomType } from './types';
 
-// Simple hash function for string to 32-bit integer
-function stringHash(str: string): number {
-    let hash = 0;
-    if (str.length === 0) return hash;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash | 0; // Convert to 32bit integer
-    }
-    return hash;
+// Async SHA-256 helper
+async function sha256(str: string): Promise<string> {
+    const msgBuffer = new TextEncoder().encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Basic Simhash implementation
-export function simhash(content: string): string {
+// Async SHA-256 to 32-bit integer helper (for Simhash)
+async function sha256Int(str: string): Promise<number> {
+    const msgBuffer = new TextEncoder().encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    // Use first 4 bytes as int
+    const view = new DataView(hashBuffer);
+    return view.getInt32(0); // big-endian by default in DataView but we just need bits
+}
+
+// Updated Simhash implementation (async)
+export async function simhash(content: string): Promise<string> {
     const tokens = content.toLowerCase().split(/\s+/).filter(t => t.length > 0);
     if (tokens.length === 0) return "00000000";
 
     // Use an array of 32 counters (initially 0)
     const vector = new Array(32).fill(0);
 
-    for (const token of tokens) {
-        const hash = stringHash(token);
+    // Calculate hashes in parallel for performance
+    const hashes = await Promise.all(tokens.map(token => sha256Int(token)));
+
+    for (const hash of hashes) {
         for (let i = 0; i < 32; i++) {
             // Check if the i-th bit is set
             if ((hash >> i) & 1) {
@@ -89,14 +96,8 @@ export function splitContent(content: string, type: ContentAtomType): string[] {
     return [content];
 }
 
-export function generateContentHash(content: string): string {
-    let hash = 0;
-    const str = content + "";
-    if (str.length === 0) return "0";
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash | 0;
-    }
-    return (hash >>> 0).toString(16);
+// Updated generateContentHash (async)
+export async function generateContentHash(content: string): Promise<string> {
+    // Return SHA-256 hex string
+    return await sha256(content);
 }

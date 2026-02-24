@@ -1,5 +1,11 @@
 import { test, describe, it, beforeEach, before } from 'node:test';
 import assert from 'node:assert';
+import { webcrypto } from 'node:crypto';
+
+if (!globalThis.crypto) {
+    // @ts-ignore
+    globalThis.crypto = webcrypto;
+}
 
 // Mock localStorage
 const store: Record<string, string> = {};
@@ -38,12 +44,12 @@ describe('AttrStrand Core Logic', () => {
         assert.strictEqual(parts[2], "$$math$$");
     });
 
-    it('should calculate simhash similarity', () => {
-        const h1 = simhash("hello world");
-        const h2 = simhash("hello world");
+    it('should calculate simhash similarity', async () => {
+        const h1 = await simhash("hello world");
+        const h2 = await simhash("hello world");
         assert.strictEqual(h1, h2);
 
-        const h3 = simhash("hello universe");
+        const h3 = await simhash("hello universe");
         assert.notStrictEqual(h1, h3);
     });
 

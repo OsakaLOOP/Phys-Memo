@@ -1900,12 +1900,6 @@ const PhysMemosApp: FC = () => {
                             className="space-y-4"
                         />
                     </div>
-                    {/* Fallback Empty State if needed (Handled by AtomListEditor 'Add' button mostly, but nice to have instructions) */}
-                    {activeAtoms.rels.length === 0 && (
-                        <div className="text-center py-4 bg-slate-50/50 rounded-lg border border-dashed border-slate-200 mb-4">
-                          <p className="text-slate-400 text-xs">暂无逻辑关联，点击下方添加</p>
-                        </div>
-                    )}
                   </div>
                   
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">

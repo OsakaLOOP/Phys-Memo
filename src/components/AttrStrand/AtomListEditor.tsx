@@ -102,7 +102,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                             <button
                                 onClick={() => handleAdd(-1)}
                                 className="bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200"
-                                title="Add block before"
+                                title={`在上方添加${isRelation ? '关联条目' : (isInline?'标签':'内容块')}`}
                             >
                                 <Plus size={12} />
                             </button>
@@ -152,7 +152,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                                     ${isInline ? 'absolute -top-2 -right-2 bg-white rounded-full shadow border z-20 hover:bg-red-50' : 'absolute top-2 right-0'}
                                     ${isRelation ? 'top-3 right-2' : ''}
                                 `}
-                                title="Delete block"
+                                title={`删除${isRelation ? '关联条目' : (isInline?'标签':'内容块')}`}
                             >
                                 <Trash2 size={isInline ? 10 : 14} />
                             </button>
@@ -165,7 +165,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                             <button
                                 onClick={() => handleAdd(index)}
                                 className="bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200"
-                                title="Add block after"
+                                title={`在上方添加${isRelation ? '关联条目' : (isInline?'标签':'内容块')}`}
                             >
                                 <Plus size={12} />
                             </button>
@@ -179,7 +179,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                     <button
                          onClick={() => handleAdd(localAtoms.length - 1)}
                          className="flex items-center justify-center w-6 h-6 rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors mt-0.5"
-                         title="Add Tag"
+                         title="添加标签"
                     >
                         <Plus size={14} />
                     </button>
@@ -190,7 +190,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                             className={`border-2 border-dashed border-slate-200 rounded-lg p-4 text-center text-slate-400 hover:border-indigo-300 hover:text-indigo-500 cursor-pointer transition-colors ${isRelation ? 'ml-8' : ''}`}
                         >
                             <Plus className="mx-auto mb-1" size={20} />
-                            <span className="text-sm">Add {isRelation ? '关联条目' : '内容块'}</span>
+                            <span className="text-sm">添加{isRelation ? '关联条目' : '内容块'}</span>
                         </div>
                     )
                 )

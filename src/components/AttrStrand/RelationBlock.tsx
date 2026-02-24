@@ -82,7 +82,7 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
                             onChange={(e) => setEditData({...editData, targetId: e.target.value})}
                             className="flex-1 text-xs border border-slate-200 rounded px-2 py-1 bg-slate-50 focus:ring-1 focus:ring-indigo-300 outline-none"
                         >
-                            <option value="">Select Target...</option>
+                            <option value="">选择概念条目...</option>
                              {Object.entries(nodesMap).map(([id, node]) => (
                                  <option key={id} value={id}>{node.title}</option>
                              ))}
@@ -92,7 +92,7 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
                         type="text"
                         value={editData.condition}
                         onChange={(e) => setEditData({...editData, condition: e.target.value})}
-                        placeholder="Condition (e.g. if x > 0)..."
+                        placeholder="条件 (e.g. if x > 0)..."
                         className="text-xs border border-slate-200 rounded px-2 py-1 focus:ring-1 focus:ring-indigo-300 outline-none w-full"
                      />
                      <div className="flex justify-end gap-2 mt-1">
@@ -106,10 +106,7 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
 
     return (
         <div className={`group relative pl-8 pb-0 ${className}`}>
-            {/* Custom vertical line logic: parent list handles the continuous line */}
 
-            {/* Removed Local Node Connector Line to avoid duplication with AtomListEditor */}
-             {/* Node Dot */}
              <div className="absolute -left-[7px] top-3 w-4 h-4 bg-white rounded-full border-2 border-slate-300 group-hover:border-indigo-400 transition-colors z-10"></div>
 
              <div

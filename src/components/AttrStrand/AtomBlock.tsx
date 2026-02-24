@@ -8,10 +8,11 @@ interface AtomBlockProps {
     onUpdate: (newContent: string) => void;
     readOnly?: boolean;
     className?: string;
+    index?: number; // Pass index for numbered lists (refs)
     counters?: { h2: number, h3: number, n: number }; // Placeholder for numbering context
 }
 
-export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly = false, className = '' }) => {
+export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly = false, className = '', index = 0 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(atom.contentJson);
 
@@ -32,8 +33,13 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            handleSave();
+        if (e.key === 'Enter') {
+             // For tags and refs, single enter saves
+             if (atom.field === 'tags' || atom.field === 'refs') {
+                 handleSave();
+             } else if (e.metaKey || e.ctrlKey) {
+                 handleSave();
+             }
         } else if (e.key === 'Escape') {
             handleCancel();
         }
@@ -47,11 +53,80 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
         return { author, share: adjustedShare };
     }).sort((a, b) => b.share - a.share);
 
+    const renderContent = () => {
+        if (atom.field === 'tags') {
+            // Match EditableBlock 'tags' style
+            return (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
+                    <RichTextRenderer content={atom.contentJson} className="inline-block [&>p]:inline [&>p]:m-0" />
+                </span>
+            );
+        }
+
+        if (atom.field === 'refs') {
+            // Match EditableBlock 'references' style (list item look)
+            return (
+                <div className="flex gap-2 items-start text-sm text-slate-600">
+                    <span className="font-mono text-slate-400 select-none pt-0.5">{index + 1}.</span>
+                    <div className="flex-1">
+                        <RichTextRenderer content={atom.contentJson} className="inline-block" />
+                    </div>
+                </div>
+            );
+        }
+
+        // Default RichText
+        return <RichTextRenderer content={atom.contentJson} enableAnalysis={true} />;
+    };
+
+    const renderEditor = () => {
+        if (atom.field === 'tags') {
+             return (
+                 <input
+                    type="text"
+                    className="w-full p-1 text-sm bg-white border border-indigo-500 rounded shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    autoFocus
+                    placeholder="Tag..."
+                 />
+             );
+        }
+
+         if (atom.field === 'refs') {
+             return (
+                 <textarea
+                    className="w-full min-h-[60px] p-2 text-sm bg-white border border-indigo-500 rounded shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none resize-y font-mono"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    autoFocus
+                    placeholder="Reference..."
+                 />
+             );
+        }
+
+        return (
+            <textarea
+                className="w-full min-h-[100px] p-3 text-sm bg-white border-2 border-indigo-400 rounded-lg shadow-inner focus:outline-none resize-y font-mono leading-relaxed"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                autoFocus
+            />
+        );
+    }
+
+
     return (
-        <div className={`group relative mb-4 transition-all ${className}`}>
-            {/* Attribution Indicator (Left Sidebar) */}
-            <div className="absolute -left-2 top-0 bottom-0 w-1 rounded-l opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-200 cursor-help">
-                <div className="absolute left-2 top-0 bg-white shadow-lg border rounded p-2 text-xs w-48 hidden group-hover:block z-50">
+        <div className={`group relative mb-2 transition-all ${atom.field === 'tags' ? 'inline-block mr-2 mb-2' : ''} ${className}`}>
+            {/* Attribution Indicator (Left Sidebar) - REPOSITIONED */}
+            {/* Instead of absolute left-0, we move it entirely to the left of the container */}
+            <div className="absolute right-full top-0 bottom-0 w-1 mr-2 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-200 cursor-help">
+                {/* Tooltip positioned to the right of the indicator (so back towards content but floating) or further left? */}
+                {/* "ensure it appears on left side, not blocking input". So tooltip should go LEFT of the indicator. */}
+                <div className="absolute right-2 top-0 bg-white shadow-lg border rounded p-2 text-xs w-48 hidden group-hover:block z-50">
                     <div className="font-bold mb-1 text-slate-600 border-b pb-1">Copyright Distribution</div>
                     {adjustedAuthors.map(({ author, share }) => (
                         <div key={author} className="flex justify-between text-slate-500 py-0.5">
@@ -66,28 +141,23 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
             </div>
 
             {isEditing ? (
-                <div className="relative">
-                    <textarea
-                        className="w-full min-h-[100px] p-3 text-sm bg-white border-2 border-indigo-400 rounded-lg shadow-inner focus:outline-none resize-y font-mono leading-relaxed"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        autoFocus
-                    />
-                    <div className="absolute top-2 right-2 flex gap-1 z-10">
+                <div className="relative min-w-[200px]">
+                    {renderEditor()}
+                    <div className="absolute top-1 right-1 flex gap-1 z-10">
+                         {/* Simplified controls for small items */}
                         <button
                             onClick={handleSave}
-                            className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
-                            title="Save (Ctrl+Enter)"
+                            className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                            title="Save (Enter / Ctrl+Enter)"
                         >
-                            <Check size={14} />
+                            <Check size={12} />
                         </button>
                         <button
                             onClick={handleCancel}
-                            className="p-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                            className="p-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
                             title="Cancel (Esc)"
                         >
-                            <X size={14} />
+                            <X size={12} />
                         </button>
                     </div>
                 </div>
@@ -95,13 +165,14 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
                 <div
                     onClick={() => !readOnly && setIsEditing(true)}
                     className={`
-                        min-h-[2rem] p-2 rounded border border-transparent transition-colors relative
-                        ${!readOnly ? 'hover:bg-slate-50 hover:border-slate-200 cursor-pointer' : ''}
+                        rounded transition-colors relative
+                        ${!readOnly ? 'cursor-pointer hover:bg-slate-50' : ''}
+                        ${atom.field === 'tags' ? '' : 'min-h-[2rem] p-2 border border-transparent hover:border-slate-200'}
                     `}
                 >
-                   <RichTextRenderer content={atom.contentJson} enableAnalysis={true} />
+                   {renderContent()}
 
-                   {!readOnly && (
+                   {!readOnly && atom.field !== 'tags' && atom.field !== 'refs' && (
                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                            <Edit3 className="w-4 h-4 text-indigo-300" />
                        </div>

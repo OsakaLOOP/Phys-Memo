@@ -74,7 +74,7 @@ export class AttrStrandCore {
         topic: string = 'General',
         disciplines: string[] = []
     ): Promise<IConceptRoot> {
-        const conceptId = generateContentHash(name + Date.now());
+        const conceptId = await generateContentHash(name + Date.now());
 
         // Create initial edition
         const edition = await this.createEdition(
@@ -108,7 +108,7 @@ export class AttrStrandCore {
         creatorId: string,
         saveType: 'autosave' | 'save' | 'publish'
     ): Promise<IEdition> {
-        const editionId = generateContentHash(conceptId + creatorId + Date.now());
+        const editionId = await generateContentHash(conceptId + creatorId + Date.now());
         const timestamp = new Date().toISOString();
 
         const atomIds: Record<ContentAtomField, string[]> = {
@@ -126,8 +126,8 @@ export class AttrStrandCore {
                 const actualField = field;
 
                 // 1. Calculate hashes
-                const contentHash = generateContentHash(sub.content);
-                const contentSimHash = simhash(sub.content);
+                const contentHash = await generateContentHash(sub.content);
+                const contentSimHash = await simhash(sub.content);
 
                 let prevAtom: IContentAtom | null = null;
                 // Try to reuse existing atom if ID provided and content matches
@@ -161,7 +161,7 @@ export class AttrStrandCore {
                 }
 
                 // Unique ID for the new atom
-                const atomId = generateContentHash(sub.content + JSON.stringify(attr) + Date.now());
+                const atomId = await generateContentHash(sub.content + JSON.stringify(attr) + Date.now());
 
                 const newAtom: IContentAtom = {
                     id: atomId,

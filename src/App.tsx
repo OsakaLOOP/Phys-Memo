@@ -23,6 +23,7 @@ import { AtomListEditor } from './components/AttrStrand/AtomListEditor';
 import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
 import { TopicChildCard } from './components/AttrStrand/TopicChildCard';
 import { splitContent } from './attrstrand/utils';
+import { migrateAtoms } from './attrstrand/migration';
 
 // --- Type Definitions ---
 
@@ -976,6 +977,9 @@ const PhysMemosApp: FC = () => {
           for (const node of newTopicNodes) await dbHelper.put(node);
         }
       }
+
+      // Check and migrate legacy hashes
+      await migrateAtoms();
 
       setNodes(finalNodes);
       if (finalNodes.length > 0 && !activeNodeId) {

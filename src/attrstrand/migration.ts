@@ -1,4 +1,4 @@
-import { IContentAtom } from './types';
+import type { IContentAtom } from './types';
 import { generateContentHash, simhash } from './utils';
 
 const STORAGE_KEYS = {

@@ -58,15 +58,8 @@ describe('Migration Logic', () => {
         assert.strictEqual(updatedAtom.contentHash.length, 64, "Hash should be 64 chars (SHA-256 hex)");
         assert.notStrictEqual(updatedAtom.contentHash, '12345678');
 
-        // Simhash might be same length (8 chars) but should be updated if logic changed?
-        // In my implementation, simhash returns 8 chars.
-        // But since I changed the underlying hash function, the value should likely change.
-        // Wait, 'test content' -> sha256 -> simhash.
-        // The old value 'abcdef12' was just a mock I put there.
-        // The real old code produced some value.
-        // The new code produces some value.
-        // I can't predict the new value easily without running it, but I can check it's a valid hex string.
-        assert.strictEqual(updatedAtom.contentSimHash.length, 8);
+        // Simhash should now be 64 chars (256-bit)
+        assert.strictEqual(updatedAtom.contentSimHash.length, 64, "Simhash should be 64 chars (256-bit hex)");
     });
 
     it('should not migrate already migrated data', async () => {

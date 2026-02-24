@@ -15,23 +15,38 @@ export class AttrStrandCore {
 
     // --- Similarity & Attribution ---
 
-    private calculateSimilarity(hash1: string, hash2: string): number {
-        // Hamming distance on hex strings
-        const h1 = parseInt(hash1, 16);
-        const h2 = parseInt(hash2, 16);
-        // XOR gives 1s where bits differ
-        // We use >>> 0 to treat them as unsigned for logical operations if needed,
-        // but bitwise operators in JS convert to 32-bit signed int.
-        // h1 ^ h2 works correctly for bit patterns.
-        let xor = h1 ^ h2;
+    public calculateSimilarity(hash1: string, hash2: string): number {
+        // Handle 256-bit (64 char) hex strings
+        // We compare them as 256-bit bitsets and compute Hamming distance.
+        // Since JS doesn't have 256-bit integers, we process byte by byte (2 chars)
+
         let distance = 0;
-        // Count set bits in 32-bit integer
-        for(let i=0; i<32; i++) {
-            if ((xor >> i) & 1) distance++;
+        const len = Math.max(hash1.length, hash2.length);
+
+        // Pad with leading zeros if needed
+        const h1 = hash1.padStart(len, '0');
+        const h2 = hash2.padStart(len, '0');
+
+        for (let i = 0; i < len; i += 2) {
+            const chunk1 = h1.substring(i, i + 2);
+            const chunk2 = h2.substring(i, i + 2);
+            const byte1 = parseInt(chunk1, 16);
+            const byte2 = parseInt(chunk2, 16);
+
+            let xor = byte1 ^ byte2;
+            // Count bits in this byte difference
+            while (xor > 0) {
+                if (xor & 1) distance++;
+                xor >>= 1;
+            }
         }
 
-        // Sim = 1 - (Distance / 32)
-        const sim = 1 - (distance / 32);
+        // Total bits = len * 4 (each hex char is 4 bits)
+        const totalBits = len * 4;
+
+        // Should be 256 for standard 64-char strings
+        // Sim = 1 - (Distance / TotalBits)
+        const sim = 1 - (distance / totalBits);
         return Math.max(0, sim);
     }
 

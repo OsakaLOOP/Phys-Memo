@@ -1,53 +1,59 @@
 import type { ContentAtomType } from './types';
 
 // Async SHA-256 helper
-async function sha256(str: string): Promise<string> {
+export async function sha256(str: string): Promise<string> {
     const msgBuffer = new TextEncoder().encode(str);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Async SHA-256 to 32-bit integer helper (for Simhash)
-async function sha256Int(str: string): Promise<number> {
-    const msgBuffer = new TextEncoder().encode(str);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    // Use first 4 bytes as int
-    const view = new DataView(hashBuffer);
-    return view.getInt32(0); // big-endian by default in DataView but we just need bits
-}
-
-// Updated Simhash implementation (async)
+// Updated Simhash implementation (async) - 256-bit
 export async function simhash(content: string): Promise<string> {
     const tokens = content.toLowerCase().split(/\s+/).filter(t => t.length > 0);
-    if (tokens.length === 0) return "00000000";
+    if (tokens.length === 0) return "0".repeat(64);
 
-    // Use an array of 32 counters (initially 0)
-    const vector = new Array(32).fill(0);
+    // Use an array of 256 counters (initially 0)
+    const vector = new Array(256).fill(0);
 
-    // Calculate hashes in parallel for performance
-    const hashes = await Promise.all(tokens.map(token => sha256Int(token)));
+    // Calculate SHA-256 hashes in parallel (32 bytes = 256 bits)
+    const hashes = await Promise.all(tokens.map(token =>
+        crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
+            .then(buf => new Uint8Array(buf))
+    ));
 
     for (const hash of hashes) {
-        for (let i = 0; i < 32; i++) {
-            // Check if the i-th bit is set
-            if ((hash >> i) & 1) {
-                vector[i]++;
-            } else {
-                vector[i]--;
+        for (let i = 0; i < 32; i++) { // 32 bytes
+            const byte = hash[i];
+            for (let bit = 0; bit < 8; bit++) { // 8 bits per byte
+                const globalBitIndex = i * 8 + bit;
+                // Check if the bit is set
+                if ((byte >> bit) & 1) {
+                    vector[globalBitIndex]++;
+                } else {
+                    vector[globalBitIndex]--;
+                }
             }
         }
     }
 
-    let fingerprint = 0;
+    // Generate 256-bit fingerprint
+    // Since JS numbers are 32-bit for bitwise ops, we construct byte by byte
+    const fingerprintBytes = new Uint8Array(32); // 256 bits
+
     for (let i = 0; i < 32; i++) {
-        if (vector[i] > 0) {
-            fingerprint |= (1 << i);
+        let byte = 0;
+        for (let bit = 0; bit < 8; bit++) {
+            const globalBitIndex = i * 8 + bit;
+            if (vector[globalBitIndex] > 0) {
+                byte |= (1 << bit);
+            }
         }
+        fingerprintBytes[i] = byte;
     }
 
-    // Convert to unsigned 32-bit hex string
-    return (fingerprint >>> 0).toString(16).padStart(8, '0');
+    // Convert to hex string (64 chars)
+    return Array.from(fingerprintBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 export function splitContent(content: string, type: ContentAtomType): string[] {

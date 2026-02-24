@@ -48,9 +48,19 @@ describe('AttrStrand Core Logic', () => {
         const h1 = await simhash("hello world");
         const h2 = await simhash("hello world");
         assert.strictEqual(h1, h2);
+        assert.strictEqual(h1.length, 64, "Simhash should be 256-bit (64 hex chars)");
 
         const h3 = await simhash("hello universe");
         assert.notStrictEqual(h1, h3);
+
+        // Test similarity logic explicitly
+        // Exact match
+        const simExact = core.calculateSimilarity(h1, h2);
+        assert.strictEqual(simExact, 1);
+
+        // Partial match
+        const simPartial = core.calculateSimilarity(h1, h3);
+        assert.ok(simPartial > 0 && simPartial < 1, "Should have partial similarity");
     });
 
     it('should create a concept and initial edition', async () => {

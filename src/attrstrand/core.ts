@@ -19,10 +19,7 @@ export class AttrStrandCore {
         // Hamming distance on hex strings
         const h1 = parseInt(hash1, 16);
         const h2 = parseInt(hash2, 16);
-        // XOR gives 1s where bits differ
-        // We use >>> 0 to treat them as unsigned for logical operations if needed,
-        // but bitwise operators in JS convert to 32-bit signed int.
-        // h1 ^ h2 works correctly for bit patterns.
+
         let xor = h1 ^ h2;
         let distance = 0;
         // Count set bits in 32-bit integer
@@ -135,15 +132,7 @@ export class AttrStrandCore {
                     prevAtom = await storage.getAtom(sub.derivedFromId);
                 }
 
-                // Check for exact match reuse
-                // We reuse ONLY if content matches AND (it's the same atom ID we are deriving from OR we find another atom with same contentHash?)
-                // To safely reuse, we must be sure.
-                // If prevAtom exists and has same contentHash, we can reuse it?
-                // Yes, because Atoms are immutable content blocks. If content is same, it is the same block.
-                // However, attribution is bound to the Atom.
-                // If I copy a block from you (same content), I should reuse your block (and your attribution).
-                // If I change it, I get new block.
-                // So yes, reuse if content matches.
+                // reuse if content matches.
 
                 if (prevAtom && prevAtom.contentHash === contentHash) {
                     atomIds[actualField].push(prevAtom.id);
@@ -161,7 +150,7 @@ export class AttrStrandCore {
                 }
 
                 // Unique ID for the new atom
-                const atomId = await generateContentHash(sub.content + JSON.stringify(attr) + Date.now());
+                const atomId = await generateContentHash(sub.content + JSON.stringify(attr));
 
                 const newAtom: IContentAtom = {
                     id: atomId,

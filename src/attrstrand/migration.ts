@@ -30,7 +30,7 @@ export async function migrateAtoms() {
         // New SHA-256 hash is 64 hex characters.
         // Old simple hash was 8 hex characters (32-bit).
         // If contentHash length < 64, we need to migrate.
-
+        console.log(atom.contentHash)
         const isOldHash = !atom.contentHash || atom.contentHash.length < 64;
 
         if (isOldHash) {

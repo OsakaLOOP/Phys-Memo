@@ -111,7 +111,13 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 
                     <div className="relative">
                         {isRelation ? (
-                            <div className="relative pl-4 border-l-2 border-slate-200 ml-2 group-last:border-transparent min-h-[40px]"> {/* Main timeline line */}
+                            <div className="relative pl-4 border-l-2 border-slate-200 ml-2 group-last:border-transparent min-h-[40px]">
+                                 {/* Dot for timeline, positioned on the border */}
+                                 {/* Border is at left:0 of this div. Dot should be centered on it. */}
+                                 {/* w-4 (1rem = 16px). Center = 8px. Border width = 2px. Center = 1px. */}
+                                 {/* Dot left = 1px - 8px = -7px. */}
+                                 <div className="absolute -left-[7px] top-3 w-4 h-4 bg-white rounded-full border-2 border-slate-300 group-hover/list-item:border-indigo-400 transition-colors z-10"></div>
+
                                  <RelationBlock
                                     atom={atom.originalAtom || {
                                         id: atom.id,

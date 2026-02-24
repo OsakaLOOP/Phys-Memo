@@ -123,7 +123,7 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
                 <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between">
                          <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-600 truncate">
-                             {targetNode ? targetNode.title : 'Unknown Node'}
+                             {targetNode ? targetNode.title : '选择概念条目'}
                          </span>
                     </div>
                     {editData.condition && (

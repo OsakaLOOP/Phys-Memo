@@ -123,10 +123,10 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
         <div className={`group relative mb-2 transition-all ${atom.field === 'tags' ? 'inline-block mr-2 mb-2' : ''} ${className}`}>
             {/* Attribution Indicator (Left Sidebar) - REPOSITIONED */}
             {/* Instead of absolute left-0, we move it entirely to the left of the container */}
-            <div className="absolute right-full top-0 bottom-0 w-1 mr-2 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-200 cursor-help">
+            <div className="absolute right-full top-0 bottom-0 w-1 mr-2 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-200 cursor-help z-50">
                 {/* Tooltip positioned to the right of the indicator (so back towards content but floating) or further left? */}
                 {/* "ensure it appears on left side, not blocking input". So tooltip should go LEFT of the indicator. */}
-                <div className="absolute right-2 top-0 bg-white shadow-lg border rounded p-2 text-xs w-48 hidden group-hover:block z-50">
+                <div className="absolute right-2 top-0 bg-white shadow-lg border rounded p-2 text-xs w-48 hidden group-hover:block pointer-events-auto">
                     <div className="font-bold mb-1 text-slate-600 border-b pb-1">Copyright Distribution</div>
                     {adjustedAuthors.map(({ author, share }) => (
                         <div key={author} className="flex justify-between text-slate-500 py-0.5">

@@ -171,7 +171,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                             <button
                                 onClick={() => handleAdd(index)}
                                 className="bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200"
-                                title={`在上方添加${isRelation ? '关联条目' : (isInline?'标签':'内容块')}`}
+                                title={`在下方添加${isRelation ? '关联条目' : (isInline?'标签':'内容块')}`}
                             >
                                 <Plus size={12} />
                             </button>

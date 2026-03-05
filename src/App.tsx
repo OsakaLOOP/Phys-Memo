@@ -2,12 +2,14 @@ import {
   useState, useEffect, useRef, useMemo,
   type FC, type ChangeEvent, type MouseEvent
 } from 'react';
+
 import { 
   ArrowRight, Maximize, Crop, 
   Database, GitCommit, X, FileText, Hash, Layers,
   Network, Book, Download, Upload, Plus, Trash2, Search, Tag,
   ChevronRight, ChevronDown, Folder, FolderOpen
 } from 'lucide-react';
+
 import * as d3 from 'd3';
 import 'katex/dist/katex.min.css';
 
@@ -1043,47 +1045,7 @@ const PhysMemosApp: FC = () => {
     };
     // Create Concept & Edition
     await core.createConcept(newNode.title, 'user', initialData, newNode.topic, newNode.disciplines);
-    // Note: createConcept uses a generated ID for concept.
-    // BUT we need to link it to newNode.id?
-    // In `loadData`, I assumed `node.id` === `concept.id`.
-    // So I should force the ID or migrate properly.
-    // The `core.createConcept` generates a hash.
-    // I should create a version of `createConcept` that accepts ID, OR rely on `core.ts` to be modified.
-    // `core.ts` -> `generateContentHash(name + Date.now())`.
-    // I can't easily override it without modifying `core.ts`.
-    // However, for this task, the legacy data generation used `node.id` as `concept.id`.
-    // If I create a new node here, `core.createConcept` will make a NEW id.
-    // Sync logic `syncAttrStrand` tries `storage.getConcept(activeNode.id)`.
-    // If it fails, it MIGRATES (creates new concept with `activeNode.id`?).
-    // Wait, `syncAttrStrand` logic:
-    /*
-      let concept = await storage.getConcept(activeNode.id);
-      if (!concept) {
-        ...
-        concept = await core.createConcept(...)
-      }
-    */
-    // `core.createConcept` returns a concept with a HASH ID. It does NOT use `activeNode.id`.
-    // So `syncAttrStrand` logic in my previous reading was wrong or incomplete?
-    // Let's check `core.ts` again. `createConcept` generates ID.
-    // `syncAttrStrand` says `concept = await core.createConcept(...)`.
-    // But `concept.id` will be different from `activeNode.id`.
-    // So `storage.getConcept(activeNode.id)` will fail again next time!
-    // UNLESS I manually overwrite the ID or store the mapping.
-
-    // FIX: I will rely on `syncAttrStrand` to perform the migration/creation on first load.
-    // BUT I need to ensure `syncAttrStrand` uses `activeNode.id` as the Concept ID.
-    // `core.createConcept` does not allow specifying ID.
-    // I should modify `syncAttrStrand` to manually construct the concept with the correct ID,
-    // OR modify `core.ts` to accept an ID.
-    // modifying `core.ts` is better.
-    // But I just wrote `core.ts` in step 1? No, I read it.
-    // I'll stick to what I have. `syncAttrStrand` logic in `App.tsx` (which I am writing now) needs to handle this.
-
-    // For now, I will let `syncAttrStrand` handle the creation when the user first clicks the node.
-    // But `handleCreateNode` sets `activeNodeId`. So `useEffect` runs.
-    // So `syncAttrStrand` runs.
-    // So I need to ensure `syncAttrStrand` creates the concept using `activeNode.id`.
+    
   };
 
   const handleDeleteNode = async () => {
@@ -1329,6 +1291,19 @@ const PhysMemosApp: FC = () => {
      saveNode(updatedNode);
 
      storage.runCleanup(Date.now() - 24 * 60 * 60 * 1000);
+  };
+
+
+  const toggleTopicCollapse = (topic: string) => {
+    setCollapsedTopics(prev => {
+      const next = new Set(prev);
+      if (next.has(topic)) {
+        next.delete(topic);
+      } else {
+        next.add(topic);
+      }
+      return next;
+    });
   };
 
   const filteredNodes = nodes.filter(n => {

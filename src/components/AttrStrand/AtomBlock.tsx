@@ -89,7 +89,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={handleKeyDown}
                     autoFocus
-                    placeholder="Tag..."
+                    placeholder="标签..."
                  />
              );
         }
@@ -102,7 +102,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={handleKeyDown}
                     autoFocus
-                    placeholder="Reference..."
+                    placeholder="引用..."
                  />
              );
         }
@@ -121,13 +121,9 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
 
     return (
         <div className={`group relative mb-2 transition-all ${atom.field === 'tags' ? 'inline-block mr-2 mb-2' : ''} ${className}`}>
-            {/* Attribution Indicator (Left Sidebar) - REPOSITIONED */}
-            {/* Instead of absolute left-0, we move it entirely to the left of the container */}
             <div className="absolute right-full top-0 bottom-0 w-1 mr-2 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-200 cursor-help z-50">
-                {/* Tooltip positioned to the right of the indicator (so back towards content but floating) or further left? */}
-                {/* "ensure it appears on left side, not blocking input". So tooltip should go LEFT of the indicator. */}
                 <div className="absolute right-2 top-0 bg-white shadow-lg border rounded p-2 text-xs w-48 hidden group-hover:block pointer-events-auto">
-                    <div className="font-bold mb-1 text-slate-600 border-b pb-1">Copyright Distribution</div>
+                    <div className="font-bold mb-1 text-slate-600 border-b pb-1">版权归属</div>
                     {adjustedAuthors.map(({ author, share }) => (
                         <div key={author} className="flex justify-between text-slate-500 py-0.5">
                             <span className="truncate max-w-[100px]">{author}</span>
@@ -148,14 +144,14 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
                         <button
                             onClick={handleSave}
                             className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
-                            title="Save (Enter / Ctrl+Enter)"
+                            title="保存 (Enter / Ctrl+Enter)"
                         >
                             <Check size={12} />
                         </button>
                         <button
                             onClick={handleCancel}
                             className="p-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-                            title="Cancel (Esc)"
+                            title="取消 (Esc)"
                         >
                             <X size={12} />
                         </button>

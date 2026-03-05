@@ -96,7 +96,7 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
                         className="text-xs border border-slate-200 rounded px-2 py-1 focus:ring-1 focus:ring-indigo-300 outline-none w-full"
                      />
                      <div className="flex justify-end gap-2 mt-1">
-                         <button onClick={handleCancel} className="p-1 text-slate-400 hover:text-slate-600"><X size={14} /></button>
+                         <button onClick={handleCancel} className="btn-icon"><X size={14} /></button>
                          <button onClick={handleSave} className="p-1 text-green-500 hover:text-green-700"><Check size={14} /></button>
                      </div>
                 </div>

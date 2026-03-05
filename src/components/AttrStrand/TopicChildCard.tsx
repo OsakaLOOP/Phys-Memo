@@ -3,7 +3,6 @@ import { storage } from '../../attrstrand/storage';
 import type { IConceptRoot, IPopulatedEdition } from '../../attrstrand/types';
 import { AtomListEditor } from './AtomListEditor';
 import { Layers, Book } from 'lucide-react';
-import RichTextRenderer from '../RichTextRenderer';
 
 interface TopicChildCardProps {
     conceptId: string;
@@ -84,14 +83,14 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
         >
              {/* Icon / Type */}
              <div className="flex flex-col items-center gap-2 pt-1">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm ${legacyTypeConfig?.color.split(' ')[0].replace('bg-', 'bg-indigo-500')}`} style={{ backgroundColor: legacyTypeConfig?.nodeColor }}>
+                <div className={`w-8 h-8 rounded-full flex-center text-white shadow-sm ${legacyTypeConfig?.color.split(' ')[0].replace('bg-', 'bg-indigo-500')}`} style={{ backgroundColor: legacyTypeConfig?.nodeColor }}>
                    <span className="font-bold text-xs">{legacyType[0]}</span>
                 </div>
              </div>
 
              {/* Content */}
              <div className="flex-1 min-w-0 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex-between">
                    <h4 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors truncate text-lg">{concept.name}</h4>
                    <span className={`text-[10px] px-2 py-0.5 rounded border ${legacyTypeConfig?.color}`}>
                       {legacyTypeConfig?.label.split(' ')[0]}

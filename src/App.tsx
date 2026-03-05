@@ -757,7 +757,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
         <div className="font-bold text-slate-500 mb-2">Node Types</div>
         <div className="grid grid-cols-2 gap-3">
           {Object.entries(NODE_TYPES).map(([k, v]) => (
-            <div key={k} className="flex items-center gap-2">
+            <div key={k} className="flex-center-gap">
               <svg width="20" height="20" viewBox="-10 -10 20 20" className="overflow-visible">
                 {legendPaths[k] && (
                   <path
@@ -1340,8 +1340,8 @@ const PhysMemosApp: FC = () => {
 
       {/* Left Sidebar */}
       <div className={`${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 bg-white border-r border-slate-200 flex flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]`}>
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
-          <h1 className="font-bold text-lg flex items-center gap-2 text-slate-800 tracking-tight">
+        <div className="p-4 border-b border-slate-100 flex-between bg-white">
+          <h1 className="font-bold text-lg flex-center-gap text-slate-800 tracking-tight">
             <Database className="w-5 h-5 text-indigo-600" />
             Phys-Memos <span className="text-[10px] font-normal text-slate-400 bg-slate-100 px-1.5 rounded">v5.0</span>
           </h1>
@@ -1356,7 +1356,7 @@ const PhysMemosApp: FC = () => {
             <input
               type="text"
               placeholder="搜索概念、领域、标签..."
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border-none rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+              className="w-full pl-9 pr-3 py-2 input-field"
               value={searchQuery}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
             />
@@ -1378,12 +1378,12 @@ const PhysMemosApp: FC = () => {
               <div key={topic} className="border-b border-slate-50">
                 {/* Topic Header */}
                 <div
-                  className={`group flex items-center justify-between px-3 py-2 cursor-pointer transition-colors ${
+                  className={`group flex-between px-3 py-2 cursor-pointer transition-colors ${
                     isTopicActive ? 'bg-indigo-50/80 border-l-4 border-l-indigo-500 pl-2' : 'hover:bg-slate-50 border-l-4 border-l-transparent pl-2'
                   }`}
                 >
                   <div
-                    className="flex items-center gap-2 flex-1 overflow-hidden"
+                    className="flex-center-gap flex-1 overflow-hidden"
                     onClick={() => {
                       if (topicNode) {
                         setActiveNodeId(topicNode.id);
@@ -1401,7 +1401,7 @@ const PhysMemosApp: FC = () => {
                       e.stopPropagation();
                       toggleTopicCollapse(topic);
                     }}
-                    className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-200/50"
+                    className="btn-icon"
                   >
                     {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                   </button>
@@ -1419,11 +1419,11 @@ const PhysMemosApp: FC = () => {
                             setActiveNodeId(node.id);
                             setViewMode('editor');
                           }}
-                          className={`pl-9 pr-3 py-2 cursor-pointer transition-all flex items-center justify-between group/item ${
+                          className={`pl-9 pr-3 py-2 cursor-pointer transition-all flex-between group/item ${
                             isActive ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-100/50'
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex-center-gap min-w-0">
                             <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-indigo-400' : 'bg-slate-300'}`}></div>
                             <span className="truncate text-xs">{node.title}</span>
                           </div>
@@ -1445,7 +1445,7 @@ const PhysMemosApp: FC = () => {
           <div className="flex gap-2">
             <button
               onClick={() => setViewMode('editor')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
+              className={`flex-1 flex-center-gap py-2 rounded-lg text-sm font-medium transition ${
                 viewMode === 'editor' ? 'bg-white border border-indigo-200 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'
               }`}
             >
@@ -1453,7 +1453,7 @@ const PhysMemosApp: FC = () => {
             </button>
             <button
               onClick={() => setViewMode('graph')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
+              className={`flex-1 flex-center-gap py-2 rounded-lg text-sm font-medium transition ${
                 viewMode === 'graph' ? 'bg-white border border-indigo-200 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'
               }`}
             >
@@ -1461,7 +1461,7 @@ const PhysMemosApp: FC = () => {
             </button>
             <button
               onClick={() => { setViewMode('history'); /* setHistoryParentId(null); */ }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
+              className={`flex-1 flex-center-gap py-2 rounded-lg text-sm font-medium transition ${
                 viewMode === 'history' ? 'bg-white border border-indigo-200 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'
               }`}
             >
@@ -1471,12 +1471,12 @@ const PhysMemosApp: FC = () => {
           <div className="flex gap-2">
             <button
               onClick={handleCreateNode}
-              className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium shadow-sm transition"
+              className="btn-primary"
             >
               <Plus className="w-4 h-4" /> 新建
             </button>
             <label
-              className="px-3 flex items-center justify-center cursor-pointer text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition"
+              className="px-3 flex-center cursor-pointer btn-secondary"
               title="导入数据集"
             >
               <Upload className="w-4 h-4" />
@@ -1484,7 +1484,7 @@ const PhysMemosApp: FC = () => {
             </label>
             <button
               onClick={handleExport}
-              className="px-3 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition"
+              className="px-3 btn-secondary"
               title="导出完整数据集"
             >
               <Download className="w-4 h-4" />
@@ -1530,10 +1530,10 @@ const PhysMemosApp: FC = () => {
         ) : (
           <>
             <div className={`bg-white border-b border-slate-100 flex flex-col justify-center px-8 z-10 transition-all ${activeNode?.type === 'TOPIC' ? 'h-16' : 'min-h-32 py-4 space-y-4'}`}>
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2">
+              <div className="flex-between w-full">
+                <div className="flex-center-gap">
                   {!sidebarOpen && (
-                    <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition mr-2">
+                    <button onClick={() => setSidebarOpen(true)} className="btn-ghost rounded-full mr-2">
                       <ArrowRight className="w-5 h-5" />
                     </button>
                   )}
@@ -1541,7 +1541,7 @@ const PhysMemosApp: FC = () => {
                     <div className="flex items-center gap-4 animate-in fade-in slide-in-from-left-2">
                       {/* 学科多选（圆形按钮） */}
                       <div className="flex flex-col gap-2">
-                        <span className="text-xs font-bold text-slate-400 flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-400 flex-center-gap">
                           <Layers className="w-3.5 h-3.5 text-indigo-400" />
                           学科
                         </span>
@@ -1559,7 +1559,7 @@ const PhysMemosApp: FC = () => {
                                     saveNode({ ...activeNode, disciplines: updated });
                                   }}
                                   className={`
-                                    flex items-center justify-center transition-all duration-200 font-bold text-xs flex-shrink-0 hover:shadow-md
+                                    flex-center transition-all duration-200 font-bold text-xs flex-shrink-0 hover:shadow-md
                                     ${isCapsule ? 'h-8 px-3 rounded-full' : 'w-8 h-8 rounded-full'}
                                   `}
                                   style={{
@@ -1577,7 +1577,7 @@ const PhysMemosApp: FC = () => {
                                       e.stopPropagation();
                                       handleDeleteDiscipline(disc.name);
                                    }}
-                                   className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm z-10 hover:bg-red-600 hover:scale-110"
+                                   className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full flex-center opacity-0 group-hover:opacity-100 transition-all shadow-sm z-10 hover:bg-red-600 hover:scale-110"
                                    title="全局删除此学科"
                                 >
                                    <X className="w-2.5 h-2.5" />
@@ -1587,7 +1587,7 @@ const PhysMemosApp: FC = () => {
                           })}
                           <button
                              onClick={() => setShowDiscModal(true)}
-                             className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all"
+                             className="w-8 h-8 rounded-full flex-center border-2 border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all"
                              title="新建学科"
                           >
                              <Plus className="w-4 h-4" />
@@ -1597,7 +1597,7 @@ const PhysMemosApp: FC = () => {
                       
                       {/* 主题/Topic */}
                       <div className="flex flex-col gap-2">
-                        <span className="text-xs font-bold text-slate-400 flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-400 flex-center-gap">
                           <Tag className="w-3.5 h-3.5 text-amber-400" />
                           主题
                         </span>
@@ -1611,7 +1611,7 @@ const PhysMemosApp: FC = () => {
                     </div>
                   )}
                   {activeNode && activeNode.type === 'TOPIC' && (
-                    <div className="flex items-center gap-2 text-slate-400 font-medium text-sm animate-in fade-in slide-in-from-left-2">
+                    <div className="flex-center-gap text-slate-400 font-medium text-sm animate-in fade-in slide-in-from-left-2">
                       <FolderOpen className="w-5 h-5 text-amber-400" />
                       <span>主题概览模式</span>
                     </div>
@@ -1621,7 +1621,7 @@ const PhysMemosApp: FC = () => {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setShowOcrPanel(!showOcrPanel)}
-                    className={`flex items-center gap-2 px-4 py-1.5 text-xs font-medium rounded-full transition border ${
+                    className={`flex-center-gap px-4 py-1.5 text-xs font-medium rounded-full transition border ${
                       showOcrPanel ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
@@ -1631,7 +1631,7 @@ const PhysMemosApp: FC = () => {
                   {activeNode && (
                     <button
                       onClick={handleDeleteNode}
-                      className="text-slate-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-full transition"
+                      className="btn-danger p-2 rounded-full text-slate-300"
                       title={activeNode.type === 'TOPIC' ? "删除主题" : "删除条目"}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1680,7 +1680,7 @@ const PhysMemosApp: FC = () => {
                 <div className="flex-1 overflow-y-auto bg-slate-50/30">
                   <div className="max-w-5xl mx-auto p-8 space-y-8">
                     {/* Header Section */}
-                    <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="card-base p-8">
                       <div className='flex flex-row'>
                         <div className="mb-6 pr-4">
                           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">主题名称 / Topic</label>
@@ -1759,7 +1759,7 @@ const PhysMemosApp: FC = () => {
                           type="markdown"
                           variant="subtle"
                           placeholder="Describe this topic..."
-                          className="bg-slate-50 rounded-lg min-h-[120px]"
+                          className="card-panel min-h-[120px] bg-slate-50 border-none"
                         />
                       </div>
                       
@@ -1767,7 +1767,7 @@ const PhysMemosApp: FC = () => {
 
                     {/* Children Cards List - REFACTORED to use TopicChildCard */}
                     <div>
-                      <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
+                      <h3 className="text-lg font-bold text-slate-700 mb-4 flex-center-gap">
                         <Layers className="w-5 h-5 text-slate-400" />
                         {activeNode.title} 中的条目
                       </h3>
@@ -1791,8 +1791,8 @@ const PhysMemosApp: FC = () => {
                     </div>
 
                     {/* Aggregated References */}
-                    <div className="bg-slate-100 rounded-xl p-6 border border-slate-200">
-                       <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <div className="card-panel bg-slate-100 p-6 rounded-xl">
+                       <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex-center-gap">
                           <Book className="w-4 h-4" />
                           文献聚合 / Aggregated References
                        </h3>
@@ -1823,7 +1823,7 @@ const PhysMemosApp: FC = () => {
                   {/* We use activeAtoms state which is synced with activeEdition */}
 
                   <div className="mb-2">
-                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">核心定义 · 数学形式 / DEF</label>
+                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex-center-gap">核心定义 · 数学形式 / DEF</label>
                      <div className="bg-white border-2 border-indigo-100 shadow-sm p-6 rounded-xl">
                         <AtomListEditor
                             atoms={activeAtoms.core}
@@ -1837,7 +1837,7 @@ const PhysMemosApp: FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="md:col-span-1">
                       <div className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm h-full">
-                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">适用域 / Fields</label>
+                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex-center-gap">适用域 / Fields</label>
                          <AtomListEditor
                             atoms={activeAtoms.tags}
                             field="tags"
@@ -1848,7 +1848,7 @@ const PhysMemosApp: FC = () => {
                     </div>
                     <div className="md:col-span-2">
                        <div className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm h-full">
-                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">笔记 · 摘要 / Notes</label>
+                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex-center-gap">笔记 · 摘要 / Notes</label>
                          <AtomListEditor
                             atoms={activeAtoms.doc}
                             field="doc"
@@ -1859,8 +1859,8 @@ const PhysMemosApp: FC = () => {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="flex items-center gap-2 mb-6">
+                  <div className="card-base">
+                    <div className="flex-center-gap mb-6">
                       <GitCommit className="w-5 h-5 text-indigo-500" />
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">关联与推演 / Related</span>
                     </div>
@@ -1878,8 +1878,8 @@ const PhysMemosApp: FC = () => {
                     </div>
                   </div>
                   
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
+                  <div className="card-base">
+                    <div className="flex-center-gap mb-4">
                       <Hash className="w-4 h-4 text-indigo-500" />
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">参考文献 / References</span>
                     </div>
@@ -1909,11 +1909,11 @@ const PhysMemosApp: FC = () => {
       {showOcrPanel && (
         <div className="w-96 border-l border-slate-200 bg-white flex flex-col shadow-2xl z-30 animate-in slide-in-from-right-10 duration-300">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center backdrop-blur-sm">
-            <h3 className="font-bold text-sm text-slate-700 flex items-center gap-2">
+            <h3 className="font-bold text-sm text-slate-700 flex-center-gap">
               <Book className="w-4 h-4 text-indigo-500" />
               文献阅读 / OCR 提取
             </h3>
-            <button onClick={() => setShowOcrPanel(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-200/50">
+            <button onClick={() => setShowOcrPanel(false)} className="btn-icon">
               <Maximize className="w-4 h-4" />
             </button>
           </div>
@@ -1930,7 +1930,7 @@ const PhysMemosApp: FC = () => {
             </div>
             {ocrText && (
               <div className="bg-white border border-indigo-100 shadow-lg shadow-indigo-500/5 rounded-xl p-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex-between mb-2">
                   <span className="text-xs font-bold text-indigo-600 uppercase tracking-wide">识别结果</span>
                   <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">置信度 98%</span>
                 </div>
@@ -1940,13 +1940,13 @@ const PhysMemosApp: FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => activeNode && saveNode({ ...activeNode, latex: ocrText })}
-                    className="flex items-center justify-center gap-1.5 text-xs bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 font-medium transition shadow-sm"
+                    className="flex-center gap-1.5 text-xs btn-primary py-2"
                   >
                     <ArrowRight className="w-3 h-3" /> 填入公式
                   </button>
                   <button
                     onClick={() => activeNode && saveNode({ ...activeNode, desc: activeNode.desc + '\n\n> OCR 来源备注: ' + ocrText })}
-                    className="flex items-center justify-center gap-1.5 text-xs bg-white border border-slate-200 text-slate-600 py-2 rounded-lg hover:bg-slate-50 font-medium transition"
+                    className="flex-center gap-1.5 text-xs bg-white border border-slate-200 text-slate-600 py-2 rounded-lg hover:bg-slate-50 font-medium transition"
                   >
                     <Plus className="w-3 h-3" /> 追加笔记
                   </button>
@@ -1959,10 +1959,10 @@ const PhysMemosApp: FC = () => {
 
       {/* Add Discipline Modal */}
       {showDiscModal && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex-center animate-in fade-in duration-200">
            <div className="bg-white p-6 rounded-xl shadow-2xl border border-slate-200 w-80 space-y-4">
-              <div className="flex items-center justify-between mb-2">
-                 <h3 className="font-bold text-slate-700 flex items-center gap-2">
+              <div className="flex-between mb-2">
+                 <h3 className="font-bold text-slate-700 flex-center-gap">
                     <Layers className="w-4 h-4 text-indigo-500" />
                     新建学科
                  </h3>
@@ -1992,7 +1992,7 @@ const PhysMemosApp: FC = () => {
                        value={newDiscAbbr}
                        onChange={e => setNewDiscAbbr(e.target.value)}
                     />
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-indigo-50 text-indigo-600 text-xs font-bold border border-indigo-100">
+                    <div className="w-10 h-10 rounded-full flex-center bg-indigo-50 text-indigo-600 text-xs font-bold border border-indigo-100">
                        {newDiscAbbr || (newDiscName ? newDiscName[0] : '?')}
                     </div>
                  </div>
@@ -2008,7 +2008,7 @@ const PhysMemosApp: FC = () => {
                  <button
                     onClick={handleAddDiscipline}
                     disabled={!newDiscName.trim()}
-                    className="flex-1 px-4 py-2 rounded-lg text-sm bg-indigo-600 text-white hover:bg-indigo-700 font-medium disabled:opacity-50 shadow-sm hover:shadow-md transition-all"
+                    className="flex-1 px-4 btn-primary disabled:opacity-50 hover:shadow-md transition-all"
                  >
                     创建
                  </button>

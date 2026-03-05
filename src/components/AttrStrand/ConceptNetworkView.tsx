@@ -190,7 +190,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             <svg ref={svgRef} width="800" height="400" className="w-full h-auto bg-white border rounded shadow-inner" />
             <div className="mt-2 text-xs text-slate-500 flex justify-end gap-2">
                 <button
-                    className="px-3 py-1 bg-white border rounded hover:bg-slate-50 shadow-sm"
+                    className="px-3 py-1 btn-secondary"
                     onClick={() => {
                         // Ideally we pass the selected edition
                         // Here assuming parent tracks selection via onSelectEdition

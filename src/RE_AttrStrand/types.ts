@@ -28,7 +28,7 @@ export interface IContentAtom {
 
 export interface IEditionWorkspace {
     conceptId: hash;
-    editionId: hash;
+    lastEditionId: hash;
 }
 
 export interface IConceptRoot {
@@ -45,7 +45,17 @@ export interface IConceptRoot {
     backMeta: Meta; // 为以后的更多后端计算结果预留
 }
 
+interface IWorkspaceDraft {
+    conceptId: hash;
+    baseEditionId: hash; 
+    draftCoreAtomIds: Array<hash>; 
+    draftDocAtomIds: Array<hash>;
+    draftTagsAtomIds: Array<hash>;
+    draftRefsAtomIds: Array<hash>;
+    draftRelsAtomIds: Array<hash>;
 
+    draftAtomsData: Record<hash, Omit<IContentAtom, 'backMeta'>>; // 本地草稿编辑时的 Atom 数据, 包含 contentJson 和 frontMeta, 但不包含后端 meta. key 是 Atom ID, value 是 Atom 数据.
+}
 
 export interface IEdition {
     id: hash;

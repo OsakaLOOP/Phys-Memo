@@ -1006,7 +1006,7 @@ const PhysMemosApp: FC = () => {
   };
 
   const handleCreateNode = async () => {
-    let initialTopic = '未分类 (Uncategorized)';
+    let initialTopic = '未分类 topic';
     const activeNode = nodes.find(n => n.id === activeNodeId);
     if (activeNode) {
        if (activeNode.type === 'TOPIC') {
@@ -1304,6 +1304,7 @@ const PhysMemosApp: FC = () => {
       }
       return next;
     });
+    setActiveNodeId(null); // Deselect active node when toggling
   };
 
   const filteredNodes = nodes.filter(n => {

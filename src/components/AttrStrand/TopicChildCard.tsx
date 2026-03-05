@@ -3,7 +3,6 @@ import { storage } from '../../attrstrand/storage';
 import type { IConceptRoot, IPopulatedEdition } from '../../attrstrand/types';
 import { AtomListEditor } from './AtomListEditor';
 import { Layers, Book } from 'lucide-react';
-import RichTextRenderer from '../RichTextRenderer';
 
 interface TopicChildCardProps {
     conceptId: string;

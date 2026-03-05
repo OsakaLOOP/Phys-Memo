@@ -6,7 +6,7 @@ import {
   ArrowRight, Maximize, Crop, 
   Database, GitCommit, X, FileText, Hash, Layers,
   Network, Book, Download, Upload, Plus, Trash2, Search, Tag,
-  ChevronRight, ChevronDown, Folder, FolderOpen
+  ChevronRight, ChevronDown, Folder, FolderOpen, Save
 } from 'lucide-react';
 import * as d3 from 'd3';
 import 'katex/dist/katex.min.css';
@@ -809,11 +809,27 @@ const PhysMemosApp: FC = () => {
   const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
   const [showOcrPanel, setShowOcrPanel] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
+
+  const toggleTopicCollapse = (topic: string) => {
+    setCollapsedTopics(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(topic)) {
+        newSet.delete(topic);
+      } else {
+        newSet.add(topic);
+      }
+      return newSet;
+    });
+  };
   
   // AttrStrand State
   const [activeEdition, setActiveEdition] = useState<IEdition | null>(null);
   const [activeAtoms, setActiveAtoms] = useState<Record<ContentAtomField, IContentAtom[]>>({ doc: [], core: [], tags: [], refs: [], rels: [] });
   // const [historyParentId, setHistoryParentId] = useState<string | null>(null); // For history view navigation
+
+  // Workspace State for unsaved changes
+  const [workspace, setWorkspace] = useState<Partial<Record<ContentAtomField, AtomSubmission[]>>>({});
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const [ocrText, setOcrText] = useState("");
   // Relation State Logic Removed in favor of AtomListEditor
@@ -1188,6 +1204,10 @@ const PhysMemosApp: FC = () => {
 
   // Sync AttrStrand when activeNode changes
   useEffect(() => {
+    // Reset workspace state when node changes
+    setWorkspace({});
+    setHasUnsavedChanges(false);
+
     const syncAttrStrand = async () => {
       if (!activeNode || activeNode.type === 'TOPIC') {
         setActiveEdition(null);
@@ -1268,11 +1288,26 @@ const PhysMemosApp: FC = () => {
     syncAttrStrand();
   }, [activeNodeId]); // Depend on ID
 
-  const handleAttrUpdate = async (field: ContentAtomField, submissions: AtomSubmission[]) => {
-     if (!activeNode || !activeEdition) return;
+  const handleWorkspaceChange = (field: ContentAtomField, submissions: AtomSubmission[]) => {
+    setWorkspace(prev => ({
+      ...prev,
+      [field]: submissions
+    }));
+    setHasUnsavedChanges(true);
+  };
 
-     const prepareField = (f: ContentAtomField, currentAtoms: IContentAtom[], newSubmissions?: AtomSubmission[]) => {
-         if (newSubmissions && f === field) return newSubmissions;
+  const handleSaveWorkspace = async () => {
+     // Use refs to get current state if called from setInterval, or state directly if called from button
+     const currentWorkspace = workspaceRef.current || workspace;
+     const currentActiveNode = activeNodeRef.current || activeNode;
+     const currentActiveEdition = activeEditionRef.current || activeEdition;
+     const currentActiveAtoms = activeAtomsRef.current || activeAtoms;
+
+     if (!currentActiveNode || !currentActiveEdition || Object.keys(currentWorkspace).length === 0) return;
+
+     const prepareField = (f: ContentAtomField, currentAtoms: IContentAtom[]) => {
+         const newSubmissions = currentWorkspace[f];
+         if (newSubmissions) return newSubmissions;
          return currentAtoms.map(a => ({
              content: a.contentJson,
              derivedFromId: a.id,
@@ -1282,16 +1317,16 @@ const PhysMemosApp: FC = () => {
      };
 
      const allData: Record<ContentAtomField, AtomSubmission[]> = {
-         doc: prepareField('doc', activeAtoms.doc, field === 'doc' ? submissions : undefined),
-         core: prepareField('core', activeAtoms.core, field === 'core' ? submissions : undefined),
-         tags: prepareField('tags', activeAtoms.tags, field === 'tags' ? submissions : undefined),
-         refs: prepareField('refs', activeAtoms.refs, field === 'refs' ? submissions : undefined),
-         rels: prepareField('rels', activeAtoms.rels, field === 'rels' ? submissions : undefined),
+         doc: prepareField('doc', currentActiveAtoms.doc),
+         core: prepareField('core', currentActiveAtoms.core),
+         tags: prepareField('tags', currentActiveAtoms.tags),
+         refs: prepareField('refs', currentActiveAtoms.refs),
+         rels: prepareField('rels', currentActiveAtoms.rels),
      };
 
      const newEdition = await core.createEdition(
-         activeNode.id,
-         activeEdition.id,
+         currentActiveNode.id,
+         currentActiveEdition.id,
          allData,
          'user', // Mock user
          'autosave'
@@ -1311,12 +1346,12 @@ const PhysMemosApp: FC = () => {
      setActiveAtoms(newAtomsState);
 
      // Sync back to Legacy NodeData for compatibility
-     const updatedNode = { ...activeNode };
-     if (field === 'doc') updatedNode.desc = newAtomsState.doc.map(a => a.contentJson).join('\n\n');
-     if (field === 'core') updatedNode.latex = newAtomsState.core.map(a => a.contentJson).join('\n\n'); // Usually one
-     if (field === 'tags') updatedNode.constraints = newAtomsState.tags.map(a => a.contentJson);
-     if (field === 'refs') updatedNode.references = newAtomsState.refs.map(a => a.contentJson).join('\n');
-     if (field === 'rels') {
+     const updatedNode = { ...currentActiveNode };
+     if (currentWorkspace.doc) updatedNode.desc = newAtomsState.doc.map(a => a.contentJson).join('\n\n');
+     if (currentWorkspace.core) updatedNode.latex = newAtomsState.core.map(a => a.contentJson).join('\n\n'); // Usually one
+     if (currentWorkspace.tags) updatedNode.constraints = newAtomsState.tags.map(a => a.contentJson);
+     if (currentWorkspace.refs) updatedNode.references = newAtomsState.refs.map(a => a.contentJson).join('\n');
+     if (currentWorkspace.rels) {
          updatedNode.relations = newAtomsState.rels.map(a => {
              try {
                  return JSON.parse(a.contentJson);
@@ -1328,8 +1363,38 @@ const PhysMemosApp: FC = () => {
 
      saveNode(updatedNode);
 
+     // Clear workspace state
+     setWorkspace({});
+     setHasUnsavedChanges(false);
+
      storage.runCleanup(Date.now() - 24 * 60 * 60 * 1000);
   };
+
+  // Auto-save logic
+  const workspaceRef = useRef(workspace);
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  const activeNodeRef = useRef(activeNode);
+  const activeEditionRef = useRef(activeEdition);
+  const activeAtomsRef = useRef(activeAtoms);
+
+  // Keep refs up-to-date with current state for the setInterval closure
+  useEffect(() => {
+    workspaceRef.current = workspace;
+    hasUnsavedChangesRef.current = hasUnsavedChanges;
+    activeNodeRef.current = activeNode;
+    activeEditionRef.current = activeEdition;
+    activeAtomsRef.current = activeAtoms;
+  }, [workspace, hasUnsavedChanges, activeNode, activeEdition, activeAtoms]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (hasUnsavedChangesRef.current && activeNodeRef.current && activeEditionRef.current) {
+        handleSaveWorkspace();
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   const filteredNodes = nodes.filter(n => {
     const q = searchQuery.toLowerCase();
@@ -1643,6 +1708,21 @@ const PhysMemosApp: FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
+                  {activeNode && activeNode.type !== 'TOPIC' && (
+                    <button
+                      onClick={handleSaveWorkspace}
+                      disabled={!hasUnsavedChanges}
+                      className={`flex items-center gap-2 px-4 py-1.5 text-xs font-medium rounded-full transition border shadow-sm ${
+                        hasUnsavedChanges
+                          ? 'bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-700'
+                          : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                      }`}
+                      title={hasUnsavedChanges ? "保存并创建新版本 (Auto-saves every 5m)" : "所有更改已保存"}
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{hasUnsavedChanges ? "保存版本" : "已保存"}</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowOcrPanel(!showOcrPanel)}
                     className={`flex items-center gap-2 px-4 py-1.5 text-xs font-medium rounded-full transition border ${
@@ -1853,7 +1933,7 @@ const PhysMemosApp: FC = () => {
                             atoms={activeAtoms.core}
                             field="core"
                             defaultAtomType="latex"
-                            onUpdate={(subs) => handleAttrUpdate('core', subs)}
+                            onUpdate={(subs) => handleWorkspaceChange('core', subs)}
                         />
                      </div>
                   </div>
@@ -1866,7 +1946,7 @@ const PhysMemosApp: FC = () => {
                             atoms={activeAtoms.tags}
                             field="tags"
                             defaultAtomType="inline"
-                            onUpdate={(subs) => handleAttrUpdate('tags', subs)}
+                            onUpdate={(subs) => handleWorkspaceChange('tags', subs)}
                         />
                       </div>
                     </div>
@@ -1877,7 +1957,7 @@ const PhysMemosApp: FC = () => {
                             atoms={activeAtoms.doc}
                             field="doc"
                             defaultAtomType="markdown"
-                            onUpdate={(subs) => handleAttrUpdate('doc', subs)}
+                            onUpdate={(subs) => handleWorkspaceChange('doc', subs)}
                         />
                       </div>
                     </div>
@@ -1894,7 +1974,7 @@ const PhysMemosApp: FC = () => {
                             atoms={activeAtoms.rels}
                             field="rels"
                             defaultAtomType="inline"
-                            onUpdate={(subs) => handleAttrUpdate('rels', subs)}
+                            onUpdate={(subs) => handleWorkspaceChange('rels', subs)}
                             nodesMap={nodesMap}
                             relationTypes={RELATION_TYPES}
                             className="space-y-4"
@@ -1911,7 +1991,7 @@ const PhysMemosApp: FC = () => {
                         atoms={activeAtoms.refs}
                         field="refs"
                         defaultAtomType="sources"
-                        onUpdate={(subs) => handleAttrUpdate('refs', subs)}
+                        onUpdate={(subs) => handleWorkspaceChange('refs', subs)}
                         className="bg-slate-50/50 rounded-lg border border-slate-100 p-2"
                     />
                   </div>

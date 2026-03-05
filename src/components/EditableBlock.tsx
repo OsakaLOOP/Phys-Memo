@@ -72,7 +72,7 @@ const EditableBlock: FC<EditableBlockProps> = ({
     subtle: "bg-transparent border-b border-transparent hover:border-slate-200 p-2",
   };
 
-  const labelStyles = "block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2";
+  const labelStyles = "block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex-center-gap";
 
   const renderView = () => {
     if (!value || (Array.isArray(value) && value.length === 0)) {
@@ -100,7 +100,7 @@ const EditableBlock: FC<EditableBlockProps> = ({
         return (
           <div className="flex flex-wrap gap-2">
             {Array.isArray(value) && value.map((tag, i) => (
-              <span key={i} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
+              <span key={i} className="inline-flex-center badge-base bg-yellow-50 text-yellow-700 border-yellow-200">
                 <RichTextRenderer content={tag} className="inline-block [&>p]:inline [&>p]:m-0" />
               </span>
             ))}
@@ -152,7 +152,7 @@ const EditableBlock: FC<EditableBlockProps> = ({
           <input
             ref={inputRef as Ref<HTMLInputElement>}
             type="text"
-            className="w-full p-2 text-sm bg-white border border-indigo-500 rounded shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none"
+            className="w-full p-2 text-sm input-bordered border-indigo-500 rounded"
             value={Array.isArray(tempValue) ? tempValue.join(', ') : tempValue}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setTempValue(e.target.value.split(/,\s*/).filter(Boolean))}
             onBlur={handleSave}
@@ -165,7 +165,7 @@ const EditableBlock: FC<EditableBlockProps> = ({
           <input
             ref={inputRef as Ref<HTMLInputElement>}
             type="text"
-            className="w-full p-2 text-sm bg-white border border-indigo-500 rounded shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none font-mono"
+            className="w-full p-2 text-sm input-bordered border-indigo-500 rounded font-mono"
             value={tempValue as string}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setTempValue(e.target.value)}
             onBlur={handleSave}

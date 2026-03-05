@@ -93,7 +93,7 @@ const FormulaAnalysis: FC<FormulaAnalysisProps> = ({ latex, label }) => {
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div className="p-3 bg-slate-50 border-b border-slate-100 flex-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">公式模板解析 / PARSING</span>
             <span className="text-[10px] text-slate-400">已解析共 {parsedData.reduce((acc, c) => acc + c.instances.length, 0)} 个变量</span>
           </div>

@@ -57,7 +57,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
         if (atom.field === 'tags') {
             // Match EditableBlock 'tags' style
             return (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
+                <span className="inline-flex-center badge-base bg-yellow-50 text-yellow-700 border-yellow-200">
                     <RichTextRenderer content={atom.contentJson} className="inline-block [&>p]:inline [&>p]:m-0" />
                 </span>
             );
@@ -84,7 +84,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
              return (
                  <input
                     type="text"
-                    className="w-full p-1 text-sm bg-white border border-indigo-500 rounded shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none"
+                    className="w-full p-1 text-sm input-bordered border-indigo-500 rounded"
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -97,7 +97,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
          if (atom.field === 'refs') {
              return (
                  <textarea
-                    className="w-full min-h-[60px] p-2 text-sm bg-white border border-indigo-500 rounded shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none resize-y font-mono"
+                    className="w-full min-h-[60px] p-2 text-sm input-bordered border-indigo-500 rounded resize-y font-mono"
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -150,7 +150,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
                         </button>
                         <button
                             onClick={handleCancel}
-                            className="p-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                            className="btn-danger bg-red-100"
                             title="取消 (Esc)"
                         >
                             <X size={12} />

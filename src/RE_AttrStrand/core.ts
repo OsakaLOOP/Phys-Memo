@@ -14,12 +14,6 @@ export interface AtomSubmission {
 export class AttrStrandCore {
 
     // --- Similarity & Attribution ---
-    private checkAtomType(field:ContentAtomField, type:ContentAtomType): boolean {
-        if (field === 'doc') {return type === 'markdown' || type === 'latex' || type === 'sources';}
-        else {
-            return type === 'inline';
-        }
-    }
     
 
     private calculateSimilarity(hash1: string, hash2: string): number {

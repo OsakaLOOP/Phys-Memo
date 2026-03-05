@@ -1470,7 +1470,7 @@ const PhysMemosApp: FC = () => {
           <div className="flex gap-2">
             <button
               onClick={handleCreateNode}
-              className="btn-primary"
+              className="flex-1 flex-center-gap btn-primary"
             >
               <Plus className="w-4 h-4" /> 新建
             </button>
@@ -1483,7 +1483,7 @@ const PhysMemosApp: FC = () => {
             </label>
             <button
               onClick={handleExport}
-              className="px-3 btn-secondary"
+              className="px-3 flex-center btn-secondary"
               title="导出完整数据集"
             >
               <Download className="w-4 h-4" />

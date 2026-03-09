@@ -63,7 +63,7 @@ export class AttrStrandCore {
         return newAttr;
     }
 
-    // --- Core Operations ---
+    // 核心 api
 
     async createConcept(
         name: string,
@@ -72,7 +72,7 @@ export class AttrStrandCore {
         topic: string = 'General',
         disciplines: string[] = []
     ): Promise<IConceptRoot> {
-        const conceptId = await generateContentHash(name + Date.now());
+        const conceptId = await generateContentHash(name + creatorId + Date.now());
 
         // Create initial edition
         const edition = await this.createEdition(

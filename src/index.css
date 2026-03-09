@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
-@layer components {
+
   /* Buttons */
   .btn-primary {
-    @apply bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium shadow-sm transition;
+    @apply flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium shadow-sm transition;
   }
   .btn-secondary {
     @apply bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition text-slate-400 hover:text-slate-600;
@@ -49,4 +49,3 @@
   .flex-between {
     @apply flex items-center justify-between;
   }
-}

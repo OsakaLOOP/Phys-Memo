@@ -28,7 +28,6 @@ import { splitContent } from './attrstrand/utils';
 import { migrateAtoms } from './attrstrand/migration';
 
 // --- Type Definitions ---
-
 interface NodeData {
   id: string;
   disciplines: string[]; // 核心学科：流体力学、颗粒物理等
@@ -416,7 +415,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
         if (angles[i] < minAngleRad || angles[(i + 1) % expandedHull.length] < minAngleRad) {
           inserts += extraInsert;
         }
-        smoothedHull.push(current);
+        smoothedHull.push(current); 
         for (let j = 1; j <= inserts; j++) {
           const t = j / (inserts + 1);
           const x = current[0] + (next[0] - current[0]) * t;
@@ -1445,7 +1444,7 @@ const PhysMemosApp: FC = () => {
           <div className="flex gap-2">
             <button
               onClick={() => setViewMode('editor')}
-              className={`flex-1 flex-center-gap py-2 rounded-lg text-sm font-medium transition ${
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
                 viewMode === 'editor' ? 'bg-white border border-indigo-200 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'
               }`}
             >
@@ -1453,7 +1452,7 @@ const PhysMemosApp: FC = () => {
             </button>
             <button
               onClick={() => setViewMode('graph')}
-              className={`flex-1 flex-center-gap py-2 rounded-lg text-sm font-medium transition ${
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
                 viewMode === 'graph' ? 'bg-white border border-indigo-200 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'
               }`}
             >
@@ -1461,7 +1460,7 @@ const PhysMemosApp: FC = () => {
             </button>
             <button
               onClick={() => { setViewMode('history'); /* setHistoryParentId(null); */ }}
-              className={`flex-1 flex-center-gap py-2 rounded-lg text-sm font-medium transition ${
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
                 viewMode === 'history' ? 'bg-white border border-indigo-200 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'
               }`}
             >

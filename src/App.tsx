@@ -832,11 +832,11 @@ const PhysMemosApp: FC = () => {
         conceptDisciplines: state.conceptDisciplines,
         baseEditionId: state.baseEditionId,
         saveType: 'usersave' as const,
-        coreAtoms: buildSubmission(state.draftCoreAtomIds),
-        docAtoms: buildSubmission(state.draftDocAtomIds),
-        tagsAtoms: buildSubmission(state.draftTagsAtomIds),
-        refsAtoms: buildSubmission(state.draftRefsAtomIds),
-        relsAtoms: buildSubmission(state.draftRelsAtomIds),
+        coreAtoms: buildSubmission(state.draftAtomLists.core),
+        docAtoms: buildSubmission(state.draftAtomLists.doc),
+        tagsAtoms: buildSubmission(state.draftAtomLists.tags),
+        refsAtoms: buildSubmission(state.draftAtomLists.refs),
+        relsAtoms: buildSubmission(state.draftAtomLists.rels),
     };
 
     const edition = await core.submitEdition(submission, 'user_uuid_here', new Date().toISOString());

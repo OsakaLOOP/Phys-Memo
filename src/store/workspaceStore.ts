@@ -50,11 +50,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         conceptDisciplines: [] as string[] as string[],
         lastEdited: new Date().toISOString(),
 
-        draftCoreAtomIds: [] as string[],
-        draftDocAtomIds: [] as string[],
-        draftTagsAtomIds: [] as string[],
-        draftRefsAtomIds: [] as string[],
-        draftRelsAtomIds: [] as string[],
+        draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
         draftAtomsData: {},
 
         initWorkspace: (edition: IPopulatedEdition | null, conceptId: string, conceptName: string, conceptTopic: string, conceptDisciplines: string[]) => {
@@ -67,11 +63,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     conceptTopic,
                     conceptDisciplines,
                     lastEdited: new Date().toISOString(),
-                    draftCoreAtomIds: [] as string[],
-                    draftDocAtomIds: [] as string[],
-                    draftTagsAtomIds: [] as string[],
-                    draftRefsAtomIds: [] as string[],
-                    draftRelsAtomIds: [] as string[],
+                    draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
                     draftAtomsData: {},
                 });
                 return;
@@ -102,11 +94,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 conceptTopic,
                 conceptDisciplines,
                 lastEdited: new Date().toISOString(),
-                draftCoreAtomIds: mapIds(edition.coreAtoms),
-                draftDocAtomIds: mapIds(edition.docAtoms),
-                draftTagsAtomIds: mapIds(edition.tagsAtoms),
-                draftRefsAtomIds: mapIds(edition.refsAtoms),
-                draftRelsAtomIds: mapIds(edition.relsAtoms),
+                draftAtomLists: {
+                    core: mapIds(edition.coreAtoms),
+                    doc: mapIds(edition.docAtoms),
+                    tags: mapIds(edition.tagsAtoms),
+                    refs: mapIds(edition.refsAtoms),
+                    rels: mapIds(edition.relsAtoms),
+                },
                 draftAtomsData,
             });
         },
@@ -117,8 +111,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         addAtomId: (field: ContentAtomField, id: DraftId, index?: number) => {
             set((state: any) => {
-                const listKey = `draft${field.charAt(0).toUpperCase() + field.slice(1)}AtomIds` as keyof IWorkspaceDraft;
-                const list = [...(state[listKey] as string[])];
+                const list = [...(state.draftAtomLists[field] || [])];
                 if (index !== undefined && index >= 0) {
                     list.splice(index + 1, 0, id);
                 } else {
@@ -147,7 +140,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 }
 
                 return {
-                    [listKey]: list,
+                    draftAtomLists: { ...state.draftAtomLists, [field]: list },
                     draftAtomsData: newData,
                     lastEdited: new Date().toISOString()
                 };
@@ -156,14 +149,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         removeAtomId: (field: ContentAtomField, index: number) => {
             set((state: any) => {
-                const listKey = `draft${field.charAt(0).toUpperCase() + field.slice(1)}AtomIds` as keyof IWorkspaceDraft;// 糟糕的做法.
-                const list = [...(state[listKey] as string[])];
+                const list = [...(state.draftAtomLists[field] || [])];
                 list.splice(index, 1);
 
                 // 撤销不删除孤立 Atom 数据. 后期引入 lost-found 和清理机制. 由于撤销后新操作而被覆盖的 Atom 数据会作为 autosave 保存, 然后本地清理.
 
                 return {
-                    [listKey]: list,
+                    draftAtomLists: { ...state.draftAtomLists, [field]: list },
                     lastEdited: new Date().toISOString()
                 };
             });
@@ -191,11 +183,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                  const newData: Record<DraftId, AtomDraft> = {};
                  const mapList = (list: string[]) => list.map(id => oldToNewMap[id] || id);
 
-                 const draftCoreAtomIds = mapList(state.draftCoreAtomIds);
-                 const draftDocAtomIds = mapList(state.draftDocAtomIds);
-                 const draftTagsAtomIds = mapList(state.draftTagsAtomIds);
-                 const draftRefsAtomIds = mapList(state.draftRefsAtomIds);
-                 const draftRelsAtomIds = mapList(state.draftRelsAtomIds);
+                 const draftAtomLists = {
+                     core: mapList(state.draftAtomLists.core || []),
+                     doc: mapList(state.draftAtomLists.doc || []),
+                     tags: mapList(state.draftAtomLists.tags || []),
+                     refs: mapList(state.draftAtomLists.refs || []),
+                     rels: mapList(state.draftAtomLists.rels || []),
+                 };
 
                  // Keep data mapped to new IDs
                  for (const oldId of Object.keys(state.draftAtomsData)) {
@@ -210,11 +204,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
                  return {
                      baseEditionId: newBaseEditionId,
-                     draftCoreAtomIds,
-                     draftDocAtomIds,
-                     draftTagsAtomIds,
-                     draftRefsAtomIds,
-                     draftRelsAtomIds,
+                     draftAtomLists,
                      draftAtomsData: newData,
                  };
              });

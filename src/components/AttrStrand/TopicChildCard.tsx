@@ -4,14 +4,6 @@ import type { IConceptRoot, IPopulatedEdition } from '../../attrstrand/types';
 
 import { Layers, Book } from 'lucide-react';
 
-// Using a dedicated store context might be overkill for read-only cards,
-// but we need to supply the right props to AtomListEditor. Wait, AtomListEditor
-// now strictly depends on the global workspace store.
-// Since these are read-only cards, we can't use AtomListEditor from the global store easily.
-// Let's implement a simple read-only renderer here or pass atoms directly if we want.
-// Actually, I'll update AtomListEditor to take atoms optionally if readOnly is true, or just render it directly here to keep it simple.
-
-
 interface TopicChildCardProps {
     conceptId: string;
     legacyTitle: string;

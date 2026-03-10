@@ -2,7 +2,7 @@
 
 export type hash = string; // SHA256
 export type uuid = string; // UUID v4 / Temp ID (can be hash length to be consistent)
-export type DraftId = string; // 草稿 ID, 可以是随机的 256 位类似 hash, 也可以是继承的 hash, 由前端生成, 提交时后端验证并计算最终 Atom ID.
+export type DraftId = string; // 草稿 ID, 可以是随机的 256 位 uuid, 也可以是继承的 hash, 由前端生成, 提交时后端验证并计算最终 Atom ID.
 
 export type ContentAtomField = 'doc' | 'core' | 'tags' | 'refs' | 'rels' // 所有概念页展示的字段内容均 json 格式化, 作为对应域的 Atom 存储.
 export type ContentAtomType = 'latex' | 'markdown' | 'inline' | 'sources' // inline -> tags/refs, sources -> uploaded md/pdf file links.

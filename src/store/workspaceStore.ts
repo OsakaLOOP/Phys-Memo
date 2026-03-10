@@ -5,7 +5,7 @@ import type {
     ContentAtomType, IPopulatedEdition, DisciplineData, IConceptView
 } from '../attrstrand/types';
 
-// Global Data Store
+// 全局 Store
 interface GlobalState {
     disciplines: DisciplineData[];
     conceptViews: Record<string, IConceptView>; // Map of all concepts for the sidebar
@@ -20,25 +20,25 @@ export const useGlobalStore = create<GlobalState>((set: any) => ({
     setConceptViews: (views: Record<string, IConceptView>) => set({ conceptViews: views }),
 }));
 
-// Workspace Draft Store with Undo/Redo
+// 实现历史记录撤销重做的 Workspace Draft Store
 interface WorkspaceState extends IWorkspaceDraft {
     initWorkspace: (edition: IPopulatedEdition | null, conceptId: string, conceptName: string, conceptTopic: string, conceptDisciplines: string[]) => void;
 
     // Concept Metadata
     updateConceptMeta: (name: string, topic: string, disciplines: string[]) => void;
 
-    // List Operations
+    // Atom ID List 操作
     addAtomId: (field: ContentAtomField, id: DraftId, index?: number) => void;
     removeAtomId: (field: ContentAtomField, index: number) => void;
 
-    // Atom Operations
+    // Atom 自身操作
     updateAtomContent: (id: DraftId, content: string) => void;
 
-    // Commit Control
+    // Commit 触发的更新操作
     markCommitted: (newBaseEditionId: string, oldToNewMap: Record<string, string>) => void;
 }
 
-// Helper to generate temporary DraftId
+// 来自 uuid 的 DraftId
 const genTempId = () => `temp_${crypto.randomUUID().replace(/-/g, '')}`;
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -59,7 +59,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         initWorkspace: (edition: IPopulatedEdition | null, conceptId: string, conceptName: string, conceptTopic: string, conceptDisciplines: string[]) => {
             if (!edition) {
-                // Empty new workspace
+                // 新建空白 Workspace
                 set({
                     conceptId,
                     baseEditionId: null as string | null,
@@ -76,18 +76,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 });
                 return;
             }
-
-            const draftAtomsData: Record<DraftId, AtomDraft> = {};
-
+            // 否则加载已有 Edition 数据到 Workspace 内存
+            const draftAtomsData: Record<DraftId, AtomDraft> = {};// 待提取至 types
+            
             const mapIds = (atoms: any[]): string[] => {
                 return atoms.map((a) => {
                     draftAtomsData[a.id] = {
                         id: a.id,
                         field: a.field,
                         type: a.type,
-                        content: a.content || a.contentJson, // Handle legacy load temporarily
+                        content: a.content || a.contentJson, // legacy
                         creatorId: a.creatorId,
-                        derivedFromId: a.derivedFromId || a.id, // For loaded atoms, the original id is the derivation point if it gets edited
+                        derivedFromId: a.id, // 加载原有 Atom 的继承.
                         frontMeta: a.frontMeta || {},
                         isDirty: false
                     };
@@ -110,7 +110,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 draftAtomsData,
             });
         },
-
+        // Concept Metadata 更新. 后期必须引入防抖, 而且 Metadata 将会跟着 Concept 一起提交.
         updateConceptMeta: (name: string, topic: string, disciplines: string[]) => {
             set({ conceptName: name, conceptTopic: topic, conceptDisciplines: disciplines, lastEdited: new Date().toISOString() });
         },
@@ -139,8 +139,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         field,
                         type,
                         content: '',
-                        creatorId: 'user', // Replace with real user context if needed
-                        derivedFromId: null, // New UUID atom
+                        creatorId: 'user', // 待完善用户系统后替换
+                        derivedFromId: null, // 新建 Atom 的 uuid 分配
                         frontMeta: {},
                         isDirty: true,
                     };
@@ -156,11 +156,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         removeAtomId: (field: ContentAtomField, index: number) => {
             set((state: any) => {
-                const listKey = `draft${field.charAt(0).toUpperCase() + field.slice(1)}AtomIds` as keyof IWorkspaceDraft;
+                const listKey = `draft${field.charAt(0).toUpperCase() + field.slice(1)}AtomIds` as keyof IWorkspaceDraft;// 糟糕的做法.
                 const list = [...(state[listKey] as string[])];
                 list.splice(index, 1);
 
-                // Note: We don't necessarily delete the draftAtomsData key yet, allows undo without losing data object
+                // 撤销不删除孤立 Atom 数据. 后期引入 lost-found 和清理机制. 由于撤销后新操作而被覆盖的 Atom 数据会作为 autosave 保存, 然后本地清理.
 
                 return {
                     [listKey]: list,
@@ -176,8 +176,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
                 const updatedAtom = { ...atom, content, isDirty: true };
 
-                // If it's an original hash atom, its derivedFromId is already correctly its original hash.
-                // If it's a UUID atom, its derivedFromId is null.
+                // 维持 derivedFromId不变, 以便提交时溯源. 在 markCommitted 时才会更新指向新的 Hash.
 
                 return {
                     draftAtomsData: { ...state.draftAtomsData, [id]: updatedAtom },

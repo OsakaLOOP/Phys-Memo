@@ -62,7 +62,7 @@ const EditableBlock: FC<EditableBlockProps> = ({
     const target = e.target as HTMLElement;
     if (target.tagName === 'A' || target.closest('a') || target.closest('.ref-link')) return;
     const selection = window.getSelection();
-    if (selection && selection.toString().length > 0) return;
+    if (selection && selection.toString().length > 0) return;// 选中文本时不进入编辑
     setIsEditing(true);
   };
 

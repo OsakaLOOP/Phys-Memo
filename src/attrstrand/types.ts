@@ -112,11 +112,7 @@ export interface IWorkspaceDraft {
 
     lastEdited: string;
 
-    draftCoreAtomIds: Array<DraftId>;
-    draftDocAtomIds: Array<DraftId>;
-    draftTagsAtomIds: Array<DraftId>;
-    draftRefsAtomIds: Array<DraftId>;
-    draftRelsAtomIds: Array<DraftId>;
+    draftAtomLists: Record<ContentAtomField, Array<DraftId>>;
 
     draftAtomsData: Record<DraftId, AtomDraft>; // 本地草稿编辑时的 Atom 数据. key 是 Atom ID, value 是 Atom 数据.
 }

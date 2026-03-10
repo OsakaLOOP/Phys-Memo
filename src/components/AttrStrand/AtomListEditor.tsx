@@ -18,8 +18,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
     className = ''
 }) => {
     // Only subscribe to the array of IDs for this list to avoid re-rendering entire list on child text change
-    const listKey = `draft${field.charAt(0).toUpperCase() + field.slice(1)}AtomIds` as keyof ReturnType<typeof useWorkspaceStore.getState>;
-    const atomIds = useWorkspaceStore((state: any) => state[listKey] as DraftId[]);
+    const atomIds = useWorkspaceStore((state: any) => state.draftAtomLists[field] as DraftId[] || []);
 
     const addAtomId = useWorkspaceStore((state: any) => state.addAtomId);
     const removeAtomId = useWorkspaceStore((state: any) => state.removeAtomId);

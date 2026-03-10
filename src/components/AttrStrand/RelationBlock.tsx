@@ -1,18 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import type { IContentAtom } from '../../attrstrand/types';
+import { useWorkspaceStore, useGlobalStore } from '../../store/workspaceStore';
+import type { DraftId } from '../../attrstrand/types';
 import RichTextRenderer from '../RichTextRenderer';
 import { X, Check } from 'lucide-react';
+import { RELATION_TYPES } from '../../constants';
 
 interface RelationBlockProps {
-    atom: IContentAtom;
-    onUpdate: (newContent: string) => void;
+    atomId: DraftId;
     readOnly?: boolean;
     className?: string;
-    // Map of node IDs to Node Data (or at least title/type) to resolve targetId
-    // We pass a simple lookup function or map
-    nodesMap: Record<string, { title: string }>;
-    // Relation Config for icons/colors
-    relationTypes: Record<string, { label: string; icon: string; color: string }>;
 }
 
 interface RelationData {
@@ -22,46 +18,49 @@ interface RelationData {
 }
 
 export const RelationBlock: React.FC<RelationBlockProps> = ({
-    atom,
-    onUpdate,
+    atomId,
     readOnly = false,
-    className = '',
-    nodesMap,
-    relationTypes
+    className = ''
 }) => {
+    // Subscribe specifically to this atom
+    const atom = useWorkspaceStore((state: any) => state.draftAtomsData[atomId]);
+    const updateAtomContent = useWorkspaceStore((state: any) => state.updateAtomContent);
+    const conceptViews = useGlobalStore((state: any) => state.conceptViews); // Use global map for lookups
+
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState<RelationData>({ targetId: '', type: 'DERIVES_FROM', condition: '' });
 
-    // Parse contentJson to RelationData
+    // Parse content
     useEffect(() => {
-        try {
-            const parsed = JSON.parse(atom.contentJson);
-            setEditData(parsed);
-        } catch (e) {
-            console.error("Failed to parse relation atom content", atom.contentJson);
+        if (atom?.content) {
+            try {
+                const parsed = JSON.parse(atom.content);
+                setEditData(parsed);
+            } catch (e) {
+                console.error("Failed to parse relation atom content", atom.content);
+            }
         }
-    }, [atom.contentJson]);
+    }, [atom?.content]);
+
+    if (!atom) return null;
 
     const handleSave = () => {
         const json = JSON.stringify(editData);
-        if (json !== atom.contentJson) {
-            onUpdate(json);
+        if (json !== atom.content) {
+            updateAtomContent(atomId, json);
         }
         setIsEditing(false);
     };
 
     const handleCancel = () => {
         try {
-            setEditData(JSON.parse(atom.contentJson));
+            if (atom.content) setEditData(JSON.parse(atom.content));
         } catch(e) {}
         setIsEditing(false);
     };
 
-    const targetNode = nodesMap[editData.targetId];
-    const typeConfig = relationTypes[editData.type] || { label: editData.type, icon: '?', color: 'text-slate-500' };
-
-    // Attribution Logic (Simplified for Relation Block - usually not needed but kept for consistency if we want it later)
-    // For relations, attribution is less visual, so we skip the popup unless requested.
+    const targetNode = conceptViews[editData.targetId];
+    const typeConfig = RELATION_TYPES[editData.type as keyof typeof RELATION_TYPES] || { label: editData.type, icon: '?', color: 'text-slate-500' };
 
     if (isEditing) {
         return (
@@ -73,7 +72,7 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
                             onChange={(e) => setEditData({...editData, type: e.target.value})}
                             className="text-xs border border-slate-200 rounded px-2 py-1 bg-slate-50 focus:ring-1 focus:ring-indigo-300 outline-none"
                         >
-                             {Object.entries(relationTypes).map(([k, v]) => (
+                             {Object.entries(RELATION_TYPES).map(([k, v]) => (
                                  <option key={k} value={k}>{v.label}</option>
                              ))}
                         </select>
@@ -83,8 +82,8 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
                             className="flex-1 text-xs border border-slate-200 rounded px-2 py-1 bg-slate-50 focus:ring-1 focus:ring-indigo-300 outline-none"
                         >
                             <option value="">选择概念条目...</option>
-                             {Object.entries(nodesMap).map(([id, node]) => (
-                                 <option key={id} value={id}>{node.title}</option>
+                             {Object.entries(conceptViews).map(([id, node]) => (
+                                 <option key={id} value={id}>{(node as any).name}</option> // using .name now instead of .title based on new type
                              ))}
                         </select>
                      </div>
@@ -106,7 +105,6 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
 
     return (
         <div className={`group relative pl-8 pb-0 ${className}`}>
-
              <div className="absolute -left-[7px] top-3 w-4 h-4 bg-white rounded-full border-2 border-slate-300 group-hover:border-indigo-400 transition-colors z-10"></div>
 
              <div
@@ -123,7 +121,7 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
                 <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between">
                          <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-600 truncate">
-                             {targetNode ? targetNode.title : '选择概念条目'}
+                             {targetNode ? targetNode.name : (editData.targetId ? '未知条目' : '点击编辑关联')}
                          </span>
                     </div>
                     {editData.condition && (

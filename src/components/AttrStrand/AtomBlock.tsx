@@ -1,40 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import type { IContentAtom } from '../../attrstrand/types';
+import { useWorkspaceStore } from '../../store/workspaceStore';
+import type { DraftId } from '../../attrstrand/types';
 import RichTextRenderer from '../RichTextRenderer';
 import { Edit3, Check, X } from 'lucide-react';
 
 interface AtomBlockProps {
-    atom: IContentAtom;
-    onUpdate: (newContent: string) => void;
+    atomId: DraftId;
     readOnly?: boolean;
     className?: string;
-    index?: number; // Pass index for numbered lists (refs)
-    counters?: { h2: number, h3: number, n: number }; // Placeholder for numbering context
+    index?: number;
 }
 
-export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly = false, className = '', index = 0 }) => {
+export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, className = '', index = 0 }) => {
+    // Subscribe specifically to this atom's data
+    const atom = useWorkspaceStore((state: any) => state.draftAtomsData[atomId]);
+    const updateAtomContent = useWorkspaceStore((state: any) => state.updateAtomContent);
+
     const [isEditing, setIsEditing] = useState(false);
-    const [editValue, setEditValue] = useState(atom.contentJson);
+    const [editValue, setEditValue] = useState(atom?.content || '');
 
     useEffect(() => {
-        setEditValue(atom.contentJson);
-    }, [atom.contentJson]);
+        if (atom) {
+            setEditValue(atom.content);
+        }
+    }, [atom?.content]);
+
+    if (!atom) return null; // Defensive check
 
     const handleSave = () => {
-        if (editValue !== atom.contentJson) {
-            onUpdate(editValue);
+        if (editValue !== atom.content) {
+            updateAtomContent(atomId, editValue);
         }
         setIsEditing(false);
     };
 
     const handleCancel = () => {
-        setEditValue(atom.contentJson);
+        setEditValue(atom.content);
         setIsEditing(false);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
-             // For tags and refs, single enter saves
              if (atom.field === 'tags' || atom.field === 'refs') {
                  handleSave();
              } else if (e.metaKey || e.ctrlKey) {
@@ -46,37 +52,38 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
     };
 
     // Attribution display with adjustment: (Val + 0.1/n) / 1.1
-    const authors = Object.entries(atom.attr);
+    // For new/temp atoms, attr might not exist until submitted, handle defensively.
+    const attr = atom.attr || { 'user': 1 };
+    const authors = Object.entries(attr);
     const n = authors.length;
     const adjustedAuthors = authors.map(([author, share]) => {
-        const adjustedShare = (share + (n > 0 ? (0.1 / n) : 0)) / 1.1;
+        const adjustedShare = (Number(share) + (n > 0 ? (0.1 / n) : 0)) / 1.1;
         return { author, share: adjustedShare };
     }).sort((a, b) => b.share - a.share);
 
     const renderContent = () => {
+        if (!atom.content) return <span className="text-slate-300 italic text-sm">点击编辑内容...</span>;
+
         if (atom.field === 'tags') {
-            // Match EditableBlock 'tags' style
             return (
                 <span className="inline-flex-center badge-base bg-yellow-50 text-yellow-700 border-yellow-200">
-                    <RichTextRenderer content={atom.contentJson} className="inline-block [&>p]:inline [&>p]:m-0" />
+                    <RichTextRenderer content={atom.content} className="inline-block [&>p]:inline [&>p]:m-0" />
                 </span>
             );
         }
 
         if (atom.field === 'refs') {
-            // Match EditableBlock 'references' style (list item look)
             return (
                 <div className="flex gap-2 items-start text-sm text-slate-600">
                     <span className="font-mono text-slate-400 select-none pt-0.5">{index + 1}.</span>
                     <div className="flex-1">
-                        <RichTextRenderer content={atom.contentJson} className="inline-block" />
+                        <RichTextRenderer content={atom.content} className="inline-block" />
                     </div>
                 </div>
             );
         }
 
-        // Default RichText
-        return <RichTextRenderer content={atom.contentJson} enableAnalysis={true} />;
+        return <RichTextRenderer content={atom.content} enableAnalysis={true} />;
     };
 
     const renderEditor = () => {
@@ -118,7 +125,6 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
         );
     }
 
-
     return (
         <div className={`group relative mb-2 transition-all ${atom.field === 'tags' ? 'inline-block mr-2 mb-2' : ''} ${className}`}>
             <div className="absolute right-full top-0 bottom-0 w-1 mr-2 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-200 cursor-help z-50">
@@ -127,11 +133,11 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
                     {adjustedAuthors.map(({ author, share }) => (
                         <div key={author} className="flex justify-between text-slate-500 py-0.5">
                             <span className="truncate max-w-[100px]">{author}</span>
-                            <span className="font-mono">{(share * 100).toFixed(1)}%</span>
+                            <span className="font-mono">{(Number(share) * 100).toFixed(1)}%</span>
                         </div>
                     ))}
                     <div className="mt-1 pt-1 border-t text-[10px] text-slate-400 font-mono truncate">
-                        ID: {atom.id}
+                        ID: {atom.id.substring(0, 8)}...
                     </div>
                 </div>
             </div>
@@ -140,7 +146,6 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atom, onUpdate, readOnly =
                 <div className="relative min-w-[200px]">
                     {renderEditor()}
                     <div className="absolute top-1 right-1 flex gap-1 z-10">
-                         {/* Simplified controls for small items */}
                         <button
                             onClick={handleSave}
                             className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"

@@ -1,7 +1,7 @@
-import type { ContentAtomType } from './types';
+import type { ContentAtomType, ContentAtomAttr } from './types.ts';
 
 // Async SHA-256 helper
-async function sha256(str: string): Promise<string> {
+export async function sha256(str: string): Promise<string> {
     const msgBuffer = new TextEncoder().encode(str);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -9,12 +9,83 @@ async function sha256(str: string): Promise<string> {
 }
 
 // Async SHA-256 to 32-bit integer helper (for Simhash)
-async function sha256Int(str: string): Promise<number> {
+export async function sha256Int(str: string): Promise<number> {
     const msgBuffer = new TextEncoder().encode(str);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
     // Use first 4 bytes as int
     const view = new DataView(hashBuffer);
     return view.getInt32(0); // big-endian by default in DataView but we just need bits
+}
+
+// Deterministic JSON stringify (sorts keys)
+export function deterministicStringify(obj: any): string {
+    if (obj === null || typeof obj !== 'object') {
+        return JSON.stringify(obj);
+    }
+
+    if (Array.isArray(obj)) {
+        const arr = obj.map(item => JSON.parse(deterministicStringify(item)));
+        return JSON.stringify(arr);
+    }
+
+    const sortedKeys = Object.keys(obj).sort();
+    const result: Record<string, any> = {};
+    for (const key of sortedKeys) {
+        result[key] = JSON.parse(deterministicStringify(obj[key]));
+    }
+    return JSON.stringify(result);
+}
+
+// Hashing Functions conforming to CAS principles
+
+// conceptId: hashkey=CONCEPT::${name}|${creatorId}|${timestampISO}
+export async function generateConceptHash(name: string, creatorId: string, timestampISO: string): Promise<string> {
+    const key = `CONCEPT::${name}|${creatorId}|${timestampISO}`;
+    return await sha256(key);
+}
+
+// atomId: hashkey=ATOM::${field}|${type}|${contentHash}|${creatorId}|${derivedFromId}|${sortedAttr}
+export async function generateAtomHash(
+    field: string,
+    type: string,
+    contentHash: string,
+    creatorId: string,
+    derivedFromId: string | null,
+    attr: ContentAtomAttr
+): Promise<string> {
+    const sortedAttr = deterministicStringify(attr);
+    const derivedStr = derivedFromId === null ? 'null' : derivedFromId;
+    const key = `ATOM::${field}|${type}|${contentHash}|${creatorId}|${derivedStr}|${sortedAttr}`;
+    return await sha256(key);
+}
+
+// editionId: hashkey=EDITION::${conceptId}|${parentEditionId}|${serializedAtoms}|${creatorId}|${timestampISO}
+export async function generateEditionHash(
+    conceptId: string,
+    parentEditionId: string | null,
+    coreAtomIds: string[],
+    docAtomIds: string[],
+    tagsAtomIds: string[],
+    refsAtomIds: string[],
+    relsAtomIds: string[],
+    creatorId: string,
+    timestampISO: string
+): Promise<string> {
+    const parentStr = parentEditionId === null ? 'null' : parentEditionId;
+
+    // Sort array elements or keep order? Order matters for lists like docs and refs.
+    // So we just deterministic stringify an object containing them in a fixed order.
+    const atomsData = {
+        core: coreAtomIds,
+        doc: docAtomIds,
+        refs: refsAtomIds,
+        rels: relsAtomIds,
+        tags: tagsAtomIds
+    };
+    const serializedAtoms = deterministicStringify(atomsData);
+
+    const key = `EDITION::${conceptId}|${parentStr}|${serializedAtoms}|${creatorId}|${timestampISO}`;
+    return await sha256(key);
 }
 
 // Updated Simhash implementation (async)
@@ -59,28 +130,16 @@ export function splitContent(content: string, type: ContentAtomType): string[] {
 
     if (type === 'markdown' || type === 'latex') {
         const atoms: string[] = [];
-        // Regex to find $$...$$ blocks.
-        // We capture the block so we can include it in the result.
-        // We also match double newlines to split paragraphs.
-
-        // Strategy:
-        // 1. Find all display math blocks. Replace them with a unique placeholder that includes a newline,
-        //    to ensure they are treated as separate "paragraphs" if they aren't already.
-        //    Actually, if we want them as separate atoms, we should treat them as splitting delimiters.
-
         const mathBlockRegex = /(\$\$[\s\S]*?\$\$)/g;
 
-        // Split content by math blocks first
         const segments = content.split(mathBlockRegex);
 
         for (const segment of segments) {
             if (!segment.trim()) continue;
 
             if (segment.startsWith('$$') && segment.endsWith('$$')) {
-                // This is a math block, add as a single atom
                 atoms.push(segment.trim());
             } else {
-                // This is text (markdown), split by double newlines (paragraphs)
                 const paragraphs = segment.split(/\n\s*\n+/);
                 for (const p of paragraphs) {
                     if (p.trim()) {

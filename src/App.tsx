@@ -25,7 +25,7 @@ import { AtomListEditor } from './components/AttrStrand/AtomListEditor';
 import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
 import { TopicChildCard } from './components/AttrStrand/TopicChildCard';
 import { useStore } from 'zustand';
-import { useWorkspaceStore, useGlobalStore } from './store/workspaceStore';
+import { useWorkspaceStore, useGlobalStore, workspaceActions } from './store/workspaceStore';
 
 // --- Type Definitions ---
 interface NodeData {
@@ -800,14 +800,11 @@ const PhysMemosApp: FC = () => {
   
   // AttrStrand State
   const [activeEdition, setActiveEdition] = useState<IEdition | IPopulatedEdition | null>(null);
-  const initWorkspace = useWorkspaceStore((state: any) => state.initWorkspace);
-
   // Zundo temporal store hooks for responsive undo/redo UI
   const pastStatesLength = useStore(useWorkspaceStore.temporal, (state) => state.pastStates.length);
   const futureStatesLength = useStore(useWorkspaceStore.temporal, (state) => state.futureStates.length);
   const undo = useStore(useWorkspaceStore.temporal, (state) => state.undo);
   const redo = useStore(useWorkspaceStore.temporal, (state) => state.redo);
-  const clearHistory = useStore(useWorkspaceStore.temporal, (state) => state.clear);
 
   const submitWorkspace = async () => {
     // Collect data to submit
@@ -844,8 +841,7 @@ const PhysMemosApp: FC = () => {
     // For simplicity here we just re-init the workspace with the new edition
     const populated = await core.getPopulatedEdition(edition.id);
     if (populated) {
-         initWorkspace(populated, edition.conceptId, submission.conceptName, submission.conceptTopic, submission.conceptDisciplines);
-         clearHistory();
+         workspaceActions.initWorkspaceAndClear(populated, edition.conceptId, submission.conceptName, submission.conceptTopic, submission.conceptDisciplines);
     }
   };
 
@@ -1014,8 +1010,7 @@ const PhysMemosApp: FC = () => {
 
     // In a real app we'd submit to core directly.
     // Here we instantiate a fresh workspace instead.
-    initWorkspace(null, '', '新物理概念', initialTopic, []);
-    clearHistory();
+    workspaceActions.initWorkspaceAndClear(null, '', '新物理概念', initialTopic, []);
 
     // We update UI local nodes
     const newNode: NodeData = {
@@ -1090,8 +1085,7 @@ const PhysMemosApp: FC = () => {
       let concept = await storage.getConcept(activeNode.id);
 
       if (!concept) {
-        initWorkspace(null, activeNode.id, activeNode.title, activeNode.topic, activeNode.disciplines);
-        clearHistory();
+          workspaceActions.initWorkspaceAndClear(null, activeNode.id, activeNode.title, activeNode.topic, activeNode.disciplines);
         return;
       }
 
@@ -1102,12 +1096,12 @@ const PhysMemosApp: FC = () => {
         const populated = await core.getPopulatedEdition(headId);
         if (populated) {
           setActiveEdition(populated);
-          initWorkspace(populated, activeNode.id, concept.name, concept.topic, concept.disciplines);
-          clearHistory();
+            workspaceActions.initWorkspaceAndClear(populated, activeNode.id, concept.name, concept.topic, concept.disciplines);
         }
       } else {
           // New concept, no heads yet, but workspace initialized earlier
-          clearHistory();
+            // If we're here and there's no head, perhaps we just clear history to be safe
+            useWorkspaceStore.temporal.getState().clear();
       }
     };
 
@@ -1339,8 +1333,7 @@ const PhysMemosApp: FC = () => {
                         setActiveEdition(edition);
                         const populated = await core.getPopulatedEdition(edition.id);
                         if (populated && activeNode) {
-                            initWorkspace(populated, activeNode.id, activeNode.title, activeNode.topic, activeNode.disciplines);
-                            clearHistory();
+                            workspaceActions.initWorkspaceAndClear(populated, activeNode.id, activeNode.title, activeNode.topic, activeNode.disciplines);
                         }
                     }}
                     onCreateBranch={(_parent) => {

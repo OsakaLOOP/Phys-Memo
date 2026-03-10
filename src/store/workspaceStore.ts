@@ -218,9 +218,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                      draftAtomsData: newData,
                  };
              });
-
-             // Also clear zundo history (zundo expose clear mechanism on the store)
-             // We'll do it from outside component if needed, or by ignoring history boundary.
         }
     }),
     {
@@ -235,5 +232,26 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }
     })
 );
+
+// --- Action Helpers ---
+// Zundo 的清理操作应当在 Zustand 外部同步执行，确保业务原子性和清空历史的正确性。
+
+export const workspaceActions = {
+    initWorkspaceAndClear: (
+        edition: IPopulatedEdition | null,
+        conceptId: string,
+        conceptName: string,
+        conceptTopic: string,
+        conceptDisciplines: string[]
+    ) => {
+        useWorkspaceStore.getState().initWorkspace(edition, conceptId, conceptName, conceptTopic, conceptDisciplines);
+        useWorkspaceStore.temporal.getState().clear();
+    },
+
+    markCommittedAndClear: (newBaseEditionId: string, oldToNewMap: Record<string, string>) => {
+        useWorkspaceStore.getState().markCommitted(newBaseEditionId, oldToNewMap);
+        useWorkspaceStore.temporal.getState().clear();
+    }
+};
 
 export { genTempId };

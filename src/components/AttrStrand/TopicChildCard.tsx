@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { storage } from '../../attrstrand/storage';
 import type { IConceptRoot, IPopulatedEdition } from '../../attrstrand/types';
-import { AtomListEditor } from './AtomListEditor';
+
 import { Layers, Book } from 'lucide-react';
+
+// Using a dedicated store context might be overkill for read-only cards,
+// but we need to supply the right props to AtomListEditor. Wait, AtomListEditor
+// now strictly depends on the global workspace store.
+// Since these are read-only cards, we can't use AtomListEditor from the global store easily.
+// Let's implement a simple read-only renderer here or pass atoms directly if we want.
+// Actually, I'll update AtomListEditor to take atoms optionally if readOnly is true, or just render it directly here to keep it simple.
+
 
 interface TopicChildCardProps {
     conceptId: string;
@@ -99,28 +107,18 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
 
                 {/* Core Atoms (Latex) */}
                 {edition.coreAtoms.length > 0 && (
-                  <div className="bg-slate-50 rounded border border-slate-100 px-3 py-2 overflow-x-auto">
-                     <AtomListEditor
-                        atoms={edition.coreAtoms as any[]}
-                        field="core"
-                        defaultAtomType="latex"
-                        onUpdate={() => {}}
-                        readOnly={true}
-                     />
+                  <div className="bg-slate-50 rounded border border-slate-100 px-3 py-2 overflow-x-auto pointer-events-none">
+                     {/* For read-only topic preview, directly render the first content to avoid store dependency */}
+                     <div className="text-xs">
+                        {edition.coreAtoms[0].content}
+                     </div>
                   </div>
                 )}
 
                 {/* Doc Atoms (Description) */}
                 {edition.docAtoms.length > 0 && (
-                   <div className="text-xs text-slate-500 line-clamp-3">
-                       <AtomListEditor
-                            atoms={edition.docAtoms as any[]}
-                            field="doc"
-                            defaultAtomType="markdown"
-                            onUpdate={() => {}}
-                            readOnly={true}
-                            className="pointer-events-none" // Prevent interaction in preview
-                       />
+                   <div className="text-xs text-slate-500 line-clamp-3 pointer-events-none">
+                       {edition.docAtoms[0].content}
                    </div>
                 )}
 

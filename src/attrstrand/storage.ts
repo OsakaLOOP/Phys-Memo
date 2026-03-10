@@ -1,4 +1,4 @@
-import type { IConceptRoot, IEdition, IContentAtom } from './types';
+import type { IConceptRoot, IEdition, IContentAtom, DisciplineData } from './types.ts';
 
 export interface IStorage {
     // Concept Operations
@@ -16,6 +16,12 @@ export interface IStorage {
     getAtom(id: string): Promise<IContentAtom | null>;
     getAtoms(ids: string[]): Promise<IContentAtom[]>;
 
+    // Discipline Operations (Flat structure)
+    saveDiscipline(discipline: DisciplineData): Promise<void>;
+    getDiscipline(name: string): Promise<DisciplineData | null>;
+    getAllDisciplines(): Promise<DisciplineData[]>;
+    deleteDiscipline(name: string): Promise<void>;
+
     // Worker Interface
     runCleanup(thresholdTimestamp: number): Promise<number>; // Returns number of deleted items
 }
@@ -23,7 +29,8 @@ export interface IStorage {
 const STORAGE_KEYS = {
     CONCEPTS: 'attr_concepts',
     EDITIONS: 'attr_editions',
-    ATOMS: 'attr_atoms'
+    ATOMS: 'attr_atoms',
+    DISCIPLINES: 'attr_disciplines'
 };
 
 export class LocalStorageMock implements IStorage {
@@ -36,6 +43,7 @@ export class LocalStorageMock implements IStorage {
         localStorage.setItem(key, JSON.stringify(data));
     }
 
+    // --- Concept Operations ---
     async saveConcept(concept: IConceptRoot): Promise<void> {
         const data = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
         data[concept.id] = concept;
@@ -52,6 +60,7 @@ export class LocalStorageMock implements IStorage {
         return Object.values(data);
     }
 
+    // --- Edition Operations ---
     async saveEdition(edition: IEdition): Promise<void> {
         const data = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
         data[edition.id] = edition;
@@ -68,6 +77,7 @@ export class LocalStorageMock implements IStorage {
         return Object.values(data).filter(e => e.conceptId === conceptId);
     }
 
+    // --- Atom Operations ---
     async saveAtom(atom: IContentAtom): Promise<void> {
         const data = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
         data[atom.id] = atom;
@@ -84,15 +94,32 @@ export class LocalStorageMock implements IStorage {
         return ids.map(id => data[id]).filter(a => a !== undefined);
     }
 
-    // Worker Functionality: Cleanup unreferenced atoms and old editions
-    // Rules:
-    // 1. Delete atoms not referenced by any Edition (unless very recent) -> Actually atoms are immutable content blocks. If no edition points to them, they are garbage.
-    // 2. Delete Editions that are:
-    //    - Not the latest head of any branch (in ConceptRoot.currentHeads)
-    //    - Not referenced as a parent by another edition (unless we want to keep full history? Prompt says: "Clean and merge... only delete specified records... note not to delete if referenced by other branch or is latest")
-    //    - Older than threshold?
+    // --- Discipline Operations ---
+    async saveDiscipline(discipline: DisciplineData): Promise<void> {
+        const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
+        data[discipline.name] = discipline;
+        this.save(STORAGE_KEYS.DISCIPLINES, data);
+    }
 
-    // For this mock, we'll implement a simple ref-count based GC logic.
+    async getDiscipline(name: string): Promise<DisciplineData | null> {
+        const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
+        return data[name] || null;
+    }
+
+    async getAllDisciplines(): Promise<DisciplineData[]> {
+        const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
+        return Object.values(data);
+    }
+
+    async deleteDiscipline(name: string): Promise<void> {
+        const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
+        if (data[name]) {
+            delete data[name];
+            this.save(STORAGE_KEYS.DISCIPLINES, data);
+        }
+    }
+
+    // --- Cleanup Operations ---
     async runCleanup(_thresholdTimestamp: number): Promise<number> {
         const concepts = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
         const editions = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
@@ -106,31 +133,11 @@ export class LocalStorageMock implements IStorage {
             Object.keys(c.currentHeads).forEach(headId => activeEditionIds.add(headId));
         });
 
-        // 2. Mark reachable editions (traverse parents)
-        // Actually, prompt says: "Clean and collapse... delete non-referenced non-latest... merge subsequent parent pointers".
-        // This implies we might delete intermediate history nodes?
-        // "Non-referenced and non-latest automatically deleted... and migrate subsequent node parents."
-        // Meaning: A -> B -> C. If B is not useful (not a head, not explicitly saved?), delete B and make C.parent = A.
-        // But for now, let's just delete unreferenced *atoms* and maybe editions that are strictly "autosave" and old?
-        // Let's stick to safe GC: Delete if not reachable from any Head.
-
-        // Wait, "Cherry-pick... history must be linear...".
-        // If I delete B, history is broken? "Migrate subsequent node parent". So A -> C.
-
-        // Let's implement a simpler version:
-        // Collect all atoms referenced by *any* edition that is still in storage.
-        // Delete atoms that are not in that set.
-
-        // Filter editions to keep:
-        // Keep if:
-        // - Is a Head (in concepts.currentHeads)
-        // - Is referenced by another kept edition (parent pointer) -- this requires traversing from heads down.
-        // - Is 'save' or 'publish' type (user explicitly saved). 'autosave' can be GC'd if not a head.
-
+        // 2. Mark reachable editions
         const keptEditionIds = new Set<string>();
         const queue = [...activeEditionIds];
 
-        // Add explicitly saved/published editions to roots
+        // Keep explicitly saved/published editions
         Object.values(editions).forEach(e => {
             if (e.saveType !== 'autosave') {
                 queue.push(e.id);
@@ -149,7 +156,7 @@ export class LocalStorageMock implements IStorage {
             }
         }
 
-        // Now delete editions not in keptEditionIds
+        // Delete editions not in keptEditionIds
         Object.keys(editions).forEach(id => {
             if (!keptEditionIds.has(id)) {
                 delete editions[id];
@@ -157,7 +164,7 @@ export class LocalStorageMock implements IStorage {
             }
         });
 
-        // Now Collect referenced atoms from KEPT editions
+        // Collect referenced atoms from kept editions
         const referencedAtomIds = new Set<string>();
         Object.values(editions).forEach(e => {
             e.coreAtomIds.forEach(id => referencedAtomIds.add(id));

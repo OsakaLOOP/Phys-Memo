@@ -38,7 +38,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             setConcept(c);
             const e = await storage.getEditionsByConcept(conceptId);
             // Sort by creation time to help layout
-            e.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+            e.sort((a, b) => new Date(a.timestampISO).getTime() - new Date(b.timestampISO).getTime());
             setEditions(e);
         };
         loadData();
@@ -79,7 +79,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
         // 2. Simulation
         // Force Y based on time?
         // const timeScale = d3.scaleTime()
-        //     .domain(d3.extent(editions, e => new Date(e.createdAt)) as [Date, Date])
+        //     .domain(d3.extent(editions, e => new Date(e.timestampISO)) as [Date, Date])
         //     .range([50, width - 50]);
 
         const simulation = d3.forceSimulation<GraphNode>(nodes)
@@ -87,7 +87,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             .force("charge", d3.forceManyBody().strength(-200))
             .force("center", d3.forceCenter(width / 2, height / 2))
             .force("collide", d3.forceCollide(30))
-            // .force("x", d3.forceX((d: any) => timeScale(new Date(d.edition.createdAt))).strength(0.5))
+            // .force("x", d3.forceX((d: any) => timeScale(new Date(d.edition.timestampISO))).strength(0.5))
             // .force("y", d3.forceY(height/2).strength(0.1));
 
         // 3. Render
@@ -141,7 +141,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             );
 
         node.append("title")
-            .text(d => `${d.edition.creator} (${new Date(d.edition.createdAt).toLocaleTimeString()})`);
+            .text(d => `${d.edition.creator} (${new Date(d.edition.timestampISO).toLocaleTimeString()})`);
 
         // Labels for heads
         const labels = svg.append("g")

@@ -46,6 +46,7 @@ export class AttrStrandCore {
     // --- Backend API ---
 
     async getPopulatedEdition(editionId: hash): Promise<IPopulatedEdition | null> {
+        console.log(`[API Call] core.getPopulatedEdition: editionId=${editionId}`);
         const edition = await storage.getEdition(editionId);
         if (!edition) return null;
 
@@ -68,6 +69,7 @@ export class AttrStrandCore {
     }
 
     async submitEdition(submission: EditionSubmission, creatorId: string, timestampISO: string): Promise<IEdition> {
+        console.log(`[API Call] core.submitEdition: conceptId=${submission.conceptId}, creatorId=${creatorId}`, submission);
         // Concept Handling
         let conceptId = submission.conceptId;
         let isNewConcept = false;

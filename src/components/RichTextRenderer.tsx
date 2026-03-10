@@ -17,10 +17,6 @@ const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "", 
   const mountedRoots = useRef<Root[]>([]);
 
   useEffect(() => {
-    // Cleanup previous roots
-    mountedRoots.current.forEach(root => root.unmount());
-    mountedRoots.current = [];
-
     if (!containerRef.current) return;
 
     // --- 1. Calculate Math Labels based on Headers ---
@@ -145,6 +141,17 @@ const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "", 
         });
       }
     }
+
+    return () => {
+      // Cleanup previous roots
+      mountedRoots.current.forEach(root => {
+        // Run unmount in next tick to avoid React "synchronous unmount during render" race conditions
+        setTimeout(() => {
+            root.unmount();
+        }, 0);
+      });
+      mountedRoots.current = [];
+    };
   }, [content, enableAnalysis]);
 
   return <div ref={containerRef} className={`markdown-body ${className}`} />;

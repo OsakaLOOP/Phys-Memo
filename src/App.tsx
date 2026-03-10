@@ -24,6 +24,7 @@ import type { IEdition, IPopulatedEdition } from './attrstrand/types';
 import { AtomListEditor } from './components/AttrStrand/AtomListEditor';
 import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
 import { TopicChildCard } from './components/AttrStrand/TopicChildCard';
+import { useStore } from 'zustand';
 import { useWorkspaceStore, useGlobalStore } from './store/workspaceStore';
 
 // --- Type Definitions ---
@@ -800,6 +801,14 @@ const PhysMemosApp: FC = () => {
   // AttrStrand State
   const [activeEdition, setActiveEdition] = useState<IEdition | IPopulatedEdition | null>(null);
   const initWorkspace = useWorkspaceStore((state: any) => state.initWorkspace);
+
+  // Zundo temporal store hooks for responsive undo/redo UI
+  const pastStatesLength = useStore(useWorkspaceStore.temporal, (state) => state.pastStates.length);
+  const futureStatesLength = useStore(useWorkspaceStore.temporal, (state) => state.futureStates.length);
+  const undo = useStore(useWorkspaceStore.temporal, (state) => state.undo);
+  const redo = useStore(useWorkspaceStore.temporal, (state) => state.redo);
+  const clearHistory = useStore(useWorkspaceStore.temporal, (state) => state.clear);
+
   const submitWorkspace = async () => {
     // Collect data to submit
     const state = useWorkspaceStore.getState() as any;
@@ -836,6 +845,7 @@ const PhysMemosApp: FC = () => {
     const populated = await core.getPopulatedEdition(edition.id);
     if (populated) {
          initWorkspace(populated, edition.conceptId, submission.conceptName, submission.conceptTopic, submission.conceptDisciplines);
+         clearHistory();
     }
   };
 
@@ -1005,6 +1015,7 @@ const PhysMemosApp: FC = () => {
     // In a real app we'd submit to core directly.
     // Here we instantiate a fresh workspace instead.
     initWorkspace(null, '', '新物理概念', initialTopic, []);
+    clearHistory();
 
     // We update UI local nodes
     const newNode: NodeData = {
@@ -1080,6 +1091,7 @@ const PhysMemosApp: FC = () => {
 
       if (!concept) {
         initWorkspace(null, activeNode.id, activeNode.title, activeNode.topic, activeNode.disciplines);
+        clearHistory();
         return;
       }
 
@@ -1091,7 +1103,11 @@ const PhysMemosApp: FC = () => {
         if (populated) {
           setActiveEdition(populated);
           initWorkspace(populated, activeNode.id, concept.name, concept.topic, concept.disciplines);
+          clearHistory();
         }
+      } else {
+          // New concept, no heads yet, but workspace initialized earlier
+          clearHistory();
       }
     };
 
@@ -1324,6 +1340,7 @@ const PhysMemosApp: FC = () => {
                         const populated = await core.getPopulatedEdition(edition.id);
                         if (populated && activeNode) {
                             initWorkspace(populated, activeNode.id, activeNode.title, activeNode.topic, activeNode.disciplines);
+                            clearHistory();
                         }
                     }}
                     onCreateBranch={(_parent) => {
@@ -1626,15 +1643,15 @@ const PhysMemosApp: FC = () => {
                   {/* Replace SmartFormulaBlock and EditableBlock with AtomListEditor */}
                   <div className="flex justify-end mb-4 gap-2">
                        <button
-                            onClick={() => useWorkspaceStore.temporal.getState().undo()}
-                            disabled={!useWorkspaceStore.temporal.getState().pastStates.length}
+                            onClick={() => undo()}
+                            disabled={pastStatesLength === 0}
                             className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50"
                        >
                             撤销
                        </button>
                        <button
-                            onClick={() => useWorkspaceStore.temporal.getState().redo()}
-                            disabled={!useWorkspaceStore.temporal.getState().futureStates.length}
+                            onClick={() => redo()}
+                            disabled={futureStatesLength === 0}
                             className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50"
                        >
                             重做

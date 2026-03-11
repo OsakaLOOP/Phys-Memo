@@ -23,9 +23,9 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
     className = ''
 }) => {
     // Subscribe specifically to this atom
-    const atom = useWorkspaceStore((state: any) => state.draftAtomsData[atomId]);
-    const updateAtomContent = useWorkspaceStore((state: any) => state.updateAtomContent);
-    const conceptViews = useGlobalStore((state: any) => state.conceptViews); // Use global map for lookups
+    const atom = useWorkspaceStore((state) => state.draftAtomsData[atomId]);
+    const updateAtomContent = useWorkspaceStore((state) => state.updateAtomContent);
+    const conceptViews = useGlobalStore((state) => state.conceptViews); // Use global map for lookups
 
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState<RelationData>({ targetId: '', type: 'DERIVES_FROM', condition: '' });
@@ -83,7 +83,7 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
                         >
                             <option value="">选择概念条目...</option>
                              {Object.entries(conceptViews).map(([id, node]) => (
-                                 <option key={id} value={id}>{(node as any).name}</option> // using .name now instead of .title based on new type
+                                 <option key={id} value={id}>{node.name}</option> // using .name now instead of .title based on new type
                              ))}
                         </select>
                      </div>

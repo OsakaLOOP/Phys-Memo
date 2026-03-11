@@ -28,7 +28,7 @@ export const migrateData = async () => {
 
         // 1. Migrate Concepts
         if (defaultData.attr_concepts) {
-            for (const c of Object.values<any>(defaultData.attr_concepts)) {
+            for (const c of Object.values<import('./types.ts').IConceptRoot & { createdAt?: string }>(defaultData.attr_concepts as Record<string, import('./types.ts').IConceptRoot & { createdAt?: string }>)) {
                 // Ensure proper hash
                 const newId = await generateConceptHash(c.name, c.creatorId || 'system', c.createdAt || new Date().toISOString());
                 idMap[c.id] = newId;
@@ -51,7 +51,7 @@ export const migrateData = async () => {
 
         // 2. Migrate Atoms
         if (defaultData.attr_atoms) {
-            for (const a of Object.values<any>(defaultData.attr_atoms)) {
+            for (const a of Object.values<import('./types.ts').IContentAtom & { contentJson?: string, createdAt?: string }>(defaultData.attr_atoms as Record<string, import('./types.ts').IContentAtom & { contentJson?: string, createdAt?: string }>)) {
                 const content = a.content || a.contentJson || '';
                 const cHash = await generateContentHash(content);
                 const sHash = await simhash(content);
@@ -89,8 +89,8 @@ export const migrateData = async () => {
 
         // 3. Migrate Editions
         if (defaultData.attr_editions) {
-            const sortedEditions = Object.values<any>(defaultData.attr_editions)
-                .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+            const sortedEditions = Object.values<import('./types.ts').IEdition & { createdAt?: string }>(defaultData.attr_editions as Record<string, import('./types.ts').IEdition & { createdAt?: string }>)
+                .sort((a, b) => new Date(a.createdAt || a.timestampISO || 0).getTime() - new Date(b.createdAt || b.timestampISO || 0).getTime());
 
             for (const e of sortedEditions) {
                 const conceptId = idMap[e.conceptId] || e.conceptId;

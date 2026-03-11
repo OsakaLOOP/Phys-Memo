@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import type {
     IWorkspaceDraft, AtomDraft, DraftId, ContentAtomField,
-    ContentAtomType, IPopulatedEdition, DisciplineData, IConceptView
+    ContentAtomType, IPopulatedEdition, DisciplineData, IConceptView, IContentAtom
 } from '../attrstrand/types';
 
 // 全局 Store
@@ -13,7 +13,7 @@ interface GlobalState {
     setConceptViews: (views: Record<string, IConceptView>) => void;
 }
 
-export const useGlobalStore = create<GlobalState>((set: any) => ({
+export const useGlobalStore = create<GlobalState>()((set) => ({
     disciplines: [],
     conceptViews: {},
     setDisciplines: (disciplines: DisciplineData[]) => set({ disciplines }),
@@ -42,9 +42,9 @@ interface WorkspaceState extends IWorkspaceDraft {
 const genTempId = () => `temp_${crypto.randomUUID().replace(/-/g, '')}`;
 
 export const useWorkspaceStore = create<WorkspaceState>()(
-    temporal((set: any) => ({
+    temporal((set) => ({
         conceptId: '',
-        baseEditionId: null as string | null as string | null,
+        baseEditionId: null as string | null,
         conceptName: '',
         conceptTopic: '未分类',
         conceptDisciplines: [] as string[] as string[],
@@ -71,13 +71,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             // 否则加载已有 Edition 数据到 Workspace 内存
             const draftAtomsData: Record<DraftId, AtomDraft> = {};// 待提取至 types
             
-            const mapIds = (atoms: any[]): string[] => {
+            type PopulatedAtom = Omit<IContentAtom, 'backMeta'> & { contentJson?: string };
+            const mapIds = (atoms: PopulatedAtom[]): string[] => {
                 return atoms.map((a) => {
                     draftAtomsData[a.id] = {
                         id: a.id,
                         field: a.field,
                         type: a.type,
-                        content: a.content || a.contentJson, // legacy
+                        content: a.content || a.contentJson || '', // legacy fallback for old format
                         creatorId: a.creatorId,
                         derivedFromId: a.id, // 加载原有 Atom 的继承.
                         frontMeta: a.frontMeta || {},
@@ -110,7 +111,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         },
 
         addAtomId: (field: ContentAtomField, id: DraftId, index?: number) => {
-            set((state: any) => {
+            set((state) => {
                 const list = [...(state.draftAtomLists[field] || [])];
                 if (index !== undefined && index >= 0) {
                     list.splice(index + 1, 0, id);
@@ -148,7 +149,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         },
 
         removeAtomId: (field: ContentAtomField, index: number) => {
-            set((state: any) => {
+            set((state) => {
                 const list = [...(state.draftAtomLists[field] || [])];
                 list.splice(index, 1);
 
@@ -162,7 +163,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         },
 
         updateAtomContent: (id: DraftId, content: string) => {
-            set((state: any) => {
+            set((state) => {
                 const atom = state.draftAtomsData[id];
                 if (!atom) return state; // Should not happen
 
@@ -179,7 +180,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         markCommitted: (newBaseEditionId: string, oldToNewMap: Record<string, string>) => {
              // Re-map all temp UUIDs or old hashes to their new submitted Hashes, and reset isDirty
-             set((state: any) => {
+             set((state) => {
                  const newData: Record<DraftId, AtomDraft> = {};
                  const mapList = (list: string[]) => list.map(id => oldToNewMap[id] || id);
 

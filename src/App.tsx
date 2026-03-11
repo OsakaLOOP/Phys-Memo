@@ -20,7 +20,7 @@ import EditableBlock from './components/EditableBlock';
 // AttrStrand Imports
 import { core } from './attrstrand/core';
 import { storage } from './attrstrand/storage';
-import type { IEdition, IPopulatedEdition } from './attrstrand/types';
+import type { IEdition, IPopulatedEdition, IConceptView } from './attrstrand/types';
 import { AtomListEditor } from './components/AttrStrand/AtomListEditor';
 import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
 import { TopicChildCard } from './components/AttrStrand/TopicChildCard';
@@ -808,7 +808,7 @@ const PhysMemosApp: FC = () => {
 
   const submitWorkspace = async () => {
     // Collect data to submit
-    const state = useWorkspaceStore.getState() as any;
+    const state = useWorkspaceStore.getState();
     const buildSubmission = (ids: string[]) => {
       return ids.map(id => {
         const atom = state.draftAtomsData[id];
@@ -927,7 +927,7 @@ const PhysMemosApp: FC = () => {
 
       // Build views for Sidebar
       // Extract topics and map node views
-      const conceptViewsMap: Record<string, any> = {};
+      const conceptViewsMap: Record<string, IConceptView> = {};
       const nodesToSet: NodeData[] = []; // Emulate NodeData for Graph & Legacy sidebar
 
       for (const concept of allConcepts) {

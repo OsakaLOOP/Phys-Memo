@@ -128,7 +128,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     return (
         <div className={`group relative mb-2 transition-all ${atom.field === 'tags' ? 'inline-block mr-2 mb-2' : ''} ${className}`}>
             <div className="absolute right-full top-0 bottom-0 w-1 mr-2 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-200 cursor-help z-50">
-                <div className="absolute right-2 top-0 bg-white shadow-lg border rounded p-2 text-xs w-48 hidden group-hover:block pointer-events-auto">
+                <div className="absolute left-3 top-full mt-1 bg-white shadow-lg border rounded p-2 text-xs w-48 hidden group-hover:block pointer-events-auto">
                     <div className="font-bold mb-1 text-slate-600 border-b pb-1">版权归属</div>
                     {adjustedAuthors.map(({ author, share }) => (
                         <div key={author} className="flex justify-between text-slate-500 py-0.5">

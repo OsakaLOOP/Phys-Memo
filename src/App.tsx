@@ -1683,7 +1683,7 @@ const PhysMemosApp: FC = () => {
                     </div>
                     {/* Migrated Relation Editor */}
                     <div className="mb-4">
-                       <AtomListEditor field="rels" className="space-y-4" />
+                       <AtomListEditor field="rels" className="space-y-0" />
                     </div>
                   </div>
                   

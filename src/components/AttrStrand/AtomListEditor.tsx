@@ -56,7 +56,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                     <div className="relative">
                         {isRelation ? (
                             <div className="relative pl-4 pt-4 border-l-2 border-slate-200 ml-2 group-last:border-transparent min-h-[40px]">
-                                 <div className="absolute -left-[8px] top-3 w-4 h-4 bg-white rounded-full border-2 border-slate-300 group-hover/list-item:border-indigo-400 transition-colors z-10"></div>
+                                 <div className="absolute -left-[8px] top-[calc(50%+8px)] -translate-y-1/2 w-4 h-4 bg-white rounded-full border-2 border-slate-300 group-hover/list-item:border-indigo-400 transition-colors z-10"></div>
                                  <RelationBlock
                                     atomId={id}
                                     readOnly={readOnly}

@@ -39,6 +39,15 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
         setIsEditing(false);
     };
 
+    const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (isEditing || readOnly) return;
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'A' || target.closest('a') || target.closest('.ref-link')) return;
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) return;
+        setIsEditing(true);
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
              if (atom.field === 'tags' || atom.field === 'refs') {
@@ -74,7 +83,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
         if (atom.field === 'refs') {
             return (
-                <div className="flex gap-2 items-start text-sm text-slate-600">
+                <div id={`ref-${index + 1}`} className="flex gap-2 items-start text-sm text-slate-600 transition-colors duration-500 rounded p-1">
                     <span className="font-mono text-slate-400 select-none pt-0.5">{index + 1}.</span>
                     <div className="flex-1">
                         <RichTextRenderer content={atom.content} className="inline-block" />
@@ -164,7 +173,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                 </div>
             ) : (
                 <div
-                    onClick={() => !readOnly && setIsEditing(true)}
+                    onClick={handleContainerClick}
                     className={`
                         rounded transition-colors relative
                         ${!readOnly ? 'cursor-pointer hover:bg-slate-50' : ''}

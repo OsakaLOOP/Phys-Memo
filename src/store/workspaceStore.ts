@@ -213,6 +213,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
         limit: 50,
+        // Only track fields that the user explicitly edits.
+        // Unrelated metadata or UI state should not pollute undo history.
+        partialize: (state) => ({
+            conceptName: state.conceptName,
+            conceptTopic: state.conceptTopic,
+            conceptDisciplines: state.conceptDisciplines,
+            draftAtomLists: state.draftAtomLists,
+            draftAtomsData: state.draftAtomsData,
+        }),
         // Optional diffing strategies can be defined here
         handleSet: (handleSet) => {
             // Can add debounce/throttle logic here if required. Zundo hooks directly into Zustand `set`.

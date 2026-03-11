@@ -53,7 +53,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     // Attribution display with adjustment: (Val + 0.1/n) / 1.1
     // For new/temp atoms, attr might not exist until submitted, handle defensively.
-    const attr = atom.attr || { 'user': 1 };
+    const attr = (atom as any).attr || { 'user': 1 };
     const authors = Object.entries(attr);
     const n = authors.length;
     const adjustedAuthors = authors.map(([author, share]) => {

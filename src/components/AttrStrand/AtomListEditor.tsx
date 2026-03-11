@@ -43,10 +43,10 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 
                     {/* Add Button Top */}
                     {!readOnly && !isInline && index === 0 && (
-                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 opacity-0 group-hover/list-item:opacity-100 transition-opacity z-10">
+                        <div className="absolute left-1/2 -top-3 transform -translate-x-1/2 opacity-0 group-hover/list-item:opacity-100 transition-opacity z-10">
                             <button
                                 onClick={() => handleAdd(-1)}
-                                className="bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200"
+                                className="bg-indigo-50 text-indigo-400 rounded-full p-1 mb-4 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200"
                             >
                                 <Plus size={12} />
                             </button>
@@ -55,7 +55,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 
                     <div className="relative">
                         {isRelation ? (
-                            <div className="relative pl-4 pt-4 border-l-2 border-slate-200 ml-2 group-last:border-transparent min-h-[40px]">
+                            <div className="relative pl-4 pt-4 pb-4 border-l-2 border-slate-200 ml-2 group-last:border-transparent min-h-[40px]">
                                  <div className="absolute -left-[8px] top-[calc(50%+8px)] -translate-y-1/2 w-4 h-4 bg-white rounded-full border-2 border-slate-300 group-hover/list-item:border-indigo-400 transition-colors z-10"></div>
                                  <RelationBlock
                                     atomId={id}

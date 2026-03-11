@@ -1677,7 +1677,7 @@ const PhysMemosApp: FC = () => {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="card-base">
-                    <div className="flex-center-gap mb-6">
+                    <div className="flex-center-gap mb-2">
                       <GitCommit className="w-5 h-5 text-indigo-500" />
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">关联与推演 / Related</span>
                     </div>

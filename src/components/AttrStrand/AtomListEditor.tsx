@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { ContentAtomField, DraftId } from '../../attrstrand/types';
 import { AtomBlock } from './AtomBlock';
@@ -36,14 +36,25 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
     const isInline = field === 'tags';
     const isRelation = field === 'rels';
 
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
     return (
         <div className={`${isInline ? 'flex flex-wrap items-start gap-2' : isRelation ? 'space-y-0' : 'space-y-2'} ${className}`}>
             {atomIds.map((id: string, index: number) => (
-                <div key={id} className={`relative group/list-item ${isInline ? 'inline-block' : ''} ${isRelation ? 'pb-0' : ''}`}>
+                <div
+                    key={id}
+                    className={`relative group/list-item ${isInline ? 'inline-block' : ''} ${isRelation ? 'pb-0' : ''}`}
+                    onMouseEnter={isRelation ? () => setHoveredIndex(index) : undefined}
+                    onMouseLeave={isRelation ? () => setHoveredIndex(null) : undefined}
+                >
 
                     {/* Add Button Top */}
                     {!readOnly && !isInline && index === 0 && (
-                        <div className="absolute left-1/2 -top-3 transform -translate-x-1/2 opacity-0 group-hover/list-item:opacity-100 transition-opacity z-10">
+                        <div className={`absolute left-1/2 -top-3 transform -translate-x-1/2 transition-opacity z-10 ${
+                            isRelation
+                                ? (hoveredIndex === 0 ? 'opacity-100' : 'opacity-0')
+                                : 'opacity-0 group-hover/list-item:opacity-100'
+                        }`}>
                             <button
                                 onClick={() => handleAdd(-1)}
                                 className="bg-indigo-50 text-indigo-400 rounded-full p-1 mb-4 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200"
@@ -87,7 +98,11 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 
                     {/* Add Button Bottom */}
                     {!readOnly && !isInline && (
-                        <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 opacity-0 group-hover/list-item:opacity-100 transition-opacity z-10">
+                        <div className={`absolute -bottom-3 left-1/2 transform -translate-x-1/2 transition-opacity z-10 ${
+                            isRelation
+                                ? ((hoveredIndex === index || hoveredIndex === index + 1) ? 'opacity-100' : 'opacity-0')
+                                : 'opacity-0 group-hover/list-item:opacity-100'
+                        }`}>
                             <button
                                 onClick={() => handleAdd(index)}
                                 className="bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200"

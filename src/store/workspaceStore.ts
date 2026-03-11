@@ -8,7 +8,7 @@ import type {
 // 全局 Store
 interface GlobalState {
     disciplines: DisciplineData[];
-    conceptViews: Record<string, IConceptView>; // Map of all concepts for the sidebar
+    conceptViews: Record<string, IConceptView>; // sidebar
     setDisciplines: (disciplines: DisciplineData[]) => void;
     setConceptViews: (views: Record<string, IConceptView>) => void;
 }
@@ -78,7 +78,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         id: a.id,
                         field: a.field,
                         type: a.type,
-                        content: a.content || a.contentJson || '', // legacy fallback for old format
+                        content: a.content || a.contentJson || '', // legacy
                         creatorId: a.creatorId,
                         derivedFromId: a.id, // 加载原有 Atom 的继承.
                         frontMeta: a.frontMeta || {},
@@ -179,7 +179,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         },
 
         markCommitted: (newBaseEditionId: string, oldToNewMap: Record<string, string>) => {
-             // Re-map all temp UUIDs or old hashes to their new submitted Hashes, and reset isDirty
+             // 提交后计算 Hashe, 重置 isDirty
              set((state) => {
                  const newData: Record<DraftId, AtomDraft> = {};
                  const mapList = (list: string[]) => list.map(id => oldToNewMap[id] || id);
@@ -213,11 +213,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
         limit: 50,
-        // Optional diffing strategies can be defined here
         handleSet: (handleSet) => {
-            // Can add debounce/throttle logic here if required. Zundo hooks directly into Zustand `set`.
+            // 后续副作用逻辑占位
             return (state) => {
-               // Ignore typing updates from the same field immediately
                handleSet(state);
             };
         }
@@ -225,7 +223,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 );
 
 // --- Action Helpers ---
-// Zundo 的清理操作应当在 Zustand 外部同步执行，确保业务原子性和清空历史的正确性。
+// Zundo 的清理操作在 Zustand 外部同步执行，确保业务原子性和清空历史的正确性。
 
 export const workspaceActions = {
     initWorkspaceAndClear: (

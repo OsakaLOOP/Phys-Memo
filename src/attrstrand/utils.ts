@@ -18,7 +18,7 @@ export async function sha256Int(str: string): Promise<number> {
 }
 
 // Deterministic JSON stringify (sorts keys)
-export function deterministicStringify(obj: any): string {
+export function deterministicStringify(obj: unknown): string {
     if (obj === null || typeof obj !== 'object') {
         return JSON.stringify(obj);
     }
@@ -29,9 +29,9 @@ export function deterministicStringify(obj: any): string {
     }
 
     const sortedKeys = Object.keys(obj).sort();
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     for (const key of sortedKeys) {
-        result[key] = JSON.parse(deterministicStringify(obj[key]));
+        result[key] = JSON.parse(deterministicStringify((obj as Record<string, unknown>)[key]));
     }
     return JSON.stringify(result);
 }

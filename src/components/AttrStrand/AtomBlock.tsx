@@ -13,8 +13,8 @@ interface AtomBlockProps {
 
 export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, className = '', index = 0 }) => {
     // Subscribe specifically to this atom's data
-    const atom = useWorkspaceStore((state: any) => state.draftAtomsData[atomId]);
-    const updateAtomContent = useWorkspaceStore((state: any) => state.updateAtomContent);
+    const atom = useWorkspaceStore((state) => state.draftAtomsData[atomId]);
+    const updateAtomContent = useWorkspaceStore((state) => state.updateAtomContent);
 
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(atom?.content || '');

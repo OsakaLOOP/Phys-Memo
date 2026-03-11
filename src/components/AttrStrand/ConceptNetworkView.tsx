@@ -188,20 +188,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
                 </div>
             </div>
             <svg ref={svgRef} width="800" height="400" className="w-full h-auto bg-white border rounded shadow-inner" />
-            <div className="mt-2 text-xs text-slate-500 flex justify-end gap-2">
-                <button
-                    className="px-3 py-1 btn-secondary"
-                    onClick={() => {
-                        // Ideally we pass the selected edition
-                        // Here assuming parent tracks selection via onSelectEdition
-                        // But we need a button to TRIGGER creation
-                        // Maybe this button shouldn't be here, but inside the parent UI context?
-                        // Yes.
-                    }}
-                >
-                    Create Branch from Selected
-                </button>
-            </div>
+            
         </div>
     );
 };

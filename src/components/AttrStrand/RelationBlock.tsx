@@ -104,11 +104,10 @@ export const RelationBlock: React.FC<RelationBlockProps> = ({
     }
 
     return (
-        <div className={`group relative pl-8 pb-0 ${className}`}>
-             <div className="absolute -left-[7px] top-3 w-4 h-4 bg-white rounded-full border-2 border-slate-300 group-hover:border-indigo-400 transition-colors z-10"></div>
-
+        <div className={`group relative pl-1 pb-0 ${className}`}>
+            
              <div
-                className="flex flex-col sm:flex-row sm:items-start gap-3 bg-white p-3 rounded-lg border border-slate-100 hover:shadow-md transition-all hover:border-indigo-100 cursor-pointer"
+                className="flex flex-col sm:flex-row sm:items-start gap-2 bg-white p-3 rounded-lg border border-slate-100 hover:shadow-md transition-all hover:border-indigo-100 cursor-pointer"
                 onClick={() => !readOnly && setIsEditing(true)}
              >
                  {/* Type Badge */}

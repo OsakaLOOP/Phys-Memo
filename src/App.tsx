@@ -1495,7 +1495,7 @@ const PhysMemosApp: FC = () => {
                   <div className="max-w-5xl mx-auto p-8 space-y-8">
                     {/* Header Section */}
                     <div className="card-base p-8">
-                      <div className='flex flex-row'>
+                      <div className='flex flex-row mb-2'>
                         <div className="mb-6 pr-4">
                           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">主题名称 / Topic</label>
                           <input

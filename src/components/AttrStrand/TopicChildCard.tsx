@@ -3,6 +3,7 @@ import { storage } from '../../attrstrand/storage';
 import type { IConceptRoot, IPopulatedEdition } from '../../attrstrand/types';
 
 import { Layers, Book } from 'lucide-react';
+import RichTextRenderer from '../RichTextRenderer';
 
 interface TopicChildCardProps {
     conceptId: string;
@@ -102,7 +103,7 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
                   <div className="bg-slate-50 rounded border border-slate-100 px-3 py-2 overflow-x-auto pointer-events-none">
                      {/* For read-only topic preview, directly render the first content to avoid store dependency */}
                      <div className="text-xs">
-                        {edition.coreAtoms[0].content}
+                        <RichTextRenderer content={edition.coreAtoms[0].content} />
                      </div>
                   </div>
                 )}
@@ -110,7 +111,7 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
                 {/* Doc Atoms (Description) */}
                 {edition.docAtoms.length > 0 && (
                    <div className="text-xs text-slate-500 line-clamp-3 pointer-events-none">
-                       {edition.docAtoms[0].content}
+                       <RichTextRenderer content={edition.docAtoms[0].content} />
                    </div>
                 )}
 

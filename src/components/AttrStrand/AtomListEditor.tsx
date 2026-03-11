@@ -77,7 +77,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                                 className={`
                                     opacity-0 group-hover/list-item:opacity-100 text-slate-300 hover:text-red-400 transition-colors p-1
                                     ${isInline ? 'absolute -top-2 -right-2 bg-white rounded-full shadow border z-20 hover:bg-red-50' : 'absolute top-2 right-0'}
-                                    ${isRelation ? 'top-3 right-2' : ''}
+                                    ${isRelation ? 'top-[calc(50%-8px)] right-2' : ''}
                                 `}
                             >
                                 <Trash2 size={isInline ? 10 : 14} />

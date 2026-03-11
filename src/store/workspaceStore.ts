@@ -213,6 +213,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
         limit: 50,
+        // 仅包含文档编辑相关状态.
+        partialize: (state) => ({
+            conceptName: state.conceptName,
+            conceptTopic: state.conceptTopic,
+            conceptDisciplines: state.conceptDisciplines,
+            draftAtomLists: state.draftAtomLists,
+            draftAtomsData: state.draftAtomsData,
+        }),
         handleSet: (handleSet) => {
             // 后续副作用逻辑占位
             return (state) => {

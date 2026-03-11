@@ -39,7 +39,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
     return (
-        <div className={`${isInline ? 'flex flex-wrap items-start gap-2' : isRelation ? 'space-y-0' : 'space-y-2'} ${className}`}>
+        <div className={`${isInline ? 'flex flex-wrap items-start gap-2' : isRelation ? 'space-y-0' : 'space-y-2'} ${atomIds.length > 0 ? className : ''}`}>
             {atomIds.map((id: string, index: number) => (
                 <div
                     key={id}

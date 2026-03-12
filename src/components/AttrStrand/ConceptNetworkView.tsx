@@ -27,7 +27,16 @@ interface ProcessedLink {
     color: string;
 }
 
-const COLORS = d3.schemeCategory10; // 颜色板
+const COLORS = [
+    ...d3.schemeCategory10,
+    "#8b5cf6", "#ec4899", "#14b8a6", "#f59e0b", "#06b6d4",
+    "#10b981", "#6366f1", "#f43f5e", "#84cc16", "#a855f7"
+]; // 扩展颜色板
+
+// 生成备用颜色
+const generateFallbackColor = (index: number) => {
+    return `hsl(${(index * 137.5) % 360}, 70%, 50%)`;
+};
 
 export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
     conceptId,
@@ -152,8 +161,15 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
         // 为每条轨道分配颜色，避免相连的轨道颜色相同
         const trackColors = new Map<number, string>();
         const trackConnections = new Map<number, Set<number>>();
+        const trackCreators = new Map<number, string>(); // 记录每个轨道的创建者
+
         for (let i = 0; i < tracks.length; i++) {
             trackConnections.set(i, new Set());
+            // 轨道内的 creator 是一致的
+            if (tracks[i].length > 0) {
+                const firstId = tracks[i][0];
+                trackCreators.set(i, idToEdition.get(firstId)!.creator);
+            }
         }
 
         const idToTrackIndex = new Map<string, number>();
@@ -172,22 +188,62 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             }
         });
 
+        // 按 Creator 分组给轨道分配颜色，优先重用同一 Creator 的颜色
+        const creatorColors = new Map<string, string[]>(); // creator -> list of colors used
+        let globalColorIndex = 0;
+
         for (let i = 0; i < tracks.length; i++) {
-            const usedColors = new Set<string>();
+            const creator = trackCreators.get(i) || "unknown";
+            const usedNeighborColors = new Set<string>();
             trackConnections.get(i)?.forEach(neighbor => {
                 if (trackColors.has(neighbor)) {
-                    usedColors.add(trackColors.get(neighbor)!);
+                    usedNeighborColors.add(trackColors.get(neighbor)!);
                 }
             });
 
-            let color = COLORS[i % COLORS.length]; // fallback
-            for (const c of COLORS) {
-                if (!usedColors.has(c)) {
-                    color = c;
+            let colorToAssign: string | null = null;
+
+            // 1. 尝试使用该 Creator 已分配过的颜色（且不与邻居冲突）
+            const preferredColors = creatorColors.get(creator) || [];
+            for (const prefColor of preferredColors) {
+                if (!usedNeighborColors.has(prefColor)) {
+                    colorToAssign = prefColor;
                     break;
                 }
             }
-            trackColors.set(i, color);
+
+            // 2. 如果没有可用的首选颜色，从全局颜色池中找一个新的颜色
+            if (!colorToAssign) {
+                for (let cIdx = 0; cIdx < COLORS.length; cIdx++) {
+                    const candidate = COLORS[(globalColorIndex + cIdx) % COLORS.length];
+                    if (!usedNeighborColors.has(candidate)) {
+                        colorToAssign = candidate;
+                        globalColorIndex = (globalColorIndex + cIdx + 1) % COLORS.length;
+                        break;
+                    }
+                }
+            }
+
+            // 3. 防护边界情况：如果预设的所有颜色都和邻居冲突了（图非常稠密）
+            if (!colorToAssign) {
+                let fallbackIdx = tracks.length;
+                while (!colorToAssign) {
+                    const fallback = generateFallbackColor(fallbackIdx++);
+                    if (!usedNeighborColors.has(fallback)) {
+                        colorToAssign = fallback;
+                    }
+                }
+            }
+
+            trackColors.set(i, colorToAssign);
+
+            // 记录该 Creator 使用的颜色
+            if (!creatorColors.has(creator)) {
+                creatorColors.set(creator, []);
+            }
+            if (!creatorColors.get(creator)!.includes(colorToAssign)) {
+                creatorColors.get(creator)!.push(colorToAssign);
+            }
         }
 
         // 3. 树状向上螺旋生长的布局

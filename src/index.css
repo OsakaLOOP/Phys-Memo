@@ -28,7 +28,7 @@
 
   /* Cards */
   .card-base {
-    @apply bg-white rounded-xl border border-slate-200 shadow-sm p-6;
+    @apply bg-white rounded-xl border border-slate-200 shadow-sm p-6 pb-3;
   }
   .card-panel {
     @apply bg-slate-50 rounded-lg p-4 border border-slate-200;

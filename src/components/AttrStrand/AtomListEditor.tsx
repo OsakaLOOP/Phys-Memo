@@ -126,7 +126,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                     atomIds.length === 0 && (
                         <div
                             onClick={() => handleAdd(-1)}
-                            className={`border-2 border-dashed border-slate-200 rounded-lg p-4 text-center text-slate-400 hover:border-indigo-300 hover:text-indigo-500 cursor-pointer transition-colors ${isRelation ? 'ml-8' : ''}`}
+                            className={`border-2 border-dashed border-slate-200 rounded-lg p-4 text-center text-slate-400 hover:border-indigo-300 hover:text-indigo-500 cursor-pointer transition-colors`}
                         >
                             <Plus className="mx-auto mb-1" size={20} />
                             <span className="text-sm">添加{isRelation ? '关联条目' : '内容块'}</span>

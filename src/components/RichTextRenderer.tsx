@@ -72,8 +72,7 @@ const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "", 
       return id;
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let html = (marked as any).parse(protectedText) as string;
+    let html = marked.parse(protectedText, { async: false });
 
     let displayMathIndex = 0;
 

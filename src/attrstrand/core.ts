@@ -6,7 +6,7 @@ import { storage } from './storage.ts';
 import { simhash, generateConceptHash, generateAtomHash, generateEditionHash, generateContentHash } from './utils.ts';
 
 export class AttrStrandCore {
-    // --- Similarity & Attribution ---
+    // 基于相似度的版权分配计算
 
     private calculateSimilarity(hash1: string, hash2: string): number {
         const h1 = parseInt(hash1, 16);
@@ -19,6 +19,7 @@ export class AttrStrandCore {
         const sim = 1 - (distance / 32);
         return Math.max(0, sim);
     }
+    // 后期将记录版本的编辑次数距离, 参与计算.
 
     private calculateAttribution(
         prevAttr: ContentAtomAttr,
@@ -41,9 +42,9 @@ export class AttrStrandCore {
             newAttr[author] /= total;
         }
         return newAttr;
-    }
+    }// 这里不符合前端的总比例1.1, 需要修改.
 
-    // --- Backend API ---
+    // 提供的 api
 
     async getPopulatedEdition(editionId: hash): Promise<IPopulatedEdition | null> {
         console.log(`[API Call] core.getPopulatedEdition: editionId=${editionId}`);
@@ -194,24 +195,24 @@ export class AttrStrandCore {
             timestampISO
         );
 
-        // Check if edition already exists (unchanged from base or previously submitted identical)
+        // 检查内容重复, 避免提交的重复. 后续前端也要判断是否禁用按钮/提交.
         const existingEdition = await storage.getEdition(editionId);
         if (existingEdition) {
-            // Ensure head is updated if not autosave
+            // 排除 autosave 更新 Heads, 相反 save 则需要确保是否先前为 autosave 情形的 head 更新.
             if (submission.saveType !== 'autosave') {
                 const concept = await storage.getConcept(conceptId);
                 if (concept && !concept.currentHeads[editionId]) {
                     concept.currentHeads[editionId] = Date.now();
-                    // Optional: remove parent from heads if linear branch
+                    
                     if (submission.baseEditionId && concept.currentHeads[submission.baseEditionId]) {
                         delete concept.currentHeads[submission.baseEditionId];
                     }
                     await storage.saveConcept(concept);
                 }
             }
-            return existingEdition;
+            return existingEdition;// 已存在完全相同的版本, 直接返回.
         }
-
+        
         const edition: IEdition = {
             id: editionId,
             conceptId,
@@ -225,12 +226,12 @@ export class AttrStrandCore {
             timestampISO,
             parentEditionId: submission.baseEditionId,
             frontMeta: {},
-            backMeta: { createdAt: timestampISO }
+            backMeta: { createdAt: timestampISO }// 记录后端生成时间
         };
 
         await storage.saveEdition(edition);
 
-        // Update Concept Heads
+        // 更新 Concept Heads
         if (submission.saveType !== 'autosave') {
              const concept = await storage.getConcept(conceptId);
              if (concept) {

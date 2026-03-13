@@ -257,10 +257,10 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
                 }
                 const slopes = usedSlopesByParent.get(parentId)!;
 
-                // 从 1 开始向两边找空位
-                let offset = 1;
+                // 从 0 开始向两边找空位
+                let offset = 0;
                 while (!found) {
-                    // 尝试右边
+                    // 尝试右边/当前位置
                     const dxRight = parentXIndex + offset - parentXIndex;
                     const slopeRight = dxRight / dy;
                     if (!slopes.has(slopeRight) && !Array.from(trackXIndex.values()).includes(parentXIndex + offset)) {
@@ -270,25 +270,27 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
                         break;
                     }
 
-                    // 尝试左边
-                    const dxLeft = parentXIndex - offset - parentXIndex;
-                    const slopeLeft = dxLeft / dy;
-                    if (!slopes.has(slopeLeft) && !Array.from(trackXIndex.values()).includes(parentXIndex - offset)) {
-                        candidateX = parentXIndex - offset;
-                        slopes.add(slopeLeft);
-                        found = true;
-                        break;
+                    // 尝试左边，只有在 offset > 0 时才尝试
+                    if (offset > 0) {
+                        const dxLeft = parentXIndex - offset - parentXIndex;
+                        const slopeLeft = dxLeft / dy;
+                        if (!slopes.has(slopeLeft) && !Array.from(trackXIndex.values()).includes(parentXIndex - offset)) {
+                            candidateX = parentXIndex - offset;
+                            slopes.add(slopeLeft);
+                            found = true;
+                            break;
+                        }
                     }
                     offset++;
                 }
             } else {
                 // 如果没有父节点（或者父节点不在列表内），退化为寻找全局未使用的空位
-                let offset = 1;
+                let offset = 0;
                 while (!found) {
                     if (!Array.from(trackXIndex.values()).includes(offset)) {
                         candidateX = offset;
                         found = true;
-                    } else if (!Array.from(trackXIndex.values()).includes(-offset)) {
+                    } else if (offset > 0 && !Array.from(trackXIndex.values()).includes(-offset)) {
                         candidateX = -offset;
                         found = true;
                     }

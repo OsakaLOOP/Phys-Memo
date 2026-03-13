@@ -74,20 +74,21 @@ export class AttrStrandCore {
         // Concept Handling
         let conceptId = submission.conceptId;
         let isNewConcept = false;
+        let concept: IConceptRoot | null = null;
 
         // 新建 Concept 的处理.
         if (!conceptId) {
             conceptId = await generateConceptHash(submission.conceptName, creatorId, timestampISO);
             isNewConcept = true;
         } else {
-            const existingConcept = await storage.getConcept(conceptId);
-            if (!existingConcept) {
+            concept = await storage.getConcept(conceptId);
+            if (!concept) {
                 isNewConcept = true;
             }
         }
 
         if (isNewConcept) {
-            const newConcept: IConceptRoot = {
+            concept = {
                 id: conceptId,
                 name: submission.conceptName,
                 topic: submission.conceptTopic,
@@ -98,10 +99,9 @@ export class AttrStrandCore {
                 frontMeta: {},
                 backMeta: { createdAt: timestampISO }
             };
-            await storage.saveConcept(newConcept);
+            await storage.saveConcept(concept);
         } else {
             // Update Concept Metadata if changed
-            const concept = await storage.getConcept(conceptId);
             if (concept) {
                 let updated = false;
                 if (concept.name !== submission.conceptName) { concept.name = submission.conceptName; updated = true; }
@@ -200,7 +200,6 @@ export class AttrStrandCore {
         if (existingEdition) {
             // 排除 autosave 更新 Heads, 相反 save 则需要确保是否先前为 autosave 情形的 head 更新.
             if (submission.saveType !== 'autosave') {
-                const concept = await storage.getConcept(conceptId);
                 if (concept && !concept.currentHeads[editionId]) {
                     concept.currentHeads[editionId] = Date.now();
                     
@@ -233,7 +232,6 @@ export class AttrStrandCore {
 
         // 更新 Concept Heads
         if (submission.saveType !== 'autosave') {
-             const concept = await storage.getConcept(conceptId);
              if (concept) {
                  const newHeads = { ...concept.currentHeads };
                  if (submission.baseEditionId && newHeads[submission.baseEditionId]) {

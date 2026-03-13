@@ -218,9 +218,23 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
         // 斜率 slope = dx / dy
         const usedSlopesByParent = new Map<string, Set<number>>();
 
-        trackXIndex.set(0, 0); // 第一条主干居中
+        // 为了让子节点计算斜率时，父节点的 X 已经被分配，需要按照轨道的起始节点的深度/行号来排序处理
+        const trackProcessingOrder = Array.from({ length: tracks.length }, (_, i) => i)
+            .sort((a, b) => {
+                const trackA = tracks[a];
+                const trackB = tracks[b];
+                const rowA = idToVirtualRow.get(trackA[0]) || 0;
+                const rowB = idToVirtualRow.get(trackB[0]) || 0;
+                return rowA - rowB;
+            });
 
-        for (let i = 1; i < tracks.length; i++) {
+        for (const i of trackProcessingOrder) {
+            // 第一个轨道（深度最浅/主干）固定在中间
+            if (i === 0 && trackXIndex.size === 0) {
+                trackXIndex.set(i, 0);
+                continue;
+            }
+
             const trackStrand = tracks[i];
             const startId = trackStrand[0];
             const startEdition = idToEdition.get(startId)!;
@@ -232,7 +246,8 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             // 如果有父节点，我们需要找一个不产生共线重叠的 X 偏移
             if (parentId && idToTrackIndex.has(parentId)) {
                 const parentTrackIdx = idToTrackIndex.get(parentId)!;
-                const parentXIndex = trackXIndex.get(parentTrackIdx) || 0;
+                // 如果因为某种原因父节点还没有分配，默认0（排序后一般不会出现）
+                const parentXIndex = trackXIndex.has(parentTrackIdx) ? trackXIndex.get(parentTrackIdx)! : 0;
                 const parentRow = idToVirtualRow.get(parentId) || 0;
                 const childRow = idToVirtualRow.get(startId) || 0;
                 const dy = childRow - parentRow; // y 的距离差（以行数为单位）

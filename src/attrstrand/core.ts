@@ -6,8 +6,8 @@ import { storage } from './storage.ts';
 import { simhash, generateConceptHash, generateAtomHash, generateEditionHash, generateContentHash } from './utils.ts';
 
 export class AttrStrandCore {
-    // 基于相似度的版权分配计算
 
+    // 基于相似度的版权分配计算
     private calculateSimilarity(hash1: string, hash2: string): number {
         const h1 = parseInt(hash1, 16);
         const h2 = parseInt(hash2, 16);
@@ -54,7 +54,7 @@ export class AttrStrandCore {
         const populate = async (ids: string[]) => {
             const atoms = await storage.getAtoms(ids);
             return atoms.map(a => {
-                const { backMeta, ...rest } = a;
+                const { backMeta, ...rest } = a;// 剔除 backmeta
                 return rest;
             });
         };
@@ -75,7 +75,7 @@ export class AttrStrandCore {
         let conceptId = submission.conceptId;
         let isNewConcept = false;
 
-        // If conceptId is empty or doesn't exist, create it
+        // 新建 Concept 的处理.
         if (!conceptId) {
             conceptId = await generateConceptHash(submission.conceptName, creatorId, timestampISO);
             isNewConcept = true;

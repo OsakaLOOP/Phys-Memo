@@ -77,7 +77,7 @@ export class AttrStrandCore {
 
         // 新建 Concept 的处理.
         if (!conceptId) {
-            conceptId = await generateConceptHash(submission.conceptName, creatorId, timestampISO);
+            conceptId = await generateConceptHash(submission.conceptName, creatorId, timestampISO);// hash 创建
             isNewConcept = true;
         } else {
             const existingConcept = await storage.getConcept(conceptId);
@@ -100,7 +100,7 @@ export class AttrStrandCore {
             };
             await storage.saveConcept(newConcept);
         } else {
-            // Update Concept Metadata if changed
+            // 检查 concept meta 更新. 后续公共的 meta 将加入审核, 或者绑定到 edition.
             const concept = await storage.getConcept(conceptId);
             if (concept) {
                 let updated = false;
@@ -115,7 +115,7 @@ export class AttrStrandCore {
                     await storage.saveConcept(concept);
                 }
             }
-        }
+        }// 完成concept入库.
 
         const processAtoms = async (field: ContentAtomField, atoms: AtomSubmission[]) => {
             const atomIds: hash[] = [];
@@ -128,7 +128,7 @@ export class AttrStrandCore {
                     prevAtom = await storage.getAtom(sub.derivedFromId);
                 }
 
-                // If content is completely identical to previous, reuse ID directly
+                // 检查内容更新.
                 if (prevAtom && prevAtom.contentHash === contentHash) {
                     atomIds.push(prevAtom.id);
                     continue;
@@ -151,7 +151,7 @@ export class AttrStrandCore {
                     attr
                 );
 
-                // Check if atom already exists globally (e.g. someone else wrote same text)
+                // 检查是否与历史 atom 完全一致.
                 const existingAtom = await storage.getAtom(atomId);
                 if (existingAtom) {
                     atomIds.push(existingAtom.id);

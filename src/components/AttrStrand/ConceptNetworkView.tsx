@@ -44,9 +44,66 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             const c = await storage.getConcept(conceptId);
             setConcept(c);
             const e = await storage.getEditionsByConcept(conceptId);
-            // 按照时间排序以构建层级
-            e.sort((a, b) => new Date(a.timestampISO).getTime() - new Date(b.timestampISO).getTime());
-            setEditions(e);
+
+            // 严格基于父子依赖的拓扑排序 (Kahn's Algorithm) + 时间兜底
+            const idToEdition = new Map<string, IEdition>();
+            const childrenMap = new Map<string, string[]>();
+            const inDegree = new Map<string, number>();
+
+            e.forEach(edition => {
+                idToEdition.set(edition.id, edition);
+                inDegree.set(edition.id, 0); // 初始化入度
+                childrenMap.set(edition.id, []);
+            });
+
+            e.forEach(edition => {
+                if (edition.parentEditionId && idToEdition.has(edition.parentEditionId)) {
+                    childrenMap.get(edition.parentEditionId)!.push(edition.id);
+                    inDegree.set(edition.id, inDegree.get(edition.id)! + 1);
+                }
+            });
+
+            // 提取所有入度为 0 的根节点
+            const queue: IEdition[] = [];
+            e.forEach(edition => {
+                if (inDegree.get(edition.id) === 0) {
+                    queue.push(edition);
+                }
+            });
+
+            // 按照时间排序优先处理较早的节点
+            queue.sort((a, b) => new Date(a.timestampISO).getTime() - new Date(b.timestampISO).getTime());
+
+            const sortedEditions: IEdition[] = [];
+            while (queue.length > 0) {
+                const current = queue.shift()!;
+                sortedEditions.push(current);
+
+                const children = childrenMap.get(current.id)!;
+                // 对子节点也按照时间排序，保证同一父节点的子节点有序
+                children.sort((aId, bId) => {
+                    const aDate = new Date(idToEdition.get(aId)!.timestampISO).getTime();
+                    const bDate = new Date(idToEdition.get(bId)!.timestampISO).getTime();
+                    return aDate - bDate;
+                });
+
+                for (const childId of children) {
+                    const degree = inDegree.get(childId)! - 1;
+                    inDegree.set(childId, degree);
+                    if (degree === 0) {
+                        queue.push(idToEdition.get(childId)!);
+                    }
+                }
+            }
+
+            // 兜底：处理可能的环形依赖 (断开环)，追加到最后
+            if (sortedEditions.length < e.length) {
+                const remaining = e.filter(edition => !sortedEditions.includes(edition));
+                remaining.sort((a, b) => new Date(a.timestampISO).getTime() - new Date(b.timestampISO).getTime());
+                sortedEditions.push(...remaining);
+            }
+
+            setEditions(sortedEditions);
         };
         loadData();
     }, [conceptId]);
@@ -79,37 +136,18 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             }
         });
 
-        // 寻找根节点 (可能没有 parentEditionId, 或者其 parentEditionId 不在当前列表里)
-        const roots = editions.filter(e => !e.parentEditionId || !idToEdition.has(e.parentEditionId));
-
+        // 计算每个节点的深度 (因为 editions 已经是严格拓扑排序，只需要线性的动态规划即可)
         const depths = new Map<string, number>();
         let maxDepth = 0;
 
-        const assignDepth = (id: string, depth: number) => {
-            depths.set(id, depth);
-            maxDepth = Math.max(maxDepth, depth);
-            const children = childrenMap.get(id) || [];
-            children.forEach(childId => assignDepth(childId, depth + 1));
-        };
-
-        roots.forEach(root => assignDepth(root.id, 0));
-
-        // 兜底深度：如果还有没遍历到的节点（可能形成了环，或者是孤立图但没被作为root选出）
-        // 我们通过不断寻找没有父节点的节点作为临时 root 继续遍历
-        while (depths.size < editions.length) {
-            const unvisited = editions.filter(e => !depths.has(e.id));
-            if (unvisited.length === 0) break;
-
-            // 找一个 parentId 不在未访问列表中的节点（即它指向已访问节点或死链）作为起点
-            const tempRoot = unvisited.find(e => !e.parentEditionId || !unvisited.find(u => u.id === e.parentEditionId)) || unvisited[0];
-
-            // 计算它的临时深度，如果有指向已访问的 parent，则等于 parent + 1，否则等于最大深度 + 1（放在最上面）
-            let newDepth = maxDepth + 1;
-            if (tempRoot.parentEditionId && depths.has(tempRoot.parentEditionId)) {
-                newDepth = depths.get(tempRoot.parentEditionId)! + 1;
+        editions.forEach(e => {
+            let depth = 0;
+            if (e.parentEditionId && depths.has(e.parentEditionId)) {
+                depth = depths.get(e.parentEditionId)! + 1;
             }
-            assignDepth(tempRoot.id, newDepth);
-        }
+            depths.set(e.id, depth);
+            maxDepth = Math.max(maxDepth, depth);
+        });
 
         // 2. 分支颜色分配算法（通达性与单条通路分割）
         const tracks: Array<string[]> = [];

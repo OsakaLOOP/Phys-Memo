@@ -242,8 +242,8 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
                 }
                 const slopes = usedSlopesByParent.get(parentId)!;
 
-                // 从 1 开始向两边找空位
-                let offset = 1;
+                // 先尝试竖直, 然后左右交替.
+                let offset = 0;
                 while (!found) {
                     // 尝试右边
                     const dxRight = parentXIndex + offset - parentXIndex;

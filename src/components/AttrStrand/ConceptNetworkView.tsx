@@ -283,7 +283,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
                 }
             } else {
                 // 如果没有父节点（或者父节点不在列表内），退化为寻找全局未使用的空位
-                let offset = 1;
+                let offset = 0;
                 while (!found) {
                     if (!Array.from(trackXIndex.values()).includes(offset)) {
                         candidateX = offset;

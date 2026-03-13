@@ -1693,7 +1693,7 @@ const PhysMemosApp: FC = () => {
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">参考文献 / References</span>
                     </div>
                     <div className="mb-4">
-                      <AtomListEditor field="refs" className="bg-slate-50/50 rounded-lg border border-slate-100 p-2" />
+                      <AtomListEditor field="refs" className="p-2" />
                     </div>
                   </div>
                 </div>

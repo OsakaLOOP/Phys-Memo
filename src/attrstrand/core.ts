@@ -118,6 +118,21 @@ export class AttrStrandCore {
             }
         }// 完成concept入库.
 
+        // 获取 baseEdition 并计算 isFork
+        let isFork = false;
+        let baseEdition: IEdition | null = null;
+        if (submission.baseEditionId) {
+            baseEdition = await storage.getEdition(submission.baseEditionId);
+            if (baseEdition) {
+                if (baseEdition.creator !== creatorId) {
+                    isFork = true;
+                } else {
+                    // 相同用户，默认非fork，除非该节点已经有后续的分支（即baseEdition不在currentHeads中）
+                    isFork = !concept?.currentHeads[submission.baseEditionId];
+                }
+            }
+        }
+
         const processAtoms = async (field: ContentAtomField, atoms: AtomSubmission[]) => {
             const atomIds: hash[] = [];
             for (const sub of atoms) {
@@ -204,7 +219,7 @@ export class AttrStrandCore {
                 if (concept && !concept.currentHeads[editionId]) {
                     concept.currentHeads[editionId] = Date.now();
                     
-                    if (submission.baseEditionId && concept.currentHeads[submission.baseEditionId]) {
+                    if (!isFork && submission.baseEditionId && concept.currentHeads[submission.baseEditionId]) {
                         delete concept.currentHeads[submission.baseEditionId];
                     }
                     await storage.saveConcept(concept);
@@ -235,7 +250,7 @@ export class AttrStrandCore {
         if (submission.saveType !== 'autosave') {
              if (concept) {
                  const newHeads = { ...concept.currentHeads };
-                 if (submission.baseEditionId && newHeads[submission.baseEditionId]) {
+                 if (!isFork && submission.baseEditionId && newHeads[submission.baseEditionId]) {
                      delete newHeads[submission.baseEditionId];
                  }
                  newHeads[editionId] = Date.now();

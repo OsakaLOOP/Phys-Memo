@@ -134,7 +134,6 @@ export interface EditionSubmission {
     conceptDisciplines: string[];
 
     baseEditionId: hash | null; // null 代表新建, 否则为编辑已有 Edition
-
     saveType: 'autosave'| 'save' | 'publish'; 
     coreAtoms: AtomSubmission[];
     docAtoms: AtomSubmission[];

@@ -288,7 +288,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
                     if (!Array.from(trackXIndex.values()).includes(offset)) {
                         candidateX = offset;
                         found = true;
-                    } else if (!Array.from(trackXIndex.values()).includes(-offset)) {
+                    } else if (offset > 0 && !Array.from(trackXIndex.values()).includes(-offset)) {
                         candidateX = -offset;
                         found = true;
                     }

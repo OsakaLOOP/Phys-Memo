@@ -223,6 +223,19 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
         // 防止左侧越界，重新计算 base X
         const safeCenterX = Math.max(center_X, -minXOffset * baseWidth + 50);
 
+        // 计算所有节点的虚拟行号以分配独占的Y轴高度
+        const sortedForRows = [...editions].sort((a, b) => {
+            const depthA = depths.get(a.id) || 0;
+            const depthB = depths.get(b.id) || 0;
+            if (depthA !== depthB) return depthA - depthB;
+            return new Date(a.timestampISO).getTime() - new Date(b.timestampISO).getTime();
+        });
+
+        const idToVirtualRow = new Map<string, number>();
+        sortedForRows.forEach((e, idx) => {
+            idToVirtualRow.set(e.id, idx);
+        });
+
         editions.forEach(e => {
              const depth = depths.get(e.id) || 0;
              const trackIdx = idToTrackIndex.get(e.id)!;
@@ -233,16 +246,9 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
              // X轴位置：基础位置 + 轨道偏移
              const x = safeCenterX + xOffset * baseWidth;
 
-             // Y轴位置：从底部往上
-             // 但是如果同一深度有多个节点，微调 Y 坐标防止完全重叠
-             let y = start_Y - depth * layerHeight;
-
-             // 如果同一层有多个节点（比如产生了分支），稍微错开 Y，防止文字互相遮挡
-             if (layerNodes.has(depth)) {
-                 const siblingCount = layerNodes.get(depth)!.length;
-                 // 根据自己在同级中的索引错开
-                 y += siblingCount * 8; // 微调，但不需要太复杂，因为后面也会排序
-             }
+             // Y轴位置：从底部往上，每个节点独占一行
+             const virtualRow = idToVirtualRow.get(e.id) || 0;
+             const y = start_Y - virtualRow * layerHeight;
 
              const node: ProcessedNode = {
                  edition: e,
@@ -396,8 +402,8 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
         svg.call(zoom);
 
         // 计算整体边界，初始化平移使最新节点（顶部）可见
-        // 根在 y = start_Y, 最新在 y = start_Y - maxDepth * layerHeight
-        const totalHeight = maxDepth * layerHeight;
+        // 根在 y = start_Y, 最新在 y = start_Y - (editions.length - 1) * layerHeight
+        const totalHeight = Math.max(0, editions.length - 1) * layerHeight;
         const topY = start_Y - totalHeight - 50; // padding
 
         // 移动到顶部可见，或者根据 currentEditionId 定位

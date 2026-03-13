@@ -149,6 +149,19 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             tracks.push(currentTrack.reverse());
         }
 
+        // 计算所有节点的虚拟行号以分配独占的Y轴高度，为后面的斜率计算做准备
+        const sortedForRows = [...editions].sort((a, b) => {
+            const depthA = depths.get(a.id) || 0;
+            const depthB = depths.get(b.id) || 0;
+            if (depthA !== depthB) return depthA - depthB;
+            return new Date(a.timestampISO).getTime() - new Date(b.timestampISO).getTime();
+        });
+
+        const idToVirtualRow = new Map<string, number>();
+        sortedForRows.forEach((e, idx) => {
+            idToVirtualRow.set(e.id, idx);
+        });
+
         // 为每条轨道分配颜色，避免相连的轨道颜色相同
         const trackColors = new Map<number, string>();
         const trackConnections = new Map<number, Set<number>>();
@@ -198,19 +211,77 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
         // 为每个轨道分配一个 X 位置
         const trackXIndex = new Map<number, number>();
 
-        // 保证有连接的轨道在相邻位置，且总体成发散状
-        // 使用更宽的分散距离以防止文字重叠
-        let nextLeft = -1;
-        let nextRight = 1;
+        // 防线重叠算法：记录每个父节点已被使用的出射斜率（dx / dy）
+        // 因为每个节点Y坐标固定为 virtualRow * layerHeight
+        // dx = (childXIndex - parentXIndex)
+        // dy = (childRow - parentRow)
+        // 斜率 slope = dx / dy
+        const usedSlopesByParent = new Map<string, Set<number>>();
+
         trackXIndex.set(0, 0); // 第一条主干居中
 
         for (let i = 1; i < tracks.length; i++) {
-            // 简单交替分配左右轨道，但增加步长
-            if (i % 2 === 1) {
-                trackXIndex.set(i, nextRight++);
+            const trackStrand = tracks[i];
+            const startId = trackStrand[0];
+            const startEdition = idToEdition.get(startId)!;
+            const parentId = startEdition.parentEditionId;
+
+            let candidateX = 0;
+            let found = false;
+
+            // 如果有父节点，我们需要找一个不产生共线重叠的 X 偏移
+            if (parentId && idToTrackIndex.has(parentId)) {
+                const parentTrackIdx = idToTrackIndex.get(parentId)!;
+                const parentXIndex = trackXIndex.get(parentTrackIdx) || 0;
+                const parentRow = idToVirtualRow.get(parentId) || 0;
+                const childRow = idToVirtualRow.get(startId) || 0;
+                const dy = childRow - parentRow; // y 的距离差（以行数为单位）
+
+                if (!usedSlopesByParent.has(parentId)) {
+                    usedSlopesByParent.set(parentId, new Set());
+                }
+                const slopes = usedSlopesByParent.get(parentId)!;
+
+                // 从 1 开始向两边找空位
+                let offset = 1;
+                while (!found) {
+                    // 尝试右边
+                    const dxRight = parentXIndex + offset - parentXIndex;
+                    const slopeRight = dxRight / dy;
+                    if (!slopes.has(slopeRight) && !Array.from(trackXIndex.values()).includes(parentXIndex + offset)) {
+                        candidateX = parentXIndex + offset;
+                        slopes.add(slopeRight);
+                        found = true;
+                        break;
+                    }
+
+                    // 尝试左边
+                    const dxLeft = parentXIndex - offset - parentXIndex;
+                    const slopeLeft = dxLeft / dy;
+                    if (!slopes.has(slopeLeft) && !Array.from(trackXIndex.values()).includes(parentXIndex - offset)) {
+                        candidateX = parentXIndex - offset;
+                        slopes.add(slopeLeft);
+                        found = true;
+                        break;
+                    }
+                    offset++;
+                }
             } else {
-                trackXIndex.set(i, nextLeft--);
+                // 如果没有父节点（或者父节点不在列表内），退化为寻找全局未使用的空位
+                let offset = 1;
+                while (!found) {
+                    if (!Array.from(trackXIndex.values()).includes(offset)) {
+                        candidateX = offset;
+                        found = true;
+                    } else if (!Array.from(trackXIndex.values()).includes(-offset)) {
+                        candidateX = -offset;
+                        found = true;
+                    }
+                    offset++;
+                }
             }
+
+            trackXIndex.set(i, candidateX);
         }
 
         const center_X = width / 4; // 将图表偏左绘制，给右侧留出文本空间
@@ -233,16 +304,9 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
              // X轴位置：基础位置 + 轨道偏移
              const x = safeCenterX + xOffset * baseWidth;
 
-             // Y轴位置：从底部往上
-             // 但是如果同一深度有多个节点，微调 Y 坐标防止完全重叠
-             let y = start_Y - depth * layerHeight;
-
-             // 如果同一层有多个节点（比如产生了分支），稍微错开 Y，防止文字互相遮挡
-             if (layerNodes.has(depth)) {
-                 const siblingCount = layerNodes.get(depth)!.length;
-                 // 根据自己在同级中的索引错开
-                 y += siblingCount * 8; // 微调，但不需要太复杂，因为后面也会排序
-             }
+             // Y轴位置：从底部往上，每个节点独占一行
+             const virtualRow = idToVirtualRow.get(e.id) || 0;
+             const y = start_Y - virtualRow * layerHeight;
 
              const node: ProcessedNode = {
                  edition: e,
@@ -396,8 +460,8 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
         svg.call(zoom);
 
         // 计算整体边界，初始化平移使最新节点（顶部）可见
-        // 根在 y = start_Y, 最新在 y = start_Y - maxDepth * layerHeight
-        const totalHeight = maxDepth * layerHeight;
+        // 根在 y = start_Y, 最新在 y = start_Y - (editions.length - 1) * layerHeight
+        const totalHeight = Math.max(0, editions.length - 1) * layerHeight;
         const topY = start_Y - totalHeight - 50; // padding
 
         // 移动到顶部可见，或者根据 currentEditionId 定位

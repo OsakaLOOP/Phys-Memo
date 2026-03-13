@@ -139,7 +139,7 @@ export interface EditionSubmission {
 
     baseEditionId: hash | null; // null 代表新建, 否则为编辑已有 Edition
 
-    saveType: 'autosave'| 'usersave' | 'publish'; // usersave instead of save for clarity maybe, but matching IEdition's saveType ('save') is better.
+    saveType: 'autosave' | 'save' | 'publish';
 
     coreAtoms: AtomSubmission[];
     docAtoms: AtomSubmission[];

@@ -89,7 +89,7 @@ export const migrateData = async () => {
 
         // 3. Migrate Editions
         if (defaultData.attr_editions) {
-            const sortedEditions = Object.values<import('./types.ts').IEdition & { createdAt?: string }>(defaultData.attr_editions as Record<string, import('./types.ts').IEdition & { createdAt?: string }>)
+            const sortedEditions = Object.values<Omit<import('./types.ts').IEdition, 'saveType'> & { createdAt?: string, saveType?: 'autosave' | 'save' | 'usersave' | 'publish' }>(defaultData.attr_editions as Record<string, Omit<import('./types.ts').IEdition, 'saveType'> & { createdAt?: string, saveType?: 'autosave' | 'save' | 'usersave' | 'publish' }>)
                 .sort((a, b) => new Date(a.createdAt || a.timestampISO || 0).getTime() - new Date(b.createdAt || b.timestampISO || 0).getTime());
 
             for (const e of sortedEditions) {
@@ -122,7 +122,7 @@ export const migrateData = async () => {
                     id: newId,
                     conceptId,
                     parentEditionId: parentId,
-                    saveType: e.saveType || 'publish',
+                    saveType: (e.saveType === 'usersave' ? 'save' : e.saveType) || 'publish',
                     coreAtomIds: coreIds,
                     docAtomIds: docIds,
                     tagsAtomIds: tagsIds,

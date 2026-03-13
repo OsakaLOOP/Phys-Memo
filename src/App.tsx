@@ -828,7 +828,7 @@ const PhysMemosApp: FC = () => {
         conceptTopic: state.conceptTopic,
         conceptDisciplines: state.conceptDisciplines,
         baseEditionId: state.baseEditionId,
-        saveType: 'usersave' as const,
+        saveType: 'save' as const,
         coreAtoms: buildSubmission(state.draftAtomLists.core),
         docAtoms: buildSubmission(state.draftAtomLists.doc),
         tagsAtoms: buildSubmission(state.draftAtomLists.tags),

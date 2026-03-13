@@ -216,7 +216,7 @@ export class AttrStrandCore {
         const edition: IEdition = {
             id: editionId,
             conceptId,
-            saveType: submission.saveType as 'autosave' | 'save' | 'publish',
+            saveType: submission.saveType,
             coreAtomIds,
             docAtomIds,
             tagsAtomIds,

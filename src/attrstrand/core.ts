@@ -1,5 +1,5 @@
 import type {
-    IConceptRoot, IEdition, IContentAtom, ContentAtomField, ContentAtomAttr,
+    IConceptRoot, IEdition, IContentAtom, ContentAtomField, ContentAtomType, ContentAtomAttr,
     EditionSubmission, AtomSubmission, hash, IPopulatedEdition
 } from './types.ts';
 import { storage } from './storage.ts';
@@ -11,6 +11,9 @@ export class AttrStrandCore {
     public calculateSimilarity(hash1: string, hash2: string): number {
         const h1 = parseInt(hash1, 16);
         const h2 = parseInt(hash2, 16);
+        if (Number.isNaN(h1) || Number.isNaN(h2)) {
+            return 0;
+        }
         let xor = h1 ^ h2;
         let distance = 0;
         for(let i=0; i<32; i++) {
@@ -18,6 +21,56 @@ export class AttrStrandCore {
         }
         const sim = 1 - (distance / 32);
         return Math.max(0, sim);
+    }
+
+    // 全库 Atom 查询
+    async queryAtoms(options: {
+        field?: ContentAtomField;
+        type?: ContentAtomType;
+        creatorId?: string;
+        contentHash?: string;
+        contentSimHash?: string;
+        contains?: string;
+    }): Promise<IContentAtom[]> {
+        const allAtoms = await storage.getAllAtoms();
+        return allAtoms.filter(atom => {
+            if (options.field && atom.field !== options.field) return false;
+            if (options.type && atom.type !== options.type) return false;
+            if (options.creatorId && atom.creatorId !== options.creatorId) return false;
+            if (options.contentHash && atom.contentHash !== options.contentHash) return false;
+            if (options.contentSimHash && atom.contentSimHash !== options.contentSimHash) return false;
+            if (options.contains && !atom.content.includes(options.contains)) return false;
+            return true;
+        });
+    }
+
+    async findExactContentMatch(content: string, field?: ContentAtomField, type?: ContentAtomType): Promise<IContentAtom | null> {
+        const targetHash = await generateContentHash(content);
+        const candidates = await storage.findAtomsByContentHash(targetHash);
+        const matched = candidates.find(atom => {
+            if (field && atom.field !== field) return false;
+            if (type && atom.type !== type) return false;
+            return true;
+        });
+        return matched || null;
+    }
+
+    async findBestSimhashMatch(targetSimHash: string, excludeId?: string, minSimilarity = 0): Promise<{ id: string, sim: number } | null> {
+        const allAtoms = await storage.getAllAtoms();
+        let bestMatch: { id: string, sim: number } | null = null;
+
+        for (const atom of allAtoms) {
+            if (atom.id === excludeId) continue;
+            if (!atom.contentSimHash) continue;
+
+            const sim = this.calculateSimilarity(targetSimHash, atom.contentSimHash);
+            if (sim < minSimilarity) continue;
+            if (!bestMatch || sim > bestMatch.sim) {
+                bestMatch = { id: atom.id, sim };
+            }
+        }
+
+        return bestMatch;
     }
 
     // 基于 diff 的版权分配计算
@@ -42,25 +95,6 @@ export class AttrStrandCore {
             newAttr[author] /= total;
         }
         return newAttr;
-    }
-
-    async findBestSimhashMatch(targetSimHash: string, excludeId?: string): Promise<{ id: string, sim: number } | null> {
-        // 由于需要全库匹配，我们需要拉取所有 atoms。这在真实生产环境中可能需要 D1 或向量数据库的支持。
-        // 目前先模拟实现，假定 storage 提供了 getAllAtoms 或遍历方式。
-        const allAtoms = await storage.getAllAtoms();
-        let bestMatch: { id: string, sim: number } | null = null;
-
-        for (const atom of allAtoms) {
-            if (atom.id === excludeId) continue;
-            if (!atom.contentSimHash) continue;
-
-            const sim = this.calculateSimilarity(targetSimHash, atom.contentSimHash);
-            if (!bestMatch || sim > bestMatch.sim) {
-                bestMatch = { id: atom.id, sim };
-            }
-        }
-
-        return bestMatch;
     }
 
     // 提供的 api

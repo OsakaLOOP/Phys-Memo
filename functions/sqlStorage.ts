@@ -84,6 +84,17 @@ export interface IStorage {
     saveAtom(atom: IContentAtom): Promise<void>;
     getAtom(id: string): Promise<IContentAtom | null>;
     getAtoms(ids: string[]): Promise<IContentAtom[]>;
+    getAllAtoms(): Promise<IContentAtom[]>;
+    findAtomsByContentHash(contentHash: string): Promise<IContentAtom[]>;
+    findAtomsByField(field: string): Promise<IContentAtom[]>;
+    queryAtoms(filter: {
+        field?: string;
+        type?: string;
+        creatorId?: string;
+        contentHash?: string;
+        contentSimHash?: string;
+        contains?: string;
+    }): Promise<IContentAtom[]>;
 
     saveDiscipline(discipline: DisciplineData): Promise<void>;
     getDiscipline(name: string): Promise<DisciplineData | null>;
@@ -389,6 +400,62 @@ export class SqlStorage implements IStorage {
         const placeholders = ids.map(() => '?').join(',');
         const results = await executeD1([{ sql: `SELECT * FROM atoms WHERE id IN (${placeholders})`, params: ids }]);
 
+        return results[0].results.map((r: any) => this.formatAtomRow(r));
+    }
+
+    async getAllAtoms(): Promise<IContentAtom[]> {
+        const results = await executeD1([{ sql: `SELECT * FROM atoms` }]);
+        return results[0].results.map((r: any) => this.formatAtomRow(r));
+    }
+
+    async findAtomsByContentHash(contentHash: string): Promise<IContentAtom[]> {
+        const results = await executeD1([{ sql: `SELECT * FROM atoms WHERE content_hash = ?`, params: [contentHash] }]);
+        return results[0].results.map((r: any) => this.formatAtomRow(r));
+    }
+
+    async findAtomsByField(field: string): Promise<IContentAtom[]> {
+        const results = await executeD1([{ sql: `SELECT * FROM atoms WHERE field = ?`, params: [field] }]);
+        return results[0].results.map((r: any) => this.formatAtomRow(r));
+    }
+
+    async queryAtoms(filter: {
+        field?: string;
+        type?: string;
+        creatorId?: string;
+        contentHash?: string;
+        contentSimHash?: string;
+        contains?: string;
+    }): Promise<IContentAtom[]> {
+        const queryFragments: string[] = [];
+        const params: any[] = [];
+
+        if (filter.field) {
+            queryFragments.push(`field = ?`);
+            params.push(filter.field);
+        }
+        if (filter.type) {
+            queryFragments.push(`type = ?`);
+            params.push(filter.type);
+        }
+        if (filter.creatorId) {
+            queryFragments.push(`creator_id = ?`);
+            params.push(filter.creatorId);
+        }
+        if (filter.contentHash) {
+            queryFragments.push(`content_hash = ?`);
+            params.push(filter.contentHash);
+        }
+        if (filter.contentSimHash) {
+            queryFragments.push(`content_sim_hash = ?`);
+            params.push(filter.contentSimHash);
+        }
+        if (filter.contains) {
+            queryFragments.push(`content LIKE ?`);
+            params.push(`%${filter.contains}%`);
+        }
+
+        const whereClause = queryFragments.length ? `WHERE ${queryFragments.join(' AND ')}` : '';
+        const results = await executeD1([{ sql: `SELECT * FROM atoms ${whereClause}`, params }]);
         return results[0].results.map((r: any) => this.formatAtomRow(r));
     }
 

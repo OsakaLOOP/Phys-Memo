@@ -1,4 +1,4 @@
-import type { IConceptRoot, IEdition, IContentAtom, DisciplineData } from './types.ts';
+import type { IConceptRoot, IEdition, IContentAtom, DisciplineData, ContentAtomField, ContentAtomType } from './types.ts';
 
 export interface IStorage {
     // Concept Operations
@@ -15,6 +15,17 @@ export interface IStorage {
     saveAtom(atom: IContentAtom): Promise<void>;
     getAtom(id: string): Promise<IContentAtom | null>;
     getAtoms(ids: string[]): Promise<IContentAtom[]>;
+    getAllAtoms(): Promise<IContentAtom[]>;
+    findAtomsByContentHash(contentHash: string): Promise<IContentAtom[]>;
+    findAtomsByField(field: ContentAtomField): Promise<IContentAtom[]>;
+    queryAtoms(filter: {
+        field?: ContentAtomField;
+        type?: ContentAtomType;
+        creatorId?: string;
+        contentHash?: string;
+        contentSimHash?: string;
+        contains?: string;
+    }): Promise<IContentAtom[]>;
 
     // Discipline Operations (Flat structure)
     saveDiscipline(discipline: DisciplineData): Promise<void>;
@@ -101,6 +112,42 @@ export class LocalStorageMock implements IStorage {
         console.log(`[API Call] storage.getAtoms: ${ids.length} ids`);
         const data = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
         return ids.map(id => data[id]).filter(a => a !== undefined);
+    }
+
+    async getAllAtoms(): Promise<IContentAtom[]> {
+        console.log('[API Call] storage.getAllAtoms');
+        const atoms = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
+        return Object.values(atoms);
+    }
+
+    async findAtomsByContentHash(contentHash: string): Promise<IContentAtom[]> {
+        const allAtoms = await this.getAllAtoms();
+        return allAtoms.filter(atom => atom.contentHash === contentHash);
+    }
+
+    async findAtomsByField(field: ContentAtomField): Promise<IContentAtom[]> {
+        const allAtoms = await this.getAllAtoms();
+        return allAtoms.filter(atom => atom.field === field);
+    }
+
+    async queryAtoms(filter: {
+        field?: ContentAtomField;
+        type?: ContentAtomType;
+        creatorId?: string;
+        contentHash?: string;
+        contentSimHash?: string;
+        contains?: string;
+    }): Promise<IContentAtom[]> {
+        const allAtoms = await this.getAllAtoms();
+        return allAtoms.filter(atom => {
+            if (filter.field && atom.field !== filter.field) return false;
+            if (filter.type && atom.type !== filter.type) return false;
+            if (filter.creatorId && atom.creatorId !== filter.creatorId) return false;
+            if (filter.contentHash && atom.contentHash !== filter.contentHash) return false;
+            if (filter.contentSimHash && atom.contentSimHash !== filter.contentSimHash) return false;
+            if (filter.contains && !atom.content.includes(filter.contains)) return false;
+            return true;
+        });
     }
 
     // --- Discipline Operations ---
@@ -200,11 +247,6 @@ export class LocalStorageMock implements IStorage {
         this.save(STORAGE_KEYS.ATOMS, atoms);
 
         return deletedCount;
-    }
-
-    async getAllAtoms(): Promise<IContentAtom[]> {
-        const atoms = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
-        return Object.values(atoms);
     }
 }
 

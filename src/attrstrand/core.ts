@@ -202,7 +202,7 @@ export class AttrStrandCore {
                     atomIds.push(prevAtom.id);
                     continue;
                 }
-
+                // 基于 diff 的变动记录
                 let attr: ContentAtomAttr = { [creatorId]: 1 };
                 let diffAdded: number | undefined;
                 let diffDeleted: number | undefined;

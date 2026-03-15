@@ -201,6 +201,11 @@ export class LocalStorageMock implements IStorage {
 
         return deletedCount;
     }
+
+    async getAllAtoms(): Promise<IContentAtom[]> {
+        const atoms = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
+        return Object.values(atoms);
+    }
 }
 
 export const storage = new LocalStorageMock();

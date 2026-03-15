@@ -1,4 +1,5 @@
 import type { ContentAtomType, ContentAtomAttr } from './types.ts';
+import diff from 'fast-diff';
 
 // Async SHA-256 helper
 export async function sha256(str: string): Promise<string> {
@@ -159,4 +160,25 @@ export function splitContent(content: string, type: ContentAtomType): string[] {
 export async function generateContentHash(content: string): Promise<string> {
     // Return SHA-256 hex string
     return await sha256(content);
+}
+
+export function calculateDiffStats(oldText: string, newText: string): { added: number, deleted: number, retained: number } {
+    const changes = diff(oldText, newText);
+    let added = 0;
+    let deleted = 0;
+    let retained = 0;
+
+    for (const [operation, text] of changes) {
+        // Here we measure length by characters. Alternatively, word-based could be implemented.
+        const length = text.length;
+        if (operation === diff.INSERT) {
+            added += length;
+        } else if (operation === diff.DELETE) {
+            deleted += length;
+        } else if (operation === diff.EQUAL) {
+            retained += length;
+        }
+    }
+
+    return { added, deleted, retained };
 }

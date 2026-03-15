@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { DraftId } from '../../attrstrand/types';
 import RichTextRenderer from '../RichTextRenderer';
 import { Edit3, Check, X } from 'lucide-react';
+import { calculateDiffStats, simhash } from '../../attrstrand/utils';
+import { core } from '../../attrstrand/core';
 
 interface AtomBlockProps {
     atomId: DraftId;
@@ -60,6 +62,35 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
         }
     };
 
+    const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const pastedText = e.clipboardData.getData('text');
+        // Trigger matching if pasted text is substantial (e.g., > 20 characters)
+        if (pastedText && pastedText.length > 20) {
+            try {
+                const targetSimhash = await simhash(pastedText);
+                const bestMatch = await core.findBestSimhashMatch(targetSimhash);
+
+                if (bestMatch && bestMatch.sim > 0.5) { // Arbitrary threshold for notification
+                    const existingFrontMeta = atom.frontMeta || {};
+                    const newFrontMeta = {
+                        ...existingFrontMeta,
+                        pastedSimMatch: {
+                            pastedLen: pastedText.length,
+                            bestMatchAtomID: bestMatch.id,
+                            sim: bestMatch.sim
+                        }
+                    };
+                    // Ideally we'd update this in the store, but since frontMeta might not be exposed directly in updateAtomContent,
+                    // we log it for now and alert as requested. In a complete implementation we'd expose updateAtomMeta.
+                    console.log('Paste simhash match:', newFrontMeta.pastedSimMatch);
+                    alert(`检测到粘贴长文本(${pastedText.length}字)。全库查重最佳匹配 ID: ${bestMatch.id} (相似度: ${(bestMatch.sim * 100).toFixed(1)}%)`);
+                }
+            } catch (err) {
+                console.error("Failed to process paste simhash:", err);
+            }
+        }
+    };
+
     // Attribution display with adjustment: (Val + 0.1/n) / 1.1
     // For new/temp atoms, attr might not exist until submitted, handle defensively.
     const attr = (atom as any).attr || { 'user': 1 };
@@ -69,6 +100,19 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
         const adjustedShare = (Number(share) + (n > 0 ? (0.1 / n) : 0)) / 1.1;
         return { author, share: adjustedShare };
     }).sort((a, b) => b.share - a.share);
+
+    // Compute optimistic diff stats
+    const displayDiff = useMemo(() => {
+        if (isEditing) {
+            return calculateDiffStats(atom.content || '', editValue);
+        } else {
+            return {
+                added: atom.diffAdded !== undefined ? atom.diffAdded : (atom.content?.length || 0),
+                deleted: atom.diffDeleted || 0,
+                retained: atom.diffRetained || 0,
+            };
+        }
+    }, [isEditing, atom.content, editValue, atom.diffAdded, atom.diffDeleted, atom.diffRetained]);
 
     const renderContent = () => {
         if (!atom.content) return <span className="text-slate-300 italic text-sm">点击编辑内容...</span>;
@@ -114,6 +158,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={handleKeyDown}
+                    onPaste={handlePaste}
                     autoFocus
                     placeholder="标签..."
                  />
@@ -127,6 +172,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={handleKeyDown}
+                    onPaste={handlePaste}
                     autoFocus
                     placeholder="引用..."
                  />
@@ -139,6 +185,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
                 autoFocus
             />
         );
@@ -155,6 +202,13 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                             <span className="font-mono">{(Number(share) * 100).toFixed(1)}%</span>
                         </div>
                     ))}
+
+                    <div className="mt-1 pt-1 border-t text-[10px] text-slate-500 flex justify-between">
+                        <span className="text-green-600 font-medium">+{displayDiff.added}字</span>
+                        <span className="text-red-500 font-medium">-{displayDiff.deleted}字</span>
+                        <span className="text-slate-400">留{displayDiff.retained}字</span>
+                    </div>
+
                     <div className="mt-1 pt-1 border-t text-[10px] text-slate-400 font-mono truncate">
                         ID: {atom.id.substring(0, 8)}...
                     </div>

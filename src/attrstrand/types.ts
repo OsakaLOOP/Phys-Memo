@@ -20,6 +20,10 @@ export interface IContentAtom {
     contentHash: hash; // 纯文本部分的 hash, 查重
     contentSimHash: hash | null; // 为基于相似度的计算预留
     
+    diffAdded?: number;
+    diffDeleted?: number;
+    diffRetained?: number;
+
     creatorId: string;
     timestampISO: string; // 前端传递
     attr: ContentAtomAttr;
@@ -97,9 +101,12 @@ export interface ITopicView {
 
 // Draft/Workspace 类型定义
 
-export type AtomDraft = Omit<IContentAtom, 'id' | 'backMeta' | 'contentHash' | 'contentSimHash' | 'timestampISO' | 'attr'> & {
+export type AtomDraft = Omit<IContentAtom, 'id' | 'backMeta' | 'contentHash' | 'contentSimHash' | 'timestampISO' | 'attr' | 'diffAdded' | 'diffDeleted' | 'diffRetained'> & {
     id: DraftId; // 允许是 256 位随机串或旧 hash
     isDirty: boolean; // 是否发生修改
+    diffAdded?: number;
+    diffDeleted?: number;
+    diffRetained?: number;
 };
 
 export interface IWorkspaceDraft {

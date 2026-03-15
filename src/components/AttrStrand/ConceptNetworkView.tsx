@@ -14,7 +14,7 @@ interface ProcessedNode {
     edition: IEdition;
     isHead: boolean;
     isCurrent: boolean;
-    depth: number; // 距离根的距离
+    depth: number; // 距离root的深度
     color: string;
     x: number;
     y: number;

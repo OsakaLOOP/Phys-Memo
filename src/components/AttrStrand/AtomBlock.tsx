@@ -101,9 +101,9 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
         return { author, share: adjustedShare };
     }).sort((a, b) => b.share - a.share);
 
-    // Compute optimistic diff stats
+    // 乐观计算实时 diff 用于显示.
     const displayDiff = useMemo(() => {
-        if (isEditing) {
+        if (isEditing && editValue !== atom.content) {
             return calculateDiffStats(atom.content || '', editValue);
         } else {
             return {

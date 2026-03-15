@@ -20,12 +20,13 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(atom?.content || '');
+    const [initialContent] = useState(atom?.content || '');
 
     useEffect(() => {
-        if (atom) {
+        if (atom && !isEditing) {
             setEditValue(atom.content);
         }
-    }, [atom?.content]);
+    }, [atom?.content, isEditing]);
 
     if (!atom) return null; // Defensive check
 
@@ -103,8 +104,9 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     // Compute optimistic diff stats
     const displayDiff = useMemo(() => {
-        if (isEditing) {
-            return calculateDiffStats(atom.content || '', editValue);
+        if (isEditing || atom.isDirty) {
+            // Compare the component's initial state (backend state) with current edit string (or unsaved draft content)
+            return calculateDiffStats(initialContent, isEditing ? editValue : atom.content);
         } else {
             return {
                 added: atom.diffAdded !== undefined ? atom.diffAdded : (atom.content?.length || 0),
@@ -112,7 +114,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                 retained: atom.diffRetained || 0,
             };
         }
-    }, [isEditing, atom.content, editValue, atom.diffAdded, atom.diffDeleted, atom.diffRetained]);
+    }, [isEditing, atom.isDirty, initialContent, editValue, atom.content, atom.diffAdded, atom.diffDeleted, atom.diffRetained]);
 
     const renderContent = () => {
         if (!atom.content) return <span className="text-slate-300 italic text-sm">点击编辑内容...</span>;

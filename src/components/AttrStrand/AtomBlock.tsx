@@ -103,7 +103,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     // 乐观计算实时 diff 用于显示.
     const displayDiff = useMemo(() => {
-        if (isEditing && editValue !== atom.content) {
+        if (isEditing) {
             return calculateDiffStats(atom.content || '', editValue);
         } else {
             return {

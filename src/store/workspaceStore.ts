@@ -82,8 +82,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         creatorId: a.creatorId,
                         derivedFromId: a.id, // 加载原有 Atom 的继承.
                         frontMeta: a.frontMeta || {},
-                        isDirty: false
-                    };
+                        isDirty: false,
+                        diffAdded: a.diffAdded,
+                        diffDeleted: a.diffDeleted,
+                        diffRetained: a.diffRetained,
+                        attr: a.attr,
+                    } as AtomDraft; // AtomDraft 忽略了 attr 等但实际可以用来在气泡等渲染兜底。由于 type 限定，我们这里合并入并断言或提取
+                    // 注意：AtomDraft 类型定义使用了 Omit去除了这些字段，如果是作为草稿其实不该包含，
+                    // 但我们需要渲染，修改 types.ts 以让 AtomDraft 兼容或者这里 as AtomDraft。
+                    // 此处加上 diff 和 attr 字段保证保存后刷新能读取到后端计算的结果
                     return a.id;
                 });
             };

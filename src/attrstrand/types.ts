@@ -107,6 +107,7 @@ export type AtomDraft = Omit<IContentAtom, 'id' | 'backMeta' | 'contentHash' | '
     diffAdded?: number;
     diffDeleted?: number;
     diffRetained?: number;
+    attr?: ContentAtomAttr; // 保证在加载已有 Edition 时能在渲染中使用后端结算后的 attr
 };
 
 export interface IWorkspaceDraft {

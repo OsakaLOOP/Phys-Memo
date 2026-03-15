@@ -26,6 +26,7 @@ import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
 import { TopicChildCard } from './components/AttrStrand/TopicChildCard';
 import { useStore } from 'zustand';
 import { useWorkspaceStore, useGlobalStore, workspaceActions } from './store/workspaceStore';
+import { useNetworkStore } from './store/networkStore';
 
 // --- Type Definitions ---
 interface NodeData {
@@ -842,6 +843,9 @@ const PhysMemosApp: FC = () => {
     const populated = await core.getPopulatedEdition(edition.id);
     if (populated) {
          workspaceActions.initWorkspaceAndClear(populated, edition.conceptId, submission.conceptName, submission.conceptTopic, submission.conceptDisciplines);
+
+         // Force update network store cache so that when users switch to history view it shows the newly submitted branch
+         useNetworkStore.getState().fetchData(edition.conceptId, true);
     }
   };
 

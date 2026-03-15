@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import type { IConceptRoot, IEdition } from '../../attrstrand/types';
-import { storage } from '../../attrstrand/storage';
+import type { IEdition } from '../../attrstrand/types';
+import { useNetworkStore } from '../../store/networkStore';
+import { useNetworkLayout } from './hooks/useNetworkLayout';
+import type { ProcessedLink } from './hooks/useNetworkLayout';
 
 interface ConceptNetworkViewProps {
     conceptId: string;
@@ -10,25 +12,6 @@ interface ConceptNetworkViewProps {
     onCreateBranch: (parentEdition: IEdition) => void;
 }
 
-interface ProcessedNode {
-    edition: IEdition;
-    isHead: boolean;
-    isCurrent: boolean;
-    depth: number; // 距离root的深度
-    color: string;
-    x: number;
-    y: number;
-    trackIdx: number;
-}
-
-interface ProcessedLink {
-    source: ProcessedNode;
-    target: ProcessedNode;
-    color: string;
-}
-
-const COLORS = d3.schemeCategory10; // 颜色板
-
 export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
     conceptId,
     currentEditionId,
@@ -36,361 +19,51 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
 }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [editions, setEditions] = useState<IEdition[]>([]);
-    const [concept, setConcept] = useState<IConceptRoot | null>(null);
+    const [containerWidth, setContainerWidth] = useState(800);
+
+    const { editions, concept, fetchData, isLoading } = useNetworkStore();
 
     useEffect(() => {
-        const loadData = async () => {
-            const c = await storage.getConcept(conceptId);
-            setConcept(c);
-            const e = await storage.getEditionsByConcept(conceptId);
-
-            // 严格基于父子依赖的拓扑排序 (Kahn's Algorithm) + 时间兜底
-            const idToEdition = new Map<string, IEdition>();
-            const childrenMap = new Map<string, string[]>();
-            const inDegree = new Map<string, number>();
-
-            e.forEach(edition => {
-                idToEdition.set(edition.id, edition);
-                inDegree.set(edition.id, 0); // 初始化入度
-                childrenMap.set(edition.id, []);
-            });
-
-            e.forEach(edition => {
-                if (edition.parentEditionId && idToEdition.has(edition.parentEditionId)) {
-                    childrenMap.get(edition.parentEditionId)!.push(edition.id);
-                    inDegree.set(edition.id, inDegree.get(edition.id)! + 1);
-                }
-            });
-
-            // 提取所有入度为 0 的根节点
-            const queue: IEdition[] = [];
-            e.forEach(edition => {
-                if (inDegree.get(edition.id) === 0) {
-                    queue.push(edition);
-                }
-            });
-
-            // 按照时间排序优先处理较早的节点
-            queue.sort((a, b) => new Date(a.timestampISO).getTime() - new Date(b.timestampISO).getTime());
-
-            const sortedEditions: IEdition[] = [];
-            while (queue.length > 0) {
-                const current = queue.shift()!;
-                sortedEditions.push(current);
-
-                const children = childrenMap.get(current.id)!;
-                // 对子节点也按照时间排序，保证同一父节点的子节点有序
-                children.sort((aId, bId) => {
-                    const aDate = new Date(idToEdition.get(aId)!.timestampISO).getTime();
-                    const bDate = new Date(idToEdition.get(bId)!.timestampISO).getTime();
-                    return aDate - bDate;
-                });
-
-                for (const childId of children) {
-                    const degree = inDegree.get(childId)! - 1;
-                    inDegree.set(childId, degree);
-                    if (degree === 0) {
-                        queue.push(idToEdition.get(childId)!);
-                    }
-                }
-            }
-
-            // 兜底：处理可能的环形依赖 (断开环)，追加到最后
-            if (sortedEditions.length < e.length) {
-                const remaining = e.filter(edition => !sortedEditions.includes(edition));
-                remaining.sort((a, b) => new Date(a.timestampISO).getTime() - new Date(b.timestampISO).getTime());
-                sortedEditions.push(...remaining);
-            }
-
-            setEditions(sortedEditions);
-        };
-        loadData();
-    }, [conceptId]);
+        fetchData(conceptId);
+    }, [conceptId, fetchData]);
 
     useEffect(() => {
-        if (!editions.length || !svgRef.current || !concept || !containerRef.current) return;
+        if (!containerRef.current) return;
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                if (entry.contentRect.width > 0) {
+                     setContainerWidth(entry.contentRect.width);
+                }
+            }
+        });
+        resizeObserver.observe(containerRef.current);
+        // 初始化宽度
+        if (containerRef.current.clientWidth > 0) {
+            setContainerWidth(containerRef.current.clientWidth);
+        }
+        return () => resizeObserver.disconnect();
+    }, []);
 
-        const containerWidth = containerRef.current.clientWidth || 800;
-        const width = containerWidth - 32; // padding
-        const height = 600;
-        const nodeRadius = 6;
-        const layerHeight = 45; // 每层高度
+    const layout = useNetworkLayout(editions, concept, currentEditionId, containerWidth);
+
+    useEffect(() => {
+        if (!layout || !svgRef.current) return;
+
+        const {
+            nodes,
+            links,
+            layerHeight,
+            nodeRadius,
+            textStartX,
+            totalHeight,
+            start_Y,
+            width,
+            height
+        } = layout;
 
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove();
 
-        // 1. 数据预处理与层级计算
-        const heads = new Set(Object.keys(concept.currentHeads));
-
-        const idToEdition = new Map<string, IEdition>();
-        const childrenMap = new Map<string, string[]>(); // parentId -> childIds
-
-        editions.forEach(e => {
-            idToEdition.set(e.id, e);
-            if (e.parentEditionId) {
-                if (!childrenMap.has(e.parentEditionId)) {
-                    childrenMap.set(e.parentEditionId, []);
-                }
-                childrenMap.get(e.parentEditionId)!.push(e.id);
-            }
-        });
-
-        // 计算每个节点的深度 (因为 editions 已经是严格拓扑排序，只需要线性的动态规划即可)
-        const depths = new Map<string, number>();
-        let maxDepth = 0;
-
-        editions.forEach(e => {
-            let depth = 0;
-            if (e.parentEditionId && depths.has(e.parentEditionId)) {
-                depth = depths.get(e.parentEditionId)! + 1;
-            }
-            depths.set(e.id, depth);
-            maxDepth = Math.max(maxDepth, depth);
-        });
-
-        // 2. 分支颜色分配算法（通达性与单条通路分割）
-        const tracks: Array<string[]> = [];
-        const unassignedIds = new Set(editions.map(e => e.id));
-
-        // 从上到下找最长链：严格按照刚才算出的拓扑深度排序
-        const sortedIds = [...editions].sort((a, b) => (depths.get(b.id) || 0) - (depths.get(a.id) || 0)).map(e => e.id);
-
-        while (unassignedIds.size > 0) {
-            // 寻找当前未分配节点中深度最大的（即最上面的叶子端）
-            const startId = sortedIds.find(id => unassignedIds.has(id));
-            if (!startId) break;
-
-            const currentTrack: string[] = [];
-            let currId: string | undefined = startId;
-            let currentCreator = idToEdition.get(currId!)!.creator;
-
-            while (currId && unassignedIds.has(currId)) {
-                currentTrack.push(currId);
-                unassignedIds.delete(currId);
-
-                const edition = idToEdition.get(currId);
-                const parentId = edition?.parentEditionId;
-
-                if (parentId && idToEdition.has(parentId)) {
-                    const parentEdition = idToEdition.get(parentId)!;
-                    // 同一用户且通达
-                    if (parentEdition.creator === currentCreator) {
-                        currId = parentId;
-                    } else {
-                        currId = undefined; // 断开，作为新轨道的起点
-                    }
-                } else {
-                    currId = undefined;
-                }
-            }
-            tracks.push(currentTrack.reverse());
-        }
-
-        // 计算所有节点的虚拟行号以分配独占的Y轴高度，为后面的斜率计算做准备
-        const sortedForRows = [...editions].sort((a, b) => {
-            const depthA = depths.get(a.id) || 0;
-            const depthB = depths.get(b.id) || 0;
-            if (depthA !== depthB) return depthA - depthB;
-            return new Date(a.timestampISO).getTime() - new Date(b.timestampISO).getTime();
-        });
-
-        const idToVirtualRow = new Map<string, number>();
-        sortedForRows.forEach((e, idx) => {
-            idToVirtualRow.set(e.id, idx);
-        });
-
-        // 为每条轨道分配颜色，避免相连的轨道颜色相同
-        const trackColors = new Map<number, string>();
-        const trackConnections = new Map<number, Set<number>>();
-        for (let i = 0; i < tracks.length; i++) {
-            trackConnections.set(i, new Set());
-        }
-
-        const idToTrackIndex = new Map<string, number>();
-        tracks.forEach((track, index) => {
-            track.forEach(id => idToTrackIndex.set(id, index));
-        });
-
-        editions.forEach(e => {
-            if (e.parentEditionId && idToEdition.has(e.parentEditionId)) {
-                const myTrack = idToTrackIndex.get(e.id);
-                const parentTrack = idToTrackIndex.get(e.parentEditionId);
-                if (myTrack !== undefined && parentTrack !== undefined && myTrack !== parentTrack) {
-                    trackConnections.get(myTrack)?.add(parentTrack);
-                    trackConnections.get(parentTrack)?.add(myTrack);
-                }
-            }
-        });
-
-        for (let i = 0; i < tracks.length; i++) {
-            const usedColors = new Set<string>();
-            trackConnections.get(i)?.forEach(neighbor => {
-                if (trackColors.has(neighbor)) {
-                    usedColors.add(trackColors.get(neighbor)!);
-                }
-            });
-
-            let color = COLORS[i % COLORS.length]; // fallback
-            for (const c of COLORS) {
-                if (!usedColors.has(c)) {
-                    color = c;
-                    break;
-                }
-            }
-            trackColors.set(i, color);
-        }
-
-        // 3. 树状向上螺旋生长的布局
-        const nodes: Map<string, ProcessedNode> = new Map();
-        const baseWidth = 30; // 轨道之间的水平步长
-        const layerNodes = new Map<number, ProcessedNode[]>();
-
-        // 为每个轨道分配一个 X 位置
-        const trackXIndex = new Map<number, number>();
-
-        // 防线重叠算法：记录每个父节点已被使用的出射斜率（dx / dy）
-        // 因为每个节点Y坐标固定为 virtualRow * layerHeight
-        // dx = (childXIndex - parentXIndex)
-        // dy = (childRow - parentRow)
-        // 斜率 slope = dx / dy
-        const usedSlopesByParent = new Map<string, Set<number>>();
-
-        // 为了让子节点计算斜率时，父节点的 X 已经被分配，需要按照轨道的起始节点的深度/行号来排序处理
-        const trackProcessingOrder = Array.from({ length: tracks.length }, (_, i) => i)
-            .sort((a, b) => {
-                const trackA = tracks[a];
-                const trackB = tracks[b];
-                const rowA = idToVirtualRow.get(trackA[0]) || 0;
-                const rowB = idToVirtualRow.get(trackB[0]) || 0;
-                return rowA - rowB;
-            });
-
-        for (const i of trackProcessingOrder) {
-            // 第一个轨道（深度最浅/主干）固定在中间
-            if (i === 0 && trackXIndex.size === 0) {
-                trackXIndex.set(i, 0);
-                continue;
-            }
-
-            const trackStrand = tracks[i];
-            const startId = trackStrand[0];
-            const startEdition = idToEdition.get(startId)!;
-            const parentId = startEdition.parentEditionId;
-
-            let candidateX = 0;
-            let found = false;
-
-            // 如果有父节点，我们需要找一个不产生共线重叠的 X 偏移
-            if (parentId && idToTrackIndex.has(parentId)) {
-                const parentTrackIdx = idToTrackIndex.get(parentId)!;
-                // 如果因为某种原因父节点还没有分配，默认0（排序后一般不会出现）
-                const parentXIndex = trackXIndex.has(parentTrackIdx) ? trackXIndex.get(parentTrackIdx)! : 0;
-                const parentRow = idToVirtualRow.get(parentId) || 0;
-                const childRow = idToVirtualRow.get(startId) || 0;
-                const dy = childRow - parentRow; // y 的距离差（以行数为单位）
-
-                if (!usedSlopesByParent.has(parentId)) {
-                    usedSlopesByParent.set(parentId, new Set());
-                }
-                const slopes = usedSlopesByParent.get(parentId)!;
-
-                // 先尝试竖直, 然后左右交替.
-                let offset = 0;
-                while (!found) {
-                    // 尝试右边
-                    const dxRight = parentXIndex + offset - parentXIndex;
-                    const slopeRight = dxRight / dy;
-                    if (!slopes.has(slopeRight) && !Array.from(trackXIndex.values()).includes(parentXIndex + offset)) {
-                        candidateX = parentXIndex + offset;
-                        slopes.add(slopeRight);
-                        found = true;
-                        break;
-                    }
-
-                    // 尝试左边
-                    const dxLeft = parentXIndex - offset - parentXIndex;
-                    const slopeLeft = dxLeft / dy;
-                    if (!slopes.has(slopeLeft) && !Array.from(trackXIndex.values()).includes(parentXIndex - offset)) {
-                        candidateX = parentXIndex - offset;
-                        slopes.add(slopeLeft);
-                        found = true;
-                        break;
-                    }
-                    offset++;
-                }
-            } else {
-                // 如果没有父节点（或者父节点不在列表内），退化为寻找全局未使用的空位
-                let offset = 0;
-                while (!found) {
-                    if (!Array.from(trackXIndex.values()).includes(offset)) {
-                        candidateX = offset;
-                        found = true;
-                    } else if (offset > 0 && !Array.from(trackXIndex.values()).includes(-offset)) {
-                        candidateX = -offset;
-                        found = true;
-                    }
-                    offset++;
-                }
-            }
-
-            trackXIndex.set(i, candidateX);
-        }
-
-        const center_X = width / 4; // 将图表偏左绘制，给右侧留出文本空间
-        const start_Y = height - 40; // 根节点从底部开始
-
-        // 我们计算所有节点的最大 xOffset，用于整体偏移修正，让右侧文字有足够空间
-        const trackXOffsets = Array.from(trackXIndex.values());
-        const minXOffset = Math.min(0, ...trackXOffsets);
-
-        // 防止左侧越界，重新计算 base X
-        const safeCenterX = Math.max(center_X, -minXOffset * baseWidth + 50);
-
-        editions.forEach(e => {
-             const depth = depths.get(e.id) || 0;
-             const trackIdx = idToTrackIndex.get(e.id)!;
-             const color = trackColors.get(trackIdx)!;
-
-             const xOffset = trackXIndex.get(trackIdx) || 0;
-
-             // X轴位置：基础位置 + 轨道偏移
-             const x = safeCenterX + xOffset * baseWidth;
-
-             // Y轴位置：从底部往上，每个节点独占一行
-             const virtualRow = idToVirtualRow.get(e.id) || 0;
-             const y = start_Y - virtualRow * layerHeight;
-
-             const node: ProcessedNode = {
-                 edition: e,
-                 isHead: heads.has(e.id),
-                 isCurrent: e.id === currentEditionId,
-                 depth,
-                 color,
-                 x,
-                 y,
-                 trackIdx
-             };
-             nodes.set(e.id, node);
-
-             if (!layerNodes.has(depth)) {
-                 layerNodes.set(depth, []);
-             }
-             layerNodes.get(depth)!.push(node);
-        });
-
-        // 4. 生成连线
-        const links: ProcessedLink[] = [];
-        editions.forEach(e => {
-            if (e.parentEditionId && nodes.has(e.parentEditionId)) {
-                const source = nodes.get(e.parentEditionId)!;
-                const target = nodes.get(e.id)!;
-                // 使用目标节点的颜色作为连线颜色
-                links.push({ source, target, color: target.color });
-            }
-        });
-
-        // 5. D3 绘制
         const zoomLayer = svg.append("g");
 
         // 特殊处理跨轨道的连线：让它平滑弯曲
@@ -415,7 +88,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
 
         // 节点组
         const nodeGroup = zoomLayer.selectAll("g.node")
-            .data(Array.from(nodes.values()))
+            .data(nodes)
             .join("g")
             .attr("class", "node")
             .attr("transform", d => `translate(${d.x}, ${d.y})`)
@@ -444,13 +117,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
              .attr("r", 2)
              .attr("fill", d => d.color);
 
-        // 计算文本偏移，所有文本统一对齐到某个 X 坐标，形成类似于 Git Log 的表格效果
-        // 找到最右侧的轨道的 X 位置，再往右加偏移
-        const maxTrackXIndex = Math.max(0, ...trackXOffsets);
-        const textStartX = safeCenterX + maxTrackXIndex * baseWidth + baseWidth * 1.5;
-
         // Git 风格文本
-        // 修改 translate，基于全局统一 X 的位置，而不是相对于节点自身
         const textGroup = nodeGroup.append("g")
             .attr("transform", d => `translate(${textStartX - d.x}, 4)`);
 
@@ -514,18 +181,17 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
 
         // 计算整体边界，初始化平移使最新节点（顶部）可见
         // 根在 y = start_Y, 最新在 y = start_Y - (editions.length - 1) * layerHeight
-        const totalHeight = Math.max(0, editions.length - 1) * layerHeight;
         const topY = start_Y - totalHeight - 50; // padding
 
         // 移动到顶部可见，或者根据 currentEditionId 定位
-        const currentY = currentEditionId && nodes.has(currentEditionId) ? nodes.get(currentEditionId)!.y : topY;
+        const currentNode = nodes.find(n => n.isCurrent);
+        const currentY = currentNode ? currentNode.y : topY;
 
         // 使 current 居中
         const initialTransform = d3.zoomIdentity.translate(0, height / 2 - currentY).scale(1);
         svg.call(zoom.transform, initialTransform);
 
-    }, [editions, concept, currentEditionId]);
-
+    }, [layout, currentEditionId]);
 
     return (
         <div className="border rounded bg-slate-50 p-4 relative overflow-hidden" ref={containerRef}>
@@ -538,6 +204,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
                     <span className="mr-3">分支端点 (Head)</span>
                     <span className="inline-block w-3 h-3 rounded-full border-[2px] border-slate-500 border-dashed mr-1"></span>
                     <span>当前 (Current)</span>
+                    {isLoading && <span className="ml-3 text-indigo-500">Loading...</span>}
                 </div>
             </div>
             <div className="border rounded shadow-inner bg-white overflow-hidden" style={{ height: '600px' }}>

@@ -3,12 +3,12 @@ import type {
     EditionSubmission, AtomSubmission, hash, IPopulatedEdition
 } from './types.ts';
 import { storage } from './storage.ts';
-import { simhash, generateConceptHash, generateAtomHash, generateEditionHash, generateContentHash } from './utils.ts';
+import { simhash, generateConceptHash, generateAtomHash, generateEditionHash, generateContentHash, calculateDiffStats } from './utils.ts';
 
 export class AttrStrandCore {
 
-    // 基于相似度的版权分配计算
-    private calculateSimilarity(hash1: string, hash2: string): number {
+    // 基于相似度的版权分配计算 (保留作搜索匹配用)
+    public calculateSimilarity(hash1: string, hash2: string): number {
         const h1 = parseInt(hash1, 16);
         const h2 = parseInt(hash2, 16);
         let xor = h1 ^ h2;
@@ -19,19 +19,19 @@ export class AttrStrandCore {
         const sim = 1 - (distance / 32);
         return Math.max(0, sim);
     }
-    // 后期将记录版本的编辑次数距离, 参与计算.
 
+    // 基于 diff 的版权分配计算
     private calculateAttribution(
         prevAttr: ContentAtomAttr,
-        similarity: number,
+        retainedWeight: number,
         creatorId: string
     ): ContentAtomAttr {
         const newAttr: ContentAtomAttr = {};
         for (const [author, share] of Object.entries(prevAttr)) {
-            newAttr[author] = share * similarity;
+            newAttr[author] = share * retainedWeight;
         }
-        const newShare = 1 - similarity;
-        newAttr[creatorId] = (newAttr[creatorId] || 0) + newShare;
+        const addedWeight = 1 - retainedWeight;
+        newAttr[creatorId] = (newAttr[creatorId] || 0) + addedWeight;
 
         let total = Object.values(newAttr).reduce((a, b) => a + b, 0);
         if (total === 0) {
@@ -42,7 +42,26 @@ export class AttrStrandCore {
             newAttr[author] /= total;
         }
         return newAttr;
-    }// 这里不符合前端的总比例1.1, 需要修改.
+    }
+
+    async findBestSimhashMatch(targetSimHash: string, excludeId?: string): Promise<{ id: string, sim: number } | null> {
+        // 由于需要全库匹配，我们需要拉取所有 atoms。这在真实生产环境中可能需要 D1 或向量数据库的支持。
+        // 目前先模拟实现，假定 storage 提供了 getAllAtoms 或遍历方式。
+        const allAtoms = await storage.getAllAtoms();
+        let bestMatch: { id: string, sim: number } | null = null;
+
+        for (const atom of allAtoms) {
+            if (atom.id === excludeId) continue;
+            if (!atom.contentSimHash) continue;
+
+            const sim = this.calculateSimilarity(targetSimHash, atom.contentSimHash);
+            if (!bestMatch || sim > bestMatch.sim) {
+                bestMatch = { id: atom.id, sim };
+            }
+        }
+
+        return bestMatch;
+    }
 
     // 提供的 api
 
@@ -151,11 +170,24 @@ export class AttrStrandCore {
                 }
 
                 let attr: ContentAtomAttr = { [creatorId]: 1 };
+                let diffAdded: number | undefined;
+                let diffDeleted: number | undefined;
+                let diffRetained: number | undefined;
+
                 if (prevAtom) {
-                    const similarity = (prevAtom.contentSimHash && contentSimHash)
-                        ? this.calculateSimilarity(prevAtom.contentSimHash, contentSimHash)
-                        : 0;
-                    attr = this.calculateAttribution(prevAtom.attr, similarity, creatorId);
+                    const diffStats = calculateDiffStats(prevAtom.content, sub.contentPayload);
+                    diffAdded = diffStats.added;
+                    diffDeleted = diffStats.deleted;
+                    diffRetained = diffStats.retained;
+
+                    const totalWeight = diffAdded + diffRetained;
+                    const retainedWeight = totalWeight > 0 ? diffRetained / totalWeight : 0;
+
+                    attr = this.calculateAttribution(prevAtom.attr, retainedWeight, creatorId);
+                } else {
+                    diffAdded = sub.contentPayload.length;
+                    diffDeleted = 0;
+                    diffRetained = 0;
                 }
 
                 const atomId = await generateAtomHash(
@@ -179,6 +211,9 @@ export class AttrStrandCore {
                         content: sub.contentPayload,
                         contentHash,
                         contentSimHash,
+                        diffAdded,
+                        diffDeleted,
+                        diffRetained,
                         creatorId,
                         timestampISO,
                         attr,

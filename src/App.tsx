@@ -1644,10 +1644,10 @@ const PhysMemosApp: FC = () => {
                        </div>
                        <div className="flex flex-1 items-center gap-2 max-w-md ml-auto">
                            <button onClick={() => setViewMode('graph')} className="btn-primary flex-1 flex justify-center items-center text-xs py-1.5 px-3">
-                                <Network className="w-4 h-4 mr-1"/> [跳转]知识图谱
+                                <Network className="w-4 h-4 mr-1"/> 知识图谱
                            </button>
                            <button onClick={() => setViewMode('history')} className="btn-primary flex-1 flex justify-center items-center text-xs py-1.5 px-3">
-                                <GitCommit className="w-4 h-4 mr-1"/> [跳转]历史版本
+                                <GitCommit className="w-4 h-4 mr-1"/> 历史版本
                            </button>
                            <button onClick={submitWorkspace} className="btn-primary flex-1 flex justify-center items-center text-xs py-1.5 px-3">
                                 <GitCommit className="w-4 h-4 mr-1"/> 保存版本

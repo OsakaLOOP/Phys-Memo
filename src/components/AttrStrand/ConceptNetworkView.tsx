@@ -75,6 +75,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
                 return `M${d.source.x},${d.source.y} C${d.source.x},${d.source.y - layerHeight/2} ${d.target.x},${d.target.y + layerHeight/2} ${d.target.x},${d.target.y}`;
             }
         };
+        // 待修改.
 
         zoomLayer.selectAll("path.link")
             .data(links)
@@ -146,7 +147,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
              .attr("x", 320)
              .attr("font-size", "10px")
              .attr("font-family", "monospace")
-             .attr("fill", "#cbd5e1")
+             .attr("fill", d => d.color)
              .text(d => d.edition.id.slice(0, 7));
 
         // 悬浮交互：节点背景高亮

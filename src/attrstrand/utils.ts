@@ -169,7 +169,7 @@ export function calculateDiffStats(oldText: string, newText: string): { added: n
     let retained = 0;
 
     for (const [operation, text] of changes) {
-        // Here we measure length by characters. Alternatively, word-based could be implemented.
+        // 待修改为词元统计.
         const length = text.length;
         if (operation === diff.INSERT) {
             added += length;

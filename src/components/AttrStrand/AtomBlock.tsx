@@ -30,6 +30,9 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     if (!atom) return null; // Defensive check
 
+    const isTags = (atom.field as string) === 'tags';
+    const isRefs = atom.field === 'refs';
+
     const handleSave = () => {
         if (editValue !== atom.content) {
             updateAtomContent(atomId, editValue);
@@ -53,7 +56,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
-             if (atom.field === 'tags' || atom.field === 'refs') {
+             if (isTags || isRefs) {
                  handleSave();
              } else if (e.metaKey || e.ctrlKey) {
                  handleSave();
@@ -66,24 +69,13 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const pastedText = e.clipboardData.getData('text');
         // Trigger matching if pasted text is substantial (e.g., > 20 characters)
-        if (pastedText && pastedText.length > 20) {
+        if (pastedText && pastedText.length > 20 ) {
             try {
                 const targetSimhash = await simhash(pastedText);
                 const bestMatch = await core.findBestSimhashMatch(targetSimhash);
 
-                if (bestMatch && bestMatch.sim > 0.5) { // Arbitrary threshold for notification
-                    const existingFrontMeta = atom.frontMeta || {};
-                    const newFrontMeta = {
-                        ...existingFrontMeta,
-                        pastedSimMatch: {
-                            pastedLen: pastedText.length,
-                            bestMatchAtomID: bestMatch.id,
-                            sim: bestMatch.sim
-                        }
-                    };
-                    // Ideally we'd update this in the store, but since frontMeta might not be exposed directly in updateAtomContent,
-                    // we log it for now and alert as requested. In a complete implementation we'd expose updateAtomMeta.
-                    console.log('Paste simhash match:', newFrontMeta.pastedSimMatch);
+                if (bestMatch && bestMatch.sim > 0.9) { // Arbitrary threshold for notification
+                    // 后期加入持久化记录 (newFrontMeta 可作为后端保存 payload)。
                     alert(`检测到粘贴长文本(${pastedText.length}字)。全库查重最佳匹配 ID: ${bestMatch.id} (相似度: ${(bestMatch.sim * 100).toFixed(1)}%)`);
                 }
             } catch (err) {
@@ -92,20 +84,19 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
         }
     };
 
-    // Attribution display with adjustment: (Val + 0.1/n) / 1.1
-    // For new/temp atoms, attr might not exist until submitted, handle defensively.
+    // attr 的初始值
     const attr = (atom as any).attr || { 'user': 1 };
     const authors = Object.entries(attr);
     const n = authors.length;
     const adjustedAuthors = authors.map(([author, share]) => {
         const adjustedShare = (Number(share) + (n > 0 ? (0.1 / n) : 0)) / 1.1;
         return { author, share: adjustedShare };
-    }).sort((a, b) => b.share - a.share);
+    }).sort((a, b) => b.share - a.share);// 一个奇怪但有用的显示时调整.
 
     // 乐观计算实时 diff 用于显示.
     const displayDiff = useMemo(() => {
         if (isEditing || atom.isDirty) {
-            // Compare the component's initial state (backend state) with current edit string (or unsaved draft content)
+            // 新增的 initialState  用于标记后端原始数据, 计算当前 workspace 总 diff.
             return calculateDiffStats(initialContent, isEditing ? editValue : atom.content);
         } else {
             return {
@@ -119,7 +110,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     const renderContent = () => {
         if (!atom.content) return <span className="text-slate-300 italic text-sm">点击编辑内容...</span>;
 
-        if (atom.field === 'tags') {
+        if (isTags) {
             return (
                 <span className="inline-flex-center badge-base bg-yellow-50 text-yellow-700 border-yellow-200">
                     <RichTextRenderer content={atom.content} className="inline-block [&>p]:inline [&>p]:m-0" />
@@ -127,7 +118,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
             );
         }
 
-        if (atom.field === 'refs') {
+        if (isRefs) {
             return (
                 <div id={`ref-${index + 1}`} className="flex gap-2 items-start text-sm text-slate-600 transition-colors duration-500 rounded p-1">
                     <span className="font-mono text-slate-400 select-none pt-0.5">{index + 1}.</span>
@@ -142,25 +133,21 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     };
 
     const renderEditor = () => {
-        if (atom.field === 'tags') {
+        if (isTags) {
              return (
                  <input
                     type="text"
                     className="
-                        p-1 pl-2 pr-[3.5rem] text-sm font-medium rounded-lg outline-none
+                        w-full h-full p-1 pl-2 pr-[3.5rem] text-sm font-medium rounded-lg outline-none
                         bg-[#f8fafc] border border-indigo-300 text-slate-700
                         shadow-[0_4px_12px_-2px_rgba(0,0,0,0.1),_0_0_0_2px_#e0e7ff]
                         focus:bg-white focus:border-indigo-400 focus:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.1),_0_0_0_2px_#c7d2fe]
-                        transition-all z-50 absolute left-0 top-1/2 -translate-y-1/2
+                        transition-all
                     "
-                    style={{
-                        width: `max(200px, calc(${editValue.length}ch + 4rem))`,
-                        maxWidth: '400px'
-                    }}
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    onPaste={handlePaste}
+                    onPaste={undefined}
                     autoFocus
                     placeholder="标签..."
                  />
@@ -174,7 +161,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    onPaste={handlePaste}
+                    onPaste={undefined}
                     autoFocus
                     placeholder="引用..."
                  />
@@ -187,14 +174,14 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
+                onPaste={atom.type!=='latex'?handlePaste : undefined}// latex atom 不参与比较
                 autoFocus
             />
         );
     }
 
     return (
-        <div className={`group relative mb-2 transition-all ${atom.field === 'tags' ? 'inline-block mr-2 mb-2' : ''} ${className}`}>
+        <div className={`group relative ${atom.field!=='core'&&atom.field!=='doc'?'mb-2':''} transition-all ${isTags ? 'inline-block mr-2 ' : ''} ${className}`}>
             <div className="absolute right-full top-0 bottom-0 w-1 mr-2 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-200 cursor-help z-50">
                 <div className="absolute left-3 top-full mt-1 bg-white shadow-lg border rounded p-2 text-xs w-48 hidden group-hover:block pointer-events-auto">
                     <div className="font-bold mb-1 text-slate-600 border-b pb-1">版权归属</div>
@@ -218,36 +205,66 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
             </div>
 
             {isEditing ? (
-                <div className={`relative min-w-[200px] ${atom.field === 'tags' ? 'h-[32px] z-50' : ''}`}>
-                    {renderEditor()}
-                    <div className={`absolute flex gap-1 z-[60] ${atom.field === 'tags' ? 'top-1/2 -translate-y-1/2' : 'top-1'} right-1`}
-                         style={atom.field === 'tags' ? { left: `calc(max(200px, calc(${editValue.length}ch + 4rem)) - 3.25rem)`, width: '3rem' } : undefined}
-                    >
-                        <button
-                            onMouseDown={(e) => { e.preventDefault(); handleSave(); }}
-                            onClick={handleSave}
-                            className={`p-1 rounded transition-colors flex items-center justify-center w-5 h-5 ${atom.field === 'tags' ? 'bg-green-100/90 text-green-600 hover:bg-green-200 shadow-sm' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
-                            title="保存 (Enter / Ctrl+Enter)"
+                isTags ? (
+                    <div className="relative min-w-[200px] h-[32px] z-50 overflow-visible">
+                        <div
+                            className="absolute top-0 left-0 bottom-0"
+                            style={{
+                                width: `max(200px, calc(${editValue.length}ch + 4rem))`,
+                                maxWidth: '400px',
+                            }}
                         >
-                            <Check size={12} strokeWidth={atom.field === 'tags' ? 2.5 : 2} />
-                        </button>
-                        <button
-                            onMouseDown={(e) => { e.preventDefault(); handleCancel(); }}
-                            onClick={handleCancel}
-                            className={`p-1 rounded transition-colors flex items-center justify-center w-5 h-5 ${atom.field === 'tags' ? 'bg-red-100/90 text-red-500 hover:bg-red-200 shadow-sm' : 'btn-danger bg-red-100'}`}
-                            title="取消 (Esc)"
-                        >
-                            <X size={12} strokeWidth={atom.field === 'tags' ? 2.5 : 2} />
-                        </button>
+                            {renderEditor()}
+                            <div className="absolute right-1 top-0 bottom-0 flex gap-1 items-center z-[60]">
+                                <button
+                                    onMouseDown={(e) => { e.preventDefault(); handleSave(); }}
+                                    onClick={handleSave}
+                                    className="p-1 rounded transition-colors flex items-center justify-center w-5 h-5 bg-green-100/90 text-green-600 hover:bg-green-200 shadow-sm"
+                                    title="保存 (Enter / Ctrl+Enter)"
+                                >
+                                    <Check size={12} strokeWidth={2.5} />
+                                </button>
+                                <button
+                                    onMouseDown={(e) => { e.preventDefault(); handleCancel(); }}
+                                    onClick={handleCancel}
+                                    className="p-1 rounded transition-colors flex items-center justify-center w-5 h-5 bg-red-100/90 text-red-500 hover:bg-red-200 shadow-sm"
+                                    title="取消 (Esc)"
+                                >
+                                    <X size={12} strokeWidth={2.5} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    <div className="relative min-w-[200px]">
+                        {renderEditor()}
+                        <div className="absolute top-1 right-1 flex gap-1 z-[60]">
+                            <button
+                                onMouseDown={(e) => { e.preventDefault(); handleSave(); }}
+                                onClick={handleSave}
+                                className="p-1 rounded transition-colors flex items-center justify-center w-5 h-5 bg-green-100 text-green-700 hover:bg-green-200"
+                                title={`保存 (${isRefs ? 'Enter / ' : ''}Ctrl+Enter)`}
+                            >
+                                <Check size={12} strokeWidth={2} />
+                            </button>
+                            <button
+                                onMouseDown={(e) => { e.preventDefault(); handleCancel(); }}
+                                onClick={handleCancel}
+                                className="p-1 rounded transition-colors flex items-center justify-center w-5 h-5 btn-danger bg-red-100"
+                                title="取消 (Esc)"
+                            >
+                                <X size={12} strokeWidth={2} />
+                            </button>
+                        </div>
+                    </div>
+                )
             ) : (
                 <div
                     onClick={handleContainerClick}
                     className={`
                         rounded transition-colors relative
                         ${!readOnly ? 'cursor-pointer hover:bg-slate-50' : ''}
-                        ${atom.field === 'tags' ? '' : 'min-h-[2rem] p-2 border border-transparent hover:border-slate-200'}
+                        ${isTags ? '' : 'min-h-[2rem] p-2 border border-transparent hover:border-slate-200'}
                     `}
                 >
                    {renderContent()}

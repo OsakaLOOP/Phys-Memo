@@ -124,7 +124,7 @@ export class AttrStrandCore {
 
     async submitEdition(submission: EditionSubmission, creatorId: string, timestampISO: string): Promise<IEdition> {
         console.log(`[API Call] core.submitEdition: conceptId=${submission.conceptId}, creatorId=${creatorId}`, submission);
-        // Concept Handling
+
         let conceptId = submission.conceptId;
         let isNewConcept = false;
         let concept: IConceptRoot | null = null;

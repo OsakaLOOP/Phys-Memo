@@ -17,7 +17,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
     readOnly = false,
     className = ''
 }) => {
-    // Only subscribe to the array of IDs for this list to avoid re-rendering entire list on child text change
+    // 严格限制的zustand订阅
     const atomIds = useWorkspaceStore((state) => state.draftAtomLists[field] as DraftId[] || []);
 
     const addAtomId = useWorkspaceStore((state) => state.addAtomId);
@@ -35,23 +35,50 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 
     const isInline = field === 'tags';
     const isRelation = field === 'rels';
+    const isIndexHoverField = isRelation || field === 'core' || field === 'doc'|| field === 'refs';
 
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
+    const handlePointerOver = (e: React.PointerEvent) => {
+        if (readOnly || field === 'tags') return;
+        const target = e.target as HTMLElement;
+        const item = target.closest('[data-index]') as HTMLElement | null;
+        if (item) {
+            const index = parseInt(item.getAttribute('data-index') || '', 10);
+            if (!Number.isNaN(index) && hoveredIndex !== index) {
+                setHoveredIndex(index);
+            }
+        }
+    };
+
+    const handlePointerLeave = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!isIndexHoverField) return;
+        const related = e.relatedTarget as Node | null;
+
+        if (related && e.currentTarget.contains(related)) {
+            return;
+        }
+
+        setHoveredIndex(null);
+    };
+
     return (
-        <div className={`${isInline ? 'flex flex-wrap items-start gap-2' : isRelation ? 'space-y-0' : 'space-y-2'} ${atomIds.length > 0 ? className : ''}`}>
+        <div
+            className={`${isInline ? 'flex flex-wrap items-start gap-2' :  'space-y-0' } ${atomIds.length > 0 ? className : ''}`}
+            onPointerOver={handlePointerOver}
+            onPointerLeave={handlePointerLeave}
+        >
             {atomIds.map((id: string, index: number) => (
                 <div
                     key={id}
+                    data-index={index}
                     className={`relative group/list-item ${isInline ? 'inline-block' : ''} ${isRelation ? 'pb-0' : ''}`}
-                    onMouseEnter={isRelation ? () => setHoveredIndex(index) : undefined}
-                    onMouseLeave={isRelation ? () => setHoveredIndex(null) : undefined}
                 >
 
-                    {/* Add Button Top */}
+                    {/* 上方+, 同时浮现 */}
                     {!readOnly && !isInline && index === 0 && (
                         <div className={`absolute left-1/2 -top-3 transform -translate-x-1/2 transition-opacity z-10 ${
-                            isRelation
+                            isIndexHoverField
                                 ? (hoveredIndex === 0 ? 'opacity-100' : 'opacity-0')
                                 : 'opacity-0 group-hover/list-item:opacity-100'
                         }`}>
@@ -96,10 +123,10 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                         )}
                     </div>
 
-                    {/* Add Button Bottom */}
+                    {/* 下方+ */}
                     {!readOnly && !isInline && (
                         <div className={`absolute -bottom-3 left-1/2 transform -translate-x-1/2 transition-opacity z-10 ${
-                            isRelation
+                            isIndexHoverField
                                 ? ((hoveredIndex === index || hoveredIndex === index + 1) ? 'opacity-100' : 'opacity-0')
                                 : 'opacity-0 group-hover/list-item:opacity-100'
                         }`}>

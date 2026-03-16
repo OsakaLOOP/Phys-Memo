@@ -7,7 +7,8 @@ import {
   ArrowRight, Maximize, Crop, 
   Database, GitCommit, X, FileText, Hash, Layers,
   Network, Book, Download, Upload, Plus, Trash2, Search, Tag,
-  ChevronRight, ChevronDown, Folder, FolderOpen
+  ChevronRight, ChevronDown, Folder, FolderOpen,
+  Undo2, Redo2
 } from 'lucide-react';
 
 import * as d3 from 'd3';
@@ -1271,22 +1272,6 @@ const PhysMemosApp: FC = () => {
             >
               <FileText className="w-4 h-4" /> 编辑
             </button>
-            <button
-              onClick={() => setViewMode('graph')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
-                viewMode === 'graph' ? 'bg-white border border-indigo-200 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'
-              }`}
-            >
-              <Network className="w-4 h-4" /> 图谱
-            </button>
-            <button
-              onClick={() => { setViewMode('history'); /* setHistoryParentId(null); */ }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
-                viewMode === 'history' ? 'bg-white border border-indigo-200 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-white/50'
-              }`}
-            >
-              <GitCommit className="w-4 h-4" /> 版本
-            </button>
           </div>
           <div className="flex gap-2">
             <button
@@ -1638,24 +1623,36 @@ const PhysMemosApp: FC = () => {
               <div className="flex-1 overflow-y-auto bg-slate-50/30">
                 <div className="max-w-full   mx-auto p-8 space-y-6">
                   {/* Replace SmartFormulaBlock and EditableBlock with AtomListEditor */}
-                  <div className="flex justify-end mb-4 gap-2">
-                       <button
-                            onClick={() => undo()}
-                            disabled={pastStatesLength === 0}
-                            className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50"
-                       >
-                            撤销
-                       </button>
-                       <button
-                            onClick={() => redo()}
-                            disabled={futureStatesLength === 0}
-                            className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50"
-                       >
-                            重做
-                       </button>
-                       <button onClick={submitWorkspace} className="btn-primary text-xs py-1.5 px-3 ml-2">
-                            <GitCommit className="w-4 h-4 mr-1"/> 保存版本
-                       </button>
+                  <div className="flex justify-between items-center mb-4 gap-4">
+                       <div className="flex items-center gap-2">
+                           <button
+                                onClick={() => undo()}
+                                disabled={pastStatesLength === 0}
+                                className="w-8 h-8 rounded-full flex items-center justify-center border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-colors"
+                                title="撤销"
+                           >
+                                <Undo2 className="w-4 h-4" />
+                           </button>
+                           <button
+                                onClick={() => redo()}
+                                disabled={futureStatesLength === 0}
+                                className="w-8 h-8 rounded-full flex items-center justify-center border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-colors"
+                                title="重做"
+                           >
+                                <Redo2 className="w-4 h-4" />
+                           </button>
+                       </div>
+                       <div className="flex flex-1 items-center gap-2 max-w-md ml-auto">
+                           <button onClick={() => setViewMode('graph')} className="btn-primary flex-1 flex justify-center items-center text-xs py-1.5 px-3">
+                                <Network className="w-4 h-4 mr-1"/> [跳转]知识图谱
+                           </button>
+                           <button onClick={() => setViewMode('history')} className="btn-primary flex-1 flex justify-center items-center text-xs py-1.5 px-3">
+                                <GitCommit className="w-4 h-4 mr-1"/> [跳转]历史版本
+                           </button>
+                           <button onClick={submitWorkspace} className="btn-primary flex-1 flex justify-center items-center text-xs py-1.5 px-3">
+                                <GitCommit className="w-4 h-4 mr-1"/> 保存版本
+                           </button>
+                       </div>
                   </div>
 
                   <div className="mb-2">

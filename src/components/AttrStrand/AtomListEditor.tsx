@@ -180,7 +180,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                          className={`flex-center border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 overflow-hidden transition-all duration-200 ease-in-out ${
                              isEffectivelyEmpty
                                  ? 'h-[56px] rounded-lg mt-0 w-full'
-                                 : 'h-[24px] rounded-full mt-0.5'
+                                 : 'h-[24px] rounded-[12px] mt-0.5'
                          } ${(deletingId !== null || addingId !== null) ? 'absolute left-0 top-0 z-10' : 'relative'}`}
                          style={{ width: isEffectivelyEmpty ? '100%' : '24px' }}
                     >

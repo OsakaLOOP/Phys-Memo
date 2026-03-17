@@ -28,7 +28,6 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     const isTags = atom?.field === 'tags';
     const isRefs = atom?.field === 'refs';
     const isMultilineEditor = atom?.field === 'core' || atom?.field === 'doc';
-    const draftAtomLists = useWorkspaceStore((state) => state.draftAtomLists);
 
     const [isEditingLocal, setIsEditingLocal] = useState(false);
     const isEditing = isMultilineEditor ? (activeEditor?.id === atomId) : isEditingLocal;
@@ -44,15 +43,20 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     if (!atom) return null; // Defensive check
 
-    const handleSave = (valToSave?: string) => {
+    const handleSave = (valToSave?: string, exit: boolean = true) => {
         const finalVal = valToSave !== undefined ? valToSave : editValue;
         if (finalVal !== atom.content) {
             updateAtomContent(atomId, finalVal);
         }
-        if (isMultilineEditor) {
-            setActiveEditor(null);
-        } else {
-            setIsEditingLocal(false);
+        if (exit) {
+            if (isMultilineEditor) {
+                // Only clear if this is still the active editor
+                if (useWorkspaceStore.getState().activeEditor?.id === atomId) {
+                    setActiveEditor(null);
+                }
+            } else {
+                setIsEditingLocal(false);
+            }
         }
     };
 
@@ -110,10 +114,11 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
         if (key === 'ArrowUp') {
             // First line
             if (line.number === 1) {
-                const list = draftAtomLists[atom.field];
+                const currentDraftAtomLists = useWorkspaceStore.getState().draftAtomLists;
+                const list = currentDraftAtomLists[atom.field] || [];
                 const currentIndex = list.indexOf(atomId);
                 if (currentIndex > 0) {
-                    handleSave(view.state.doc.toString());
+                    handleSave(view.state.doc.toString(), false);
                     setActiveEditor({ field: atom.field, id: list[currentIndex - 1] });
                     return true;
                 }
@@ -121,10 +126,11 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
         } else if (key === 'ArrowDown') {
             // Last line
             if (line.number === state.doc.lines) {
-                const list = draftAtomLists[atom.field];
+                const currentDraftAtomLists = useWorkspaceStore.getState().draftAtomLists;
+                const list = currentDraftAtomLists[atom.field] || [];
                 const currentIndex = list.indexOf(atomId);
                 if (currentIndex >= 0 && currentIndex < list.length - 1) {
-                    handleSave(view.state.doc.toString());
+                    handleSave(view.state.doc.toString(), false);
                     setActiveEditor({ field: atom.field, id: list[currentIndex + 1] });
                     return true;
                 }

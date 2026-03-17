@@ -112,13 +112,52 @@ export class AttrStrandCore {
             });
         };
 
+        const coreAtoms = await populate(edition.coreAtomIds);
+        const docAtoms = await populate(edition.docAtomIds);
+        const tagsAtoms = await populate(edition.tagsAtomIds);
+        const refsAtoms = await populate(edition.refsAtomIds);
+        const relsAtoms = await populate(edition.relsAtomIds);
+
+        const allAtoms = [...coreAtoms, ...docAtoms, ...tagsAtoms, ...refsAtoms, ...relsAtoms];
+
+        let editionDiffAdded = 0;
+        let editionDiffDeleted = 0;
+        let editionDiffRetained = 0;
+        const editionAttr: ContentAtomAttr = {};
+
+        for (const atom of allAtoms) {
+            editionDiffAdded += atom.diffAdded || 0;
+            editionDiffDeleted += atom.diffDeleted || 0;
+            editionDiffRetained += atom.diffRetained || 0;
+
+            const atomTotalWeight = (atom.diffAdded || 0) + (atom.diffRetained || 0);
+            if (atomTotalWeight > 0 && atom.attr) {
+                for (const [author, share] of Object.entries(atom.attr)) {
+                    editionAttr[author] = (editionAttr[author] || 0) + (share * atomTotalWeight);
+                }
+            }
+        }
+
+        const totalEditionWeight = editionDiffAdded + editionDiffRetained;
+        if (totalEditionWeight > 0) {
+            for (const author of Object.keys(editionAttr)) {
+                editionAttr[author] /= totalEditionWeight;
+            }
+        } else if (allAtoms.length > 0 && edition.creator) {
+            editionAttr[edition.creator] = 1;
+        }
+
         return {
             ...edition,
-            coreAtoms: await populate(edition.coreAtomIds),
-            docAtoms: await populate(edition.docAtomIds),
-            tagsAtoms: await populate(edition.tagsAtomIds),
-            refsAtoms: await populate(edition.refsAtomIds),
-            relsAtoms: await populate(edition.relsAtomIds),
+            coreAtoms,
+            docAtoms,
+            tagsAtoms,
+            refsAtoms,
+            relsAtoms,
+            editionAttr,
+            editionDiffAdded,
+            editionDiffDeleted,
+            editionDiffRetained
         };
     }
 

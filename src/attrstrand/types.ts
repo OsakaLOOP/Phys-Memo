@@ -84,6 +84,12 @@ export interface IPopulatedEdition extends Omit<IEdition, 'coreAtomIds' | 'docAt
     tagsAtoms: Omit<IContentAtom, 'backMeta'>[];
     refsAtoms: Omit<IContentAtom, 'backMeta'>[];
     relsAtoms: Omit<IContentAtom, 'backMeta'>[];
+
+    // 动态计算的 Edition 级别汇总信息
+    editionAttr?: ContentAtomAttr;
+    editionDiffAdded?: number;
+    editionDiffDeleted?: number;
+    editionDiffRetained?: number;
 } // 后端返回的完整填充 Edition, 用于渲染, 避免过多请求. 为了安全, 剔除后端 meta.
 
 export interface IConceptView {

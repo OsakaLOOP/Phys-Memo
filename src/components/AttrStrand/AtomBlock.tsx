@@ -5,6 +5,7 @@ import RichTextRenderer from '../RichTextRenderer';
 import { Edit3, Check, X } from 'lucide-react';
 import { calculateDiffStats, simhash } from '../../attrstrand/utils';
 import { core } from '../../attrstrand/core';
+import { CopyrightTooltip } from './CopyrightTooltip';
 
 interface AtomBlockProps {
     atomId: DraftId;
@@ -183,25 +184,14 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     return (
         <div className={`group relative ${atom.field!=='core'&&atom.field!=='doc'?'mb-2':''} transition-all ${isTags ? 'inline-block mr-2 ' : ''} ${className}`}>
             <div className="absolute right-full top-0 bottom-0 w-1 mr-2 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-200 cursor-help z-50">
-                <div className="absolute left-3 top-full mt-1 bg-white shadow-lg border rounded p-2 text-xs w-48 hidden group-hover:block pointer-events-auto">
-                    <div className="font-bold mb-1 text-slate-600 border-b pb-1">版权归属</div>
-                    {adjustedAuthors.map(({ author, share }) => (
-                        <div key={author} className="flex justify-between text-slate-500 py-0.5">
-                            <span className="truncate max-w-[100px]">{author}</span>
-                            <span className="font-mono">{(Number(share) * 100).toFixed(1)}%</span>
-                        </div>
-                    ))}
-
-                    <div className="mt-1 pt-1 border-t text-[10px] text-slate-500 flex justify-between">
-                        <span className="text-green-600 font-medium">+{displayDiff.added}字</span>
-                        <span className="text-red-500 font-medium">-{displayDiff.deleted}字</span>
-                        <span className="text-slate-400">留{displayDiff.retained}字</span>
-                    </div>
-
-                    <div className="mt-1 pt-1 border-t text-[10px] text-slate-400 font-mono truncate">
-                        ID: {atom.id.substring(0, 8)}...
-                    </div>
-                </div>
+                <CopyrightTooltip
+                    className="absolute left-3 top-full mt-1 hidden group-hover:block pointer-events-auto"
+                    authors={adjustedAuthors}
+                    diffAdded={displayDiff.added}
+                    diffDeleted={displayDiff.deleted}
+                    diffRetained={displayDiff.retained}
+                    itemId={atom.id}
+                />
             </div>
 
             {isEditing ? (

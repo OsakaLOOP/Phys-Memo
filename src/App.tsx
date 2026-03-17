@@ -803,6 +803,7 @@ const PhysMemosApp: FC = () => {
   
   // AttrStrand State
   const [activeEdition, setActiveEdition] = useState<IEdition | IPopulatedEdition | null>(null);
+  const [topicRefs, setTopicRefs] = useState<string[]>([]);
   // Zundo temporal store hooks for responsive undo/redo UI
   const pastStatesLength = useStore(useWorkspaceStore.temporal, (state) => state.pastStates.length);
   const futureStatesLength = useStore(useWorkspaceStore.temporal, (state) => state.futureStates.length);
@@ -967,6 +968,7 @@ const PhysMemosApp: FC = () => {
       allTopics.forEach(topicName => {
           const children = nodesToSet.filter(n => n.topic === topicName);
           const disciplines = Array.from(new Set(children.flatMap(c => c.disciplines)));
+          const savedSummary = localStorage.getItem(`topic_summary_${topicName}`) || '';
 
           newTopicNodes.push({
             id: generateTopicId(topicName),
@@ -975,7 +977,7 @@ const PhysMemosApp: FC = () => {
             type: 'TOPIC',
             disciplines: disciplines,
             latex: '',
-            desc: '',
+            desc: savedSummary,
             references: '',
             constraints: [],
             relations: []
@@ -1084,6 +1086,29 @@ const PhysMemosApp: FC = () => {
     const syncAttrStrand = async () => {
       if (!activeNode || activeNode.type === 'TOPIC') {
         setActiveEdition(null);
+
+        // Fetch Aggregated References for TOPIC Overview
+        if (activeNode && activeNode.type === 'TOPIC') {
+           const allConcepts = await storage.getAllConcepts();
+           const topicConcepts = allConcepts.filter(c => c.topic === activeNode.title);
+
+           const aggregatedRefs = new Set<string>();
+           for (const concept of topicConcepts) {
+               const heads = Object.entries(concept.currentHeads).sort((a, b) => b[1] - a[1]);
+               if (heads.length > 0) {
+                   const headId = heads[0][0];
+                   const populated = await core.getPopulatedEdition(headId);
+                   if (populated) {
+                       populated.refsAtoms.forEach(atom => {
+                           if (atom.content.trim()) {
+                               aggregatedRefs.add(atom.content.trim());
+                           }
+                       });
+                   }
+               }
+           }
+           setTopicRefs(Array.from(aggregatedRefs));
+        }
         return;
       }
 
@@ -1499,6 +1524,13 @@ const PhysMemosApp: FC = () => {
                                 // 预留防冲突
                               }
 
+                              // Migrate the summary if title changes
+                              const summary = localStorage.getItem(`topic_summary_${oldTitle}`);
+                              if (summary) {
+                                localStorage.setItem(`topic_summary_${newTitle}`, summary);
+                                localStorage.removeItem(`topic_summary_${oldTitle}`);
+                              }
+
                               // Optimistic update for UI
                               const updatedNode = { ...activeNode, title: newTitle, topic: newTitle };
 
@@ -1559,7 +1591,11 @@ const PhysMemosApp: FC = () => {
                         <EditableBlock
                           label="主题摘要 / Summary"
                           value={activeNode.desc}
-                          onChange={(val) => saveNode({ ...activeNode, desc: val as string })}
+                          onChange={(val) => {
+                            const newDesc = val as string;
+                            saveNode({ ...activeNode, desc: newDesc });
+                            localStorage.setItem(`topic_summary_${activeNode.title}`, newDesc);
+                          }}
                           type="markdown"
                           variant="subtle"
                           placeholder="Describe this topic..."
@@ -1601,19 +1637,13 @@ const PhysMemosApp: FC = () => {
                           文献聚合 / Aggregated References
                        </h3>
                        <ol className="list-decimal list-outside ml-4 space-y-2 text-xs text-slate-600">
-                          {Array.from(new Set(
-                             nodes
-                               .filter(n => n.topic === activeNode.title && n.type !== 'TOPIC')
-                               .flatMap(n => (n.references || '').split('\n'))
-                               .map(r => r.trim())
-                               .filter(Boolean)
-                          )).map((ref, i) => (
+                          {topicRefs.map((ref, i) => (
                              <li key={i}>
                                 <RichTextRenderer content={ref} className="inline-block" />
                              </li>
                           ))}
-                          {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').every(n => !n.references) && (
-                             <li className="text-slate-400 italic list-none -ml-4">No references found.</li>
+                          {topicRefs.length === 0 && (
+                             <li className="text-slate-400 italic list-none -ml-4">暂无相关文献 / No references found.</li>
                           )}
                        </ol>
                     </div>

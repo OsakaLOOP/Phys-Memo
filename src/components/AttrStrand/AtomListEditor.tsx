@@ -62,6 +62,24 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
         setHoveredIndex(null);
     };
 
+    // 两步动画：平滑过渡删除最后一个标签时的瞬间跳跃
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const handleDeleteWithAnim = (index: number, id: string) => {
+        if (readOnly) return;
+        if (isInline && atomIds.length === 1) {
+            setDeletingId(id);
+            setTimeout(() => {
+                handleDelete(index);
+                setDeletingId(null);
+            }, 300); // 匹配 CSS 过渡时间
+        } else {
+            handleDelete(index);
+        }
+    };
+
+    const isEffectivelyEmpty = atomIds.length === 0 || (isInline && atomIds.length === 1 && deletingId !== null);
+
     return (
         <div
             className={`${isInline ? 'flex flex-wrap items-start gap-2' :  'space-y-0' } ${atomIds.length > 0 ? className : ''}`}
@@ -72,7 +90,9 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                 <div
                     key={id}
                     data-index={index}
-                    className={`relative group/list-item ${isInline ? 'inline-block' : ''} ${isRelation ? 'pb-0' : ''}`}
+                    className={`relative group/list-item ${isInline ? 'inline-block transition-all duration-300 ease-in-out origin-left overflow-hidden' : ''} ${isRelation ? 'pb-0' : ''} ${
+                        id === deletingId ? 'opacity-0 max-w-0 mr-[-0.5rem] scale-95 pointer-events-none' : 'opacity-100 max-w-[1000px] scale-100'
+                    }`}
                 >
 
                     {/* 上方+, 同时浮现 */}
@@ -111,7 +131,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 
                         {!readOnly && (
                             <button
-                                onClick={() => handleDelete(index)}
+                                onClick={() => handleDeleteWithAnim(index, id)}
                                 className={`
                                     opacity-0 group-hover/list-item:opacity-100 text-slate-300 hover:text-red-400 transition-colors p-1
                                     ${isInline ? 'absolute -top-2 -right-2 bg-white rounded-full shadow border z-20 hover:bg-red-50' : 'absolute top-2 right-0'}
@@ -146,15 +166,16 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                     <button
                          onClick={() => handleAdd(atomIds.length - 1)}
                          className={`relative flex-center border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 overflow-hidden transition-all duration-300 ease-in-out ${
-                             atomIds.length === 0
-                                 ? 'w-full h-[66px] rounded-lg mt-0'
-                                 : 'w-6 h-6 rounded-full mt-0.5'
+                             isEffectivelyEmpty
+                                 ? 'h-[66px] rounded-lg mt-0 w-full'
+                                 : 'h-[24px] rounded-full mt-0.5'
                          }`}
+                         style={{ width: isEffectivelyEmpty ? '100%' : '24px' }}
                     >
                         {/* Empty state content */}
                         <div
-                            className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 ease-in-out ${
-                                atomIds.length === 0 ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none'
+                            className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity ease-in-out ${
+                                isEffectivelyEmpty ? 'opacity-100 duration-300 delay-150' : 'opacity-0 duration-75 pointer-events-none'
                             }`}
                         >
                             <Plus className="mx-auto mb-1" size={20} />
@@ -163,8 +184,8 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 
                         {/* Populated state content */}
                         <div
-                            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ease-in-out ${
-                                atomIds.length > 0 ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none'
+                            className={`absolute inset-0 flex items-center justify-center transition-opacity ease-in-out ${
+                                !isEffectivelyEmpty ? 'opacity-100 duration-300 delay-150' : 'opacity-0 duration-75 pointer-events-none'
                             }`}
                         >
                             <Plus size={14} />

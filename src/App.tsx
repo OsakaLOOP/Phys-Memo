@@ -1327,47 +1327,17 @@ const PhysMemosApp: FC = () => {
       {/* Main Work Area */}
       <div className="flex-1 flex flex-col h-full relative bg-white">
         
-        {viewMode === 'graph' ? (
-          <KnowledgeGraph
-            nodes={nodes}
-            disciplinesMap={disciplinesMap}
-            activeNodeId={activeNodeId}
-            onNodeClick={(id) => {
-              setActiveNodeId(id);
-              setViewMode('editor');
-            }}
-          />
-        ) : viewMode === 'history' && activeNodeId ? (
-            <div className="flex-1 p-8 bg-slate-50 overflow-hidden flex flex-col">
-                <h2 className="text-xl font-bold mb-4 text-slate-700">Concept History: {activeNode?.title}</h2>
-                <ConceptNetworkView
-                    conceptId={activeNodeId}
-                    currentEditionId={activeEdition?.id}
-                    onSelectEdition={async (edition) => {
-                        // Switch to this edition
-                        setActiveEdition(edition);
-                        const populated = await core.getPopulatedEdition(edition.id);
-                        if (populated && activeNode) {
-                            workspaceActions.initWorkspaceAndClear(populated, activeNode.id, activeNode.title, activeNode.topic, activeNode.disciplines);
-                        }
-                    }}
-                    onCreateBranch={(_parent) => {
-                        alert("Branch creation not implemented in UI demo yet, but core supports it!");
-                    }}
-                />
-            </div>
-        ) : (
-          <>
-            <div className={`bg-white border-b border-slate-100 flex flex-col justify-center px-8 z-10 transition-all ${activeNode?.type === 'TOPIC' ? 'h-16' : 'min-h-32 py-4 space-y-4'}`}>
-              <div className="flex-between w-full">
-                <div className="flex-center-gap">
-                  {!sidebarOpen && (
-                    <button onClick={() => setSidebarOpen(true)} className="btn-ghost rounded-full mr-2">
-                      <ArrowRight className="w-5 h-5" />
-                    </button>
-                  )}
-                  {activeNode && activeNode.type !== 'TOPIC' && (
-                    <div className="flex items-center gap-4 animate-in fade-in slide-in-from-left-2">
+        {/* Common Header */}
+        <div className={`bg-white border-b border-slate-100 flex flex-col justify-center px-8 z-10 transition-all ${activeNode?.type === 'TOPIC' ? 'h-16' : 'min-h-32 py-4 space-y-4'}`}>
+          <div className="flex-between w-full">
+            <div className="flex-center-gap">
+              {!sidebarOpen && (
+                <button onClick={() => setSidebarOpen(true)} className="btn-ghost rounded-full mr-2">
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              )}
+              {activeNode && activeNode.type !== 'TOPIC' && (
+                <div className="flex items-center gap-4 animate-in fade-in slide-in-from-left-2">
                       {/* 学科多选（圆形按钮） */}
                       <div className="flex flex-col gap-2">
                         <span className="text-xs font-bold text-slate-400 flex-center-gap">
@@ -1503,6 +1473,57 @@ const PhysMemosApp: FC = () => {
               )}
             </div>
 
+        {viewMode === 'graph' ? (
+          <div className="flex-1 flex flex-col overflow-y-hidden bg-slate-50/30">
+            <div className="max-w-full mx-auto w-full px-8 pt-4 pb-0">
+              <div className="flex justify-between items-center mb-4 gap-4">
+                <button onClick={() => setViewMode('editor')} className="btn-primary flex justify-center items-center text-xs py-1.5 px-3 mr-auto" style={{ width: '144px', flex: 'none' }}>
+                  <FileText className="w-4 h-4 mr-1"/> 返回编辑
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 relative">
+              <KnowledgeGraph
+                nodes={nodes}
+                disciplinesMap={disciplinesMap}
+                activeNodeId={activeNodeId}
+                onNodeClick={(id) => {
+                  setActiveNodeId(id);
+                  setViewMode('editor');
+                }}
+              />
+            </div>
+          </div>
+        ) : viewMode === 'history' && activeNodeId ? (
+            <div className="flex-1 overflow-y-auto bg-slate-50/30 flex flex-col">
+              <div className="max-w-full mx-auto w-full px-8 pt-4 pb-0">
+                <div className="flex justify-between items-center mb-4 gap-4">
+                  <button onClick={() => setViewMode('editor')} className="btn-primary flex justify-center items-center text-xs py-1.5 px-3 mr-auto" style={{ width: '144px', flex: 'none' }}>
+                    <FileText className="w-4 h-4 mr-1"/> 返回编辑
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 p-8 pt-0 overflow-hidden flex flex-col">
+                  <h2 className="text-xl font-bold mb-4 text-slate-700">Concept History: {activeNode?.title}</h2>
+                  <ConceptNetworkView
+                      conceptId={activeNodeId}
+                      currentEditionId={activeEdition?.id}
+                      onSelectEdition={async (edition) => {
+                          // Switch to this edition
+                          setActiveEdition(edition);
+                          const populated = await core.getPopulatedEdition(edition.id);
+                          if (populated && activeNode) {
+                              workspaceActions.initWorkspaceAndClear(populated, activeNode.id, activeNode.title, activeNode.topic, activeNode.disciplines);
+                          }
+                      }}
+                      onCreateBranch={(_parent) => {
+                          alert("Branch creation not implemented in UI demo yet, but core supports it!");
+                      }}
+                  />
+              </div>
+            </div>
+        ) : (
+          <>
             {activeNode ? (
               activeNode.type === 'TOPIC' ? (
                 // --- TOPIC OVERVIEW PAGE ---

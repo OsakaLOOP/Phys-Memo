@@ -8,7 +8,8 @@ import {
   Database, GitCommit, X, FileText, Hash, Layers,
   Network, Book, Download, Upload, Plus, Trash2, Search, Tag,
   ChevronRight, ChevronDown, Folder, FolderOpen,
-  Undo2, Redo2
+  Undo2, Redo2,
+  Save
 } from 'lucide-react';
 
 import * as d3 from 'd3';
@@ -1346,7 +1347,7 @@ const PhysMemosApp: FC = () => {
                       <div className="flex flex-col gap-2">
                         <span className="text-xs font-bold text-slate-400 flex-center-gap">
                           <Layers className="w-3.5 h-3.5 text-indigo-400" />
-                          学科
+                          学科 / DISCIPLINE
                         </span>
                         <div className="flex flex-wrap gap-2 items-center">
                           {disciplines.map((disc) => {
@@ -1414,9 +1415,9 @@ const PhysMemosApp: FC = () => {
                     </div>
                   )}
                   {activeNode && activeNode.type === 'TOPIC' && (
-                    <div className="flex-center-gap text-slate-400 font-medium text-sm animate-in fade-in slide-in-from-left-2">
+                    <div className="flex-center-gap text-slate-400 font-bold text-sm animate-in fade-in slide-in-from-left-2">
                       <FolderOpen className="w-5 h-5 text-amber-400" />
-                      <span>主题概览模式</span>
+                      <span >主题概览 / OVERVIEW</span>
                     </div>
                   )}
                 </div>
@@ -1647,10 +1648,10 @@ const PhysMemosApp: FC = () => {
                                 <Network className="w-4 h-4 mr-1"/> 知识图谱
                            </button>
                            <button onClick={() => setViewMode('history')} className="btn-primary flex-1 flex justify-center items-center text-xs py-1.5 px-3">
-                                <GitCommit className="w-4 h-4 mr-1"/> 历史版本
+                                <GitCommit className="w-4 h-4 mr-1"/> 版本历史
                            </button>
                            <button onClick={submitWorkspace} className="btn-primary flex-1 flex justify-center items-center text-xs py-1.5 px-3">
-                                <GitCommit className="w-4 h-4 mr-1"/> 保存版本
+                                <Save className="w-4 h-4 mr-1"/> 保存版本
                            </button>
                        </div>
                   </div>

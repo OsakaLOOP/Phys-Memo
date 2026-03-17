@@ -169,7 +169,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
         if (isRefs) {
             return (
-                <div id={`ref-${index + 1}`} className="flex gap-2 items-start text-sm text-slate-600 transition-colors duration-500 rounded p-1">
+                <div id={`ref-${index + 1}`} className="flex gap-2 items-start text-sm text-slate-600 transition-colors duration-300 rounded p-1">
                     <span className="font-mono text-slate-400 select-none pt-0.5">{index + 1}.</span>
                     <div className="flex-1">
                         <RichTextRenderer content={atom.content} className="inline-block" />
@@ -232,6 +232,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                         minHeight="100px"
                         extensions={[
                             markdown({ base: markdownLanguage, codeLanguages: languages }),
+                            EditorView.lineWrapping,
                             EditorView.domEventHandlers({
                                 keydown: (e, view) => {
                                     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -259,7 +260,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                             autocompletion: true,
                             rectangularSelection: true,
                             crosshairCursor: true,
-                            highlightActiveLine: true,
+                            highlightActiveLine: false,
                             highlightSelectionMatches: true,
                             closeBracketsKeymap: true,
                             defaultKeymap: true,

@@ -85,7 +85,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
         if (isInline && atomIds.length === 0) {
             setAddingId(newId);
             // 添加 atom 时不延迟，立即清除添加状态
-            setTimeout(() => setAddingId(null), 0);
+            setTimeout(() => setAddingId(null), 300);
         }
         addAtomId(field, newId, index);
     };
@@ -94,7 +94,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 
     return (
         <div
-            className={`relative ${isInline ? 'flex flex-wrap items-start gap-2' :  'space-y-0' } ${atomIds.length > 0 ? className : ''}`}
+            className={`relative ${isInline ? 'flex items-start gap-2' :  'space-y-0' } ${isInline?(addAtomId!==null?'flex-nowrap':'flex-wrap'):''}${atomIds.length > 0 ? className : ''}`}
             onPointerOver={handlePointerOver}
             onPointerLeave={handlePointerLeave}
         >
@@ -177,14 +177,13 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                 isInline ? (
                     <button
                          onClick={() => handleAddWithAnim(atomIds.length - 1)}
-                         className={`flex-center border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 overflow-hidden ${
+                         className={`flex-center border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 overflow-hidden transition-all duration-200 ease-in-out ${
                              isEffectivelyEmpty
                                  ? 'h-[56px] rounded-lg mt-0 w-full'
                                  : 'h-[24px] rounded-[12px] mt-0.5'
-                         } ${(deletingId !== null || addingId !== null) ? 'absolute left-0 top-0 z-10' : 'relative'}`}
-                         style={{
-                             width: isEffectivelyEmpty ? '100%' : '24px',
-                             transition: 'width 200ms ease-out, height 200ms ease-out, left 300ms ease-in, top 300ms ease-in, border-radius 200ms ease-out, background-color 200ms, border-color 200ms, color 200ms'
+                         } ${deletingId !== null  ? 'absolute left-0 top-0 z-10' : (addAtomId!==null?'relative left-0 top-0 z-10':'relative')}`}
+                         style={{ width: isEffectivelyEmpty ? '100%' : '24px', 
+                            transition: 'width 200ms ease-out, height 200ms ease-out, left 300ms ease-in, top 300ms ease-in, border-radius 200ms ease-out, background-color 200ms, border-color 200ms, color 200ms'
                          }}
                     >
                         {/* Empty state content */}

@@ -64,6 +64,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 
     // 两步动画：平滑过渡删除最后一个标签时的瞬间跳跃
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [addingId, setAddingId] = useState<string | null>(null);
 
     const handleDeleteWithAnim = (index: number, id: string) => {
         if (readOnly) return;
@@ -78,7 +79,17 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
         }
     };
 
-    const isEffectivelyEmpty = atomIds.length === 0 || (isInline && atomIds.length === 1 && deletingId !== null);
+    const handleAddWithAnim = (index: number) => {
+        if (readOnly) return;
+        const newId = genTempId();
+        if (isInline && atomIds.length === 0) {
+            setAddingId(newId);
+            setTimeout(() => setAddingId(null), 300);
+        }
+        addAtomId(field, newId, index);
+    };
+
+    const isEffectivelyEmpty = (atomIds.length === 0 && addingId === null) || (isInline && atomIds.length === 1 && deletingId !== null);
 
     return (
         <div
@@ -91,7 +102,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                     key={id}
                     data-index={index}
                     className={`relative group/list-item ${isInline ? 'inline-block transition-opacity duration-300 ease-in-out' : ''} ${isRelation ? 'pb-0' : ''} ${
-                        id === deletingId ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                        id === deletingId ? 'opacity-0 pointer-events-none' : (id === addingId ? 'animate-[pulse_300ms_ease-in-out] opacity-100' : 'opacity-100')
                     }`}
                 >
 
@@ -164,12 +175,12 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
             {!readOnly && (
                 isInline ? (
                     <button
-                         onClick={() => handleAdd(atomIds.length - 1)}
+                         onClick={() => handleAddWithAnim(atomIds.length - 1)}
                          className={`flex-center border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 overflow-hidden transition-all duration-300 ease-in-out ${
                              isEffectivelyEmpty
                                  ? 'h-[66px] rounded-lg mt-0 w-full'
                                  : 'h-[24px] rounded-full mt-0.5'
-                         } ${deletingId !== null ? 'absolute left-0 top-0 z-10' : 'relative'}`}
+                         } ${(deletingId !== null || addingId !== null) ? 'absolute left-0 top-0 z-10' : 'relative'}`}
                          style={{ width: isEffectivelyEmpty ? '100%' : '24px' }}
                     >
                         {/* Empty state content */}
@@ -194,7 +205,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                 ) : (
                     atomIds.length === 0 && (
                         <div
-                            onClick={() => handleAdd(-1)}
+                            onClick={() => handleAddWithAnim(-1)}
                             className={`border-2 border-dashed border-slate-200 rounded-lg p-4 text-center text-slate-400 hover:border-indigo-300 hover:text-indigo-500 cursor-pointer transition-colors`}
                         >
                             <Plus className="mx-auto mb-1" size={20} />

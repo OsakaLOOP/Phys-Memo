@@ -84,7 +84,8 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
         const newId = genTempId();
         if (isInline && atomIds.length === 0) {
             setAddingId(newId);
-            setTimeout(() => setAddingId(null), 300);
+            // 添加 atom 时不延迟，立即清除添加状态
+            setTimeout(() => setAddingId(null), 0);
         }
         addAtomId(field, newId, index);
     };

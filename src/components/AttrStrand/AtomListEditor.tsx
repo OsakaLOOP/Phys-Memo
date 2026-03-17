@@ -145,9 +145,20 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                 isInline ? (
                     <button
                          onClick={() => handleAdd(atomIds.length - 1)}
-                         className="flex-center w-6 h-6 rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors mt-0.5"
+                         className={`flex-center border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 overflow-hidden transition-all duration-300 ease-in-out ${
+                             atomIds.length === 0
+                                 ? 'w-full h-[66px] rounded-lg mt-0'
+                                 : 'w-6 h-6 rounded-full mt-0.5'
+                         }`}
                     >
-                        <Plus size={14} />
+                        {atomIds.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center w-full h-full text-center">
+                                <Plus className="mx-auto mb-1" size={20} />
+                                <span className="text-sm">添加标签</span>
+                            </div>
+                        ) : (
+                            <Plus size={14} />
+                        )}
                     </button>
                 ) : (
                     atomIds.length === 0 && (

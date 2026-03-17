@@ -120,8 +120,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         addAtomId: (field: ContentAtomField, id: DraftId, index?: number) => {
             set((state) => {
                 const list = [...(state.draftAtomLists[field] || [])];
-                if (index !== undefined && index >= 0) {
-                    list.splice(index + 1, 0, id);
+                if (index !== undefined) {
+                    if (index === -1) {
+                        list.unshift(id);
+                    } else if (index >= 0) {
+                        list.splice(index + 1, 0, id);
+                    } else {
+                        list.push(id);
+                    }
                 } else {
                     list.push(id);
                 }

@@ -82,7 +82,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
 
     return (
         <div
-            className={`${isInline ? 'flex flex-wrap items-start gap-2' :  'space-y-0' } ${atomIds.length > 0 ? className : ''}`}
+            className={`relative ${isInline ? 'flex flex-wrap items-start gap-2' :  'space-y-0' } ${atomIds.length > 0 ? className : ''}`}
             onPointerOver={handlePointerOver}
             onPointerLeave={handlePointerLeave}
         >
@@ -90,8 +90,8 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                 <div
                     key={id}
                     data-index={index}
-                    className={`relative group/list-item ${isInline ? 'inline-block transition-all duration-300 ease-in-out origin-left overflow-hidden' : ''} ${isRelation ? 'pb-0' : ''} ${
-                        id === deletingId ? 'opacity-0 max-w-0 mr-[-0.5rem] scale-95 pointer-events-none' : 'opacity-100 max-w-[1000px] scale-100'
+                    className={`relative group/list-item ${isInline ? 'inline-block transition-opacity duration-300 ease-in-out' : ''} ${isRelation ? 'pb-0' : ''} ${
+                        id === deletingId ? 'opacity-0 pointer-events-none' : 'opacity-100'
                     }`}
                 >
 
@@ -165,11 +165,11 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                 isInline ? (
                     <button
                          onClick={() => handleAdd(atomIds.length - 1)}
-                         className={`relative flex-center border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 overflow-hidden transition-all duration-300 ease-in-out ${
+                         className={`flex-center border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 overflow-hidden transition-all duration-300 ease-in-out ${
                              isEffectivelyEmpty
                                  ? 'h-[66px] rounded-lg mt-0 w-full'
                                  : 'h-[24px] rounded-full mt-0.5'
-                         }`}
+                         } ${deletingId !== null ? 'absolute left-0 top-0 z-10' : 'relative'}`}
                          style={{ width: isEffectivelyEmpty ? '100%' : '24px' }}
                     >
                         {/* Empty state content */}

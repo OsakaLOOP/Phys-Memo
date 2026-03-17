@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import type { IEdition } from '../../attrstrand/types';
+import type { IEdition, IPopulatedEdition } from '../../attrstrand/types';
 import { useNetworkStore } from '../../store/networkStore';
 import { useNetworkLayout } from './hooks/useNetworkLayout';
 import type { ProcessedLink } from './hooks/useNetworkLayout';
+import { CopyrightTooltip } from './CopyrightTooltip';
+import { core } from '../../attrstrand/core';
 
 interface ConceptNetworkViewProps {
     conceptId: string;
@@ -20,6 +22,10 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerWidth, setContainerWidth] = useState(800);
+    const [hoveredEditionId, setHoveredEditionId] = useState<string | null>(null);
+    const [hoverPos, setHoverPos] = useState<{ x: number, y: number } | null>(null);
+    const [populatedEditionsCache, setPopulatedEditionsCache] = useState<Record<string, IPopulatedEdition>>({});
+    const [isFetchingHovered, setIsFetchingHovered] = useState(false);
 
     const { editions, concept, fetchData, isLoading } = useNetworkStore();
 
@@ -153,7 +159,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
         // 悬浮交互：节点背景高亮
         const highlightBg = zoomLayer.insert("g", ":first-child").attr("class", "highlight-layer");
 
-        nodeGroup.on("mouseenter", function(_event, d) {
+        nodeGroup.on("mouseenter", function(event, d) {
              d3.select(this).select("circle").attr("stroke-width", 4);
 
              // 添加整行高亮
@@ -165,10 +171,22 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
                  .attr("height", layerHeight)
                  .attr("fill", "rgba(0,0,0,0.03)")
                  .attr("pointer-events", "none");
+
+             // 触发 tooltip 显示
+             const [mx, my] = d3.pointer(event, containerRef.current);
+             setHoverPos({ x: mx + 10, y: my + 10 });
+             setHoveredEditionId(d.edition.id);
+        })
+        .on("mousemove", function(event) {
+             const [mx, my] = d3.pointer(event, containerRef.current);
+             setHoverPos({ x: mx + 10, y: my + 10 });
         })
         .on("mouseleave", function(_event, d) {
              d3.select(this).select("circle").attr("stroke-width", d.isHead ? 3 : 2);
              highlightBg.selectAll(".row-hover").remove();
+
+             setHoveredEditionId(null);
+             setHoverPos(null);
         });
 
         // 缩放平移
@@ -194,8 +212,77 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
 
     }, [layout, currentEditionId]);
 
+    // 加载 Hover 的 Edition 详细数据
+    useEffect(() => {
+        if (hoveredEditionId && !populatedEditionsCache[hoveredEditionId]) {
+            setIsFetchingHovered(true);
+            core.getPopulatedEdition(hoveredEditionId).then(populated => {
+                if (populated) {
+                    setPopulatedEditionsCache(prev => ({ ...prev, [hoveredEditionId]: populated }));
+                }
+                setIsFetchingHovered(false);
+            }).catch(err => {
+                console.error("Failed to load populated edition for tooltip", err);
+                setIsFetchingHovered(false);
+            });
+        }
+    }, [hoveredEditionId, populatedEditionsCache]);
+
+    const renderTooltip = () => {
+        if (!hoveredEditionId || !hoverPos) return null;
+
+        const populated = populatedEditionsCache[hoveredEditionId];
+        let tooltipContent;
+
+        if (!populated || isFetchingHovered) {
+            tooltipContent = (
+                <CopyrightTooltip
+                    authors={[]}
+                    diffAdded={0}
+                    diffDeleted={0}
+                    diffRetained={0}
+                    itemId={hoveredEditionId}
+                    isLoading={true}
+                />
+            );
+        } else {
+            const attr = populated.editionAttr || { 'user': 1 };
+            const authors = Object.entries(attr);
+            const n = authors.length;
+            const adjustedAuthors = authors.map(([author, share]) => {
+                const adjustedShare = (Number(share) + (n > 0 ? (0.1 / n) : 0)) / 1.1;
+                return { author, share: adjustedShare };
+            }).sort((a, b) => b.share - a.share);
+
+            tooltipContent = (
+                <CopyrightTooltip
+                    authors={adjustedAuthors}
+                    diffAdded={populated.editionDiffAdded || 0}
+                    diffDeleted={populated.editionDiffDeleted || 0}
+                    diffRetained={populated.editionDiffRetained || 0}
+                    itemId={hoveredEditionId}
+                />
+            );
+        }
+
+        return (
+            <div
+                style={{
+                    position: 'absolute',
+                    left: hoverPos.x,
+                    top: hoverPos.y,
+                    zIndex: 100,
+                    pointerEvents: 'none'
+                }}
+            >
+                {tooltipContent}
+            </div>
+        );
+    };
+
     return (
         <div className="border rounded bg-slate-50 p-4 relative overflow-hidden" ref={containerRef}>
+            {renderTooltip()}
             <div className="mb-4 flex justify-between items-center z-10 relative">
                 <h3 className="font-bold text-sm text-slate-700">分支追溯视图 / Branch History</h3>
                 <div className="text-xs text-slate-500 flex items-center">

@@ -232,6 +232,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                         minHeight="100px"
                         extensions={[
                             markdown({ base: markdownLanguage, codeLanguages: languages }),
+                            EditorView.lineWrapping,
                             EditorView.domEventHandlers({
                                 keydown: (e, view) => {
                                     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {

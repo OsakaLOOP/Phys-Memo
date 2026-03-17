@@ -165,9 +165,9 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                 isInline ? (
                     <button
                          onClick={() => handleAdd(atomIds.length - 1)}
-                         className={`flex-center border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 overflow-hidden transition-all duration-300 ease-in-out ${
+                         className={`flex-center border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 overflow-hidden transition-all duration-250 ease-in-out ${
                              isEffectivelyEmpty
-                                 ? 'h-[66px] rounded-lg mt-0 w-full'
+                                 ? 'h-[56px] rounded-lg mt-0 w-full'
                                  : 'h-[24px] rounded-full mt-0.5'
                          } ${deletingId !== null ? 'absolute left-0 top-0 z-10' : 'relative'}`}
                          style={{ width: isEffectivelyEmpty ? '100%' : '24px' }}
@@ -175,7 +175,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                         {/* Empty state content */}
                         <div
                             className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity ease-in-out ${
-                                isEffectivelyEmpty ? 'opacity-100 duration-300 delay-150' : 'opacity-0 duration-75 pointer-events-none'
+                                isEffectivelyEmpty ? 'opacity-100 duration-300 delay-80' : 'opacity-0 duration-75 pointer-events-none'
                             }`}
                         >
                             <Plus className="mx-auto mb-1" size={20} />
@@ -185,7 +185,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                         {/* Populated state content */}
                         <div
                             className={`absolute inset-0 flex items-center justify-center transition-opacity ease-in-out ${
-                                !isEffectivelyEmpty ? 'opacity-100 duration-300 delay-150' : 'opacity-0 duration-75 pointer-events-none'
+                                !isEffectivelyEmpty ? 'opacity-100 duration-300 delay-80' : 'opacity-0 duration-75 pointer-events-none'
                             }`}
                         >
                             <Plus size={14} />

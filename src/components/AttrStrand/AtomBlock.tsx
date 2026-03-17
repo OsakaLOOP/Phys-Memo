@@ -3,9 +3,13 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { DraftId } from '../../attrstrand/types';
 import RichTextRenderer from '../RichTextRenderer';
 import { Edit3, Check, X } from 'lucide-react';
-import { calculateDiffStats, simhash } from '../../attrstrand/utils';
-import { core } from '../../attrstrand/core';
+import { calculateDiffStats } from '../../attrstrand/utils';
 import { CopyrightTooltip } from './CopyrightTooltip';
+
+import CodeMirror from '@uiw/react-codemirror';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import { languages } from '@codemirror/language-data';
+import { EditorView } from '@codemirror/view';
 
 interface AtomBlockProps {
     atomId: DraftId;
@@ -18,8 +22,17 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     // Subscribe specifically to this atom's data
     const atom = useWorkspaceStore((state) => state.draftAtomsData[atomId]);
     const updateAtomContent = useWorkspaceStore((state) => state.updateAtomContent);
+    const activeEditor = useWorkspaceStore((state) => state.activeEditor);
+    const setActiveEditor = useWorkspaceStore((state) => state.setActiveEditor);
 
-    const [isEditing, setIsEditing] = useState(false);
+    const isTags = atom?.field === 'tags';
+    const isRefs = atom?.field === 'refs';
+    const isMultilineEditor = atom?.field === 'core' || atom?.field === 'doc';
+    const draftAtomLists = useWorkspaceStore((state) => state.draftAtomLists);
+
+    const [isEditingLocal, setIsEditingLocal] = useState(false);
+    const isEditing = isMultilineEditor ? (activeEditor?.id === atomId) : isEditingLocal;
+
     const [editValue, setEditValue] = useState(atom?.content || '');
     const [initialContent] = useState(atom?.content || '');
 
@@ -31,19 +44,21 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     if (!atom) return null; // Defensive check
 
-    const isTags = (atom.field as string) === 'tags';
-    const isRefs = atom.field === 'refs';
-
-    const handleSave = () => {
-        if (editValue !== atom.content) {
-            updateAtomContent(atomId, editValue);
+    const handleSave = (valToSave?: string) => {
+        const finalVal = valToSave !== undefined ? valToSave : editValue;
+        if (finalVal !== atom.content) {
+            updateAtomContent(atomId, finalVal);
         }
-        setIsEditing(false);
+        if (isMultilineEditor) {
+            setActiveEditor(null);
+        } else {
+            setIsEditingLocal(false);
+        }
     };
 
     const handleCancel = () => {
-        setEditValue(atom.content);
-        setIsEditing(false);
+        // As requested: Esc should now "exit and save" rather than cancel
+        handleSave();
     };
 
     const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -52,7 +67,11 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
         if (target.tagName === 'A' || target.closest('a') || target.closest('.ref-link')) return;
         const selection = window.getSelection();
         if (selection && selection.toString().length > 0) return;
-        setIsEditing(true);
+        if (isMultilineEditor) {
+            setActiveEditor({ field: atom.field, id: atomId });
+        } else {
+            setIsEditingLocal(true);
+        }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -67,22 +86,51 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
         }
     };
 
-    const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const pastedText = e.clipboardData.getData('text');
-        // Trigger matching if pasted text is substantial (e.g., > 20 characters)
-        if (pastedText && pastedText.length > 20 ) {
-            try {
-                const targetSimhash = await simhash(pastedText);
-                const bestMatch = await core.findBestSimhashMatch(targetSimhash);
+    const handleCodeMirrorKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            handleSave();
+            e.preventDefault();
+        } else if (e.key === 'Escape') {
+            handleSave();
+            e.preventDefault();
+        }
+    };
 
-                if (bestMatch && bestMatch.sim > 0.9) { // Arbitrary threshold for notification
-                    // 后期加入持久化记录 (newFrontMeta 可作为后端保存 payload)。
-                    alert(`检测到粘贴长文本(${pastedText.length}字)。全库查重最佳匹配 ID: ${bestMatch.id} (相似度: ${(bestMatch.sim * 100).toFixed(1)}%)`);
+    const handleArrowNav = (view: EditorView, key: 'ArrowUp' | 'ArrowDown') => {
+        if (!isMultilineEditor || !atom.field) return false;
+
+        const state = view.state;
+        const mainSel = state.selection.main;
+
+        // Ensure we are dealing with a single cursor, not a selection
+        if (!mainSel.empty) return false;
+
+        const line = state.doc.lineAt(mainSel.head);
+
+        if (key === 'ArrowUp') {
+            // First line
+            if (line.number === 1) {
+                const list = draftAtomLists[atom.field];
+                const currentIndex = list.indexOf(atomId);
+                if (currentIndex > 0) {
+                    handleSave(view.state.doc.toString());
+                    setActiveEditor({ field: atom.field, id: list[currentIndex - 1] });
+                    return true;
                 }
-            } catch (err) {
-                console.error("Failed to process paste simhash:", err);
+            }
+        } else if (key === 'ArrowDown') {
+            // Last line
+            if (line.number === state.doc.lines) {
+                const list = draftAtomLists[atom.field];
+                const currentIndex = list.indexOf(atomId);
+                if (currentIndex >= 0 && currentIndex < list.length - 1) {
+                    handleSave(view.state.doc.toString());
+                    setActiveEditor({ field: atom.field, id: list[currentIndex + 1] });
+                    return true;
+                }
             }
         }
+        return false;
     };
 
     // attr 的初始值
@@ -155,30 +203,78 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
              );
         }
 
-         if (atom.field === 'refs') {
+         if (isRefs) {
              return (
                  <textarea
                     className="w-full min-h-[60px] p-2 text-sm input-bordered border-indigo-500 rounded resize-y font-mono"
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    onPaste={undefined}
                     autoFocus
                     placeholder="引用..."
                  />
              );
         }
 
-        return (
-            <textarea
-                className="w-full min-h-[100px] p-3 text-sm bg-white border-2 border-indigo-400 rounded-lg shadow-inner focus:outline-none resize-y font-mono leading-relaxed"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onPaste={atom.type!=='latex'?handlePaste : undefined}// latex atom 不参与比较
-                autoFocus
-            />
-        );
+        if (isMultilineEditor) {
+            return (
+                <div className="w-full bg-white border-2 border-indigo-400 rounded-lg shadow-inner focus-within:outline-none overflow-hidden font-mono text-sm leading-relaxed"
+                     onBlur={(e) => {
+                         // Only save if focus actually left the CodeMirror container completely
+                         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                             handleSave(editValue);
+                         }
+                     }}
+                     onKeyDown={handleCodeMirrorKeyDown}
+                >
+                    <CodeMirror
+                        value={editValue}
+                        minHeight="100px"
+                        extensions={[
+                            markdown({ base: markdownLanguage, codeLanguages: languages }),
+                            EditorView.domEventHandlers({
+                                keydown: (e, view) => {
+                                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                                        if (handleArrowNav(view, e.key)) {
+                                            e.preventDefault();
+                                            return true;
+                                        }
+                                    }
+                                    return false;
+                                }
+                            })
+                        ]}
+                        onChange={(value) => setEditValue(value)}
+                        autoFocus
+                        basicSetup={{
+                            lineNumbers: true,
+                            highlightActiveLineGutter: true,
+                            foldGutter: true,
+                            dropCursor: true,
+                            allowMultipleSelections: true,
+                            indentOnInput: true,
+                            syntaxHighlighting: true,
+                            bracketMatching: true,
+                            closeBrackets: true,
+                            autocompletion: true,
+                            rectangularSelection: true,
+                            crosshairCursor: true,
+                            highlightActiveLine: true,
+                            highlightSelectionMatches: true,
+                            closeBracketsKeymap: true,
+                            defaultKeymap: true,
+                            searchKeymap: true,
+                            historyKeymap: true,
+                            foldKeymap: true,
+                            completionKeymap: true,
+                            lintKeymap: true,
+                        }}
+                    />
+                </div>
+            );
+        }
+
+        return null;
     }
 
     return (
@@ -208,7 +304,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                             <div className="absolute right-1 top-0 bottom-0 flex gap-1 items-center z-[60]">
                                 <button
                                     onMouseDown={(e) => { e.preventDefault(); handleSave(); }}
-                                    onClick={handleSave}
+                                    onClick={() => handleSave()}
                                     className="p-1 rounded transition-colors flex items-center justify-center w-5 h-5 bg-green-100/90 text-green-600 hover:bg-green-200 shadow-sm"
                                     title="保存 (Enter / Ctrl+Enter)"
                                 >
@@ -228,24 +324,26 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
                 ) : (
                     <div className="relative min-w-[200px]">
                         {renderEditor()}
-                        <div className="absolute top-1 right-1 flex gap-1 z-[60]">
-                            <button
-                                onMouseDown={(e) => { e.preventDefault(); handleSave(); }}
-                                onClick={handleSave}
-                                className="p-1 rounded transition-colors flex items-center justify-center w-5 h-5 bg-green-100 text-green-700 hover:bg-green-200"
-                                title={`保存 (${isRefs ? 'Enter / ' : ''}Ctrl+Enter)`}
-                            >
-                                <Check size={12} strokeWidth={2} />
-                            </button>
-                            <button
-                                onMouseDown={(e) => { e.preventDefault(); handleCancel(); }}
-                                onClick={handleCancel}
-                                className="p-1 rounded transition-colors flex items-center justify-center w-5 h-5 btn-danger bg-red-100"
-                                title="取消 (Esc)"
-                            >
-                                <X size={12} strokeWidth={2} />
-                            </button>
-                        </div>
+                        {!isMultilineEditor && (
+                            <div className="absolute top-1 right-1 flex gap-1 z-[60]">
+                                <button
+                                    onMouseDown={(e) => { e.preventDefault(); handleSave(); }}
+                                    onClick={() => handleSave()}
+                                    className="p-1 rounded transition-colors flex items-center justify-center w-5 h-5 bg-green-100 text-green-700 hover:bg-green-200"
+                                    title={`保存 (${isRefs ? 'Enter / ' : ''}Ctrl+Enter)`}
+                                >
+                                    <Check size={12} strokeWidth={2} />
+                                </button>
+                                <button
+                                    onMouseDown={(e) => { e.preventDefault(); handleCancel(); }}
+                                    onClick={handleCancel}
+                                    className="p-1 rounded transition-colors flex items-center justify-center w-5 h-5 btn-danger bg-red-100"
+                                    title="取消 (Esc)"
+                                >
+                                    <X size={12} strokeWidth={2} />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )
             ) : (

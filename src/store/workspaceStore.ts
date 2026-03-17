@@ -36,6 +36,10 @@ interface WorkspaceState extends IWorkspaceDraft {
 
     // Commit 触发的更新操作
     markCommitted: (newBaseEditionId: string, oldToNewMap: Record<string, string>) => void;
+
+    // Editor UI State
+    activeEditor: { field: ContentAtomField, id: DraftId } | null;
+    setActiveEditor: (editor: { field: ContentAtomField, id: DraftId } | null) => void;
 }
 
 // 来自 uuid 的 DraftId
@@ -53,6 +57,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
         draftAtomsData: {},
 
+        activeEditor: null,
+        setActiveEditor: (editor) => set({ activeEditor: editor }),
+
         initWorkspace: (edition: IPopulatedEdition | null, conceptId: string, conceptName: string, conceptTopic: string, conceptDisciplines: string[]) => {
             if (!edition) {
                 // 新建空白 Workspace
@@ -65,6 +72,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     lastEdited: new Date().toISOString(),
                     draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
                     draftAtomsData: {},
+                activeEditor: null,
                 });
                 return;
             }
@@ -110,6 +118,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     rels: mapIds(edition.relsAtoms),
                 },
                 draftAtomsData,
+                activeEditor: null,
             });
         },
         // Concept Metadata 更新. 后期必须引入防抖, 而且 Metadata 将会跟着 Concept 一起提交.

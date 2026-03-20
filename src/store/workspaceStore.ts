@@ -90,11 +90,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             type PopulatedAtom = Omit<IContentAtom, 'backMeta'> & { contentJson?: string };
             const mapIds = (atoms: PopulatedAtom[]): string[] => {
                 return atoms.map((a) => {
+                    // 初始化加载时，严格去除头尾空行
+                    const rawContent = a.content || a.contentJson || '';
                     draftAtomsData[a.id] = {
                         id: a.id,
                         field: a.field,
                         type: a.type,
-                        content: a.content || a.contentJson || '', // legacy
+                        content: rawContent.trim(),
                         creatorId: a.creatorId,
                         derivedFromId: a.id, // 加载原有 Atom 的继承.
                         frontMeta: a.frontMeta || {},

@@ -4,6 +4,7 @@ import type { ContentAtomField } from '../../attrstrand/types';
 import RichTextRenderer from '../RichTextRenderer';
 import { UnifiedCodeMirror } from './Editor/UnifiedCodeMirror';
 import { Edit3 } from 'lucide-react';
+import { ErrorBoundary } from '../ErrorBoundary';
 
 interface FieldEditorProps {
     field: ContentAtomField;
@@ -32,7 +33,9 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
     if (isEditing) {
         return (
             <div className={`relative w-full ${className}`}>
-                <UnifiedCodeMirror field={field} initialAtomIds={atomIds} />
+                <ErrorBoundary>
+                    <UnifiedCodeMirror field={field} initialAtomIds={atomIds} />
+                </ErrorBoundary>
 
                 {/* 右上角操作按钮：完成编辑 */}
                 <div className="absolute top-2 right-2 flex gap-1 z-10">

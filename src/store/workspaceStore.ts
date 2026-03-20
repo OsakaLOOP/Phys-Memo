@@ -149,11 +149,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     list.push(id);
                 }
 
-                // Ensure atom exists in data map
-                const newData = { ...state.draftAtomsData };
+                                const newData = { ...state.draftAtomsData };
                 if (!newData[id]) {
-                    // Default type mapping
-                    let type: ContentAtomType = 'markdown';
+                                        let type: ContentAtomType = 'markdown';
                     if (field === 'core') type = 'latex';
                     if (field === 'tags' || field === 'rels') type = 'inline';
                     if (field === 'refs') type = 'sources';
@@ -195,8 +193,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         updateAtomContent: (id: DraftId, content: string) => {
             set((state) => {
                 const atom = state.draftAtomsData[id];
-                if (!atom) return state; // Should not happen
-
+                if (!atom) return state;
                 const updatedAtom = { ...atom, content, isDirty: true };
 
                 // 维持 derivedFromId不变, 以便提交时溯源. 在 markCommitted 时才会更新指向新的 Hash.
@@ -304,15 +301,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                      rels: mapList(state.draftAtomLists.rels || []),
                  };
 
-                 // Keep data mapped to new IDs
-                 for (const oldId of Object.keys(state.draftAtomsData)) {
+                                  for (const oldId of Object.keys(state.draftAtomsData)) {
                      const newId = oldToNewMap[oldId] || oldId;
                      newData[newId] = {
                          ...state.draftAtomsData[oldId],
                          id: newId,
-                         isDirty: false, // Clean slate
-                         derivedFromId: newId // Ready for next edits
-                     };
+                         isDirty: false,                          derivedFromId: newId                      };
                  }
 
                  return {

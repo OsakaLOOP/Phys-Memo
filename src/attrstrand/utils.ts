@@ -1,7 +1,6 @@
 import type { ContentAtomType, ContentAtomAttr } from './types.ts';
 import diff from 'fast-diff';
 
-// Async SHA-256 helper
 export async function sha256(str: string): Promise<string> {
     const msgBuffer = new TextEncoder().encode(str);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -9,16 +8,12 @@ export async function sha256(str: string): Promise<string> {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Async SHA-256 to 32-bit integer helper (for Simhash)
 export async function sha256Int(str: string): Promise<number> {
     const msgBuffer = new TextEncoder().encode(str);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    // Use first 4 bytes as int
-    const view = new DataView(hashBuffer);
-    return view.getInt32(0); // big-endian by default in DataView but we just need bits
-}
+        const view = new DataView(hashBuffer);
+    return view.getInt32(0); }
 
-// Deterministic JSON stringify (sorts keys)
 export function deterministicStringify(obj: unknown): string {
     if (obj === null || typeof obj !== 'object') {
         return JSON.stringify(obj);
@@ -37,7 +32,6 @@ export function deterministicStringify(obj: unknown): string {
     return JSON.stringify(result);
 }
 
-// Hashing Functions conforming to CAS principles
 
 // conceptId: hashkey=CONCEPT::${name}|${creatorId}|${timestampISO}
 export async function generateConceptHash(name: string, creatorId: string, timestampISO: string): Promise<string> {
@@ -74,9 +68,7 @@ export async function generateEditionHash(
 ): Promise<string> {
     const parentStr = parentEditionId === null ? 'null' : parentEditionId;
 
-    // Sort array elements or keep order? Order matters for lists like docs and refs.
-    // So we just deterministic stringify an object containing them in a fixed order.
-    const atomsData = {
+            const atomsData = {
         core: coreAtomIds,
         doc: docAtomIds,
         refs: refsAtomIds,
@@ -89,21 +81,17 @@ export async function generateEditionHash(
     return await sha256(key);
 }
 
-// Updated Simhash implementation (async)
 export async function simhash(content: string): Promise<string> {
     const tokens = content.toLowerCase().split(/\s+/).filter(t => t.length > 0);
     if (tokens.length === 0) return "00000000";
 
-    // Use an array of 32 counters (initially 0)
-    const vector = new Array(32).fill(0);
+        const vector = new Array(32).fill(0);
 
-    // Calculate hashes in parallel for performance
-    const hashes = await Promise.all(tokens.map(token => sha256Int(token)));
+        const hashes = await Promise.all(tokens.map(token => sha256Int(token)));
 
     for (const hash of hashes) {
         for (let i = 0; i < 32; i++) {
-            // Check if the i-th bit is set
-            if ((hash >> i) & 1) {
+                        if ((hash >> i) & 1) {
                 vector[i]++;
             } else {
                 vector[i]--;
@@ -118,15 +106,13 @@ export async function simhash(content: string): Promise<string> {
         }
     }
 
-    // Convert to unsigned 32-bit hex string
-    return (fingerprint >>> 0).toString(16).padStart(8, '0');
+        return (fingerprint >>> 0).toString(16).padStart(8, '0');
 }
 
 export function splitContent(content: string, type: ContentAtomType): string[] {
     if (!content) return [];
 
-    if (type === 'inline' || type === 'sources') { // Maps to tags/refs/rels logic
-        return content.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+    if (type === 'inline' || type === 'sources') {         return content.split('\n').map(s => s.trim()).filter(s => s.length > 0);
     }
 
     if (type === 'markdown' || type === 'latex') {
@@ -156,10 +142,8 @@ export function splitContent(content: string, type: ContentAtomType): string[] {
     return [content];
 }
 
-// Updated generateContentHash (async)
 export async function generateContentHash(content: string): Promise<string> {
-    // Return SHA-256 hex string
-    return await sha256(content);
+        return await sha256(content);
 }
 
 export function calculateDiffStats(oldText: string, newText: string): { added: number, deleted: number, retained: number } {

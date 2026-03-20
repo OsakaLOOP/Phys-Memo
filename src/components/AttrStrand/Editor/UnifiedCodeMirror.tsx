@@ -20,9 +20,6 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
 
-    // 缓存上一次同步给外部的数据签名，防止外部数据回来时造成的死循环重全量渲染
-    const lastSyncedSignatureRef = useRef<string>('');
-
     // --- 1. 组装初始的文本与映射表 ---
     const buildInitialState = () => {
         const state = useWorkspaceStore.getState();
@@ -55,9 +52,6 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                 currentOffset += content.length;
             }
         }
-
-        // 生成数据签名用于死循环拦截
-        lastSyncedSignatureRef.current = initialAtomIds.map(id => `${id}:${data[id]?.content || ''}`).join('|');
 
         return { fullText, mappings };
     };
@@ -148,8 +142,18 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                 // 计算当前外部数据的签名
                 const currentSignature = current.ids.map((id: string) => `${id}:${current.data[id]?.content || ''}`).join('|');
 
-                // 如果签名和我们最后一次主动推出去的一样，说明这是自己人干的，忽略。
-                if (currentSignature === lastSyncedSignatureRef.current) {
+                // 实时提取当前 CodeMirror 实例中的数据签名，直接与 Zustand 的新签名比对
+                const view = viewRef.current;
+                const mappings = view.state.field(atomMapField);
+                // 必须保证当前的映射数量和顺序与我们要同步的 ids 一致（或者仅对比内容，但严格来说数量顺序也代表状态）
+                const currentCMSignature = mappings.map(m => {
+                    // sliceDoc 获取当前块内的最新文本
+                    const text = view.state.sliceDoc(m.from, m.to);
+                    return `${m.id}:${text}`;
+                }).join('|');
+
+                // 如果签名完全一样，说明 CM 已经是最新状态，跳过更新，防止光标重置
+                if (currentSignature === currentCMSignature) {
                     return;
                 }
 
@@ -175,9 +179,6 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                         currentOffset += content.length + separator.length;
                     }
                 }
-
-                // 更新签名缓存
-                lastSyncedSignatureRef.current = currentSignature;
 
                 // 派发带有 'external_sync' 标记的全量替换事务，这样内部的 syncPlugin 就不会再反向推回 Zustand
                 viewRef.current.dispatch({

@@ -61,9 +61,8 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     };
 
     const handleCancel = () => {
-        // As requested: Esc should now "exit and save" rather than cancel
         handleSave();
-    };
+    };//Esc默认保存
 
     const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (isEditing || readOnly) return;
@@ -102,11 +101,11 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     const handleArrowNav = (view: EditorView, key: 'ArrowUp' | 'ArrowDown') => {
         if (!isMultilineEditor || !atom.field) return false;
-
+        console.log(key);
         const state = view.state;
         const mainSel = state.selection.main;
 
-        // Ensure we are dealing with a single cursor, not a selection
+        // 排除有选中情形
         if (!mainSel.empty) return false;
 
         const line = state.doc.lineAt(mainSel.head);
@@ -143,6 +142,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     const attr = (atom as any).attr || { 'user': 1 };
     const authors = Object.entries(attr);
     const n = authors.length;
+    
     const adjustedAuthors = authors.map(([author, share]) => {
         const adjustedShare = (Number(share) + (n > 0 ? (0.1 / n) : 0)) / 1.1;
         return { author, share: adjustedShare };

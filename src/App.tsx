@@ -24,6 +24,7 @@ import { core } from './attrstrand/core';
 import { storage } from './attrstrand/storage';
 import type { IEdition, IPopulatedEdition, IConceptView } from './attrstrand/types';
 import { AtomListEditor } from './components/AttrStrand/AtomListEditor';
+import { FieldEditor } from './components/AttrStrand/FieldEditor';
 import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
 import { TopicChildCard } from './components/AttrStrand/TopicChildCard';
 import { useStore } from 'zustand';
@@ -1710,7 +1711,7 @@ const PhysMemosApp: FC = () => {
                   <div className="mb-2">
                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex-center-gap">核心定义 · 数学形式 / DEF</label>
                      <div className="bg-white border-2 border-indigo-100 shadow-sm p-6 rounded-xl">
-                        <AtomListEditor field="core" />
+                        <FieldEditor field="core" />
                      </div>
                   </div>
 
@@ -1724,7 +1725,7 @@ const PhysMemosApp: FC = () => {
                     <div className="md:col-span-2">
                        <div className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm h-full">
                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex-center-gap">笔记 · 摘要 / Notes</label>
-                         <AtomListEditor field="doc" />
+                         <FieldEditor field="doc" />
                       </div>
                     </div>
                   </div>

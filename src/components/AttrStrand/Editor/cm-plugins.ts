@@ -35,8 +35,14 @@ export const atomMapField = StateField.define<AtomMapping[]>({
             return mappings.map(m => {
                 // mapPos 自动处理插入/删除带来的偏移量
                 // assoc: -1 (from 倾向于左侧), assoc: 1 (to 倾向于右侧)
-                const newFrom = tr.changes.mapPos(m.from, -1);
-                const newTo = tr.changes.mapPos(m.to, 1);
+                let newFrom = tr.changes.mapPos(m.from, -1);
+                let newTo = tr.changes.mapPos(m.to, 1);
+
+                // 极端的防越界保护（防止用户疯狂退格导致从右向左删越过了 from）
+                if (newFrom > newTo) {
+                    newTo = newFrom;
+                }
+
                 return { ...m, from: newFrom, to: newTo };
             });
         }
@@ -79,14 +85,22 @@ export const syncToZustandPlugin = (field: ContentAtomField) => ViewPlugin.fromC
             for (const m of mappings) {
                 // 如果用户删除了两个块之间的所有内容，from 可能会等于 to
                 // sliceDoc 会安全地返回空字符串
-                const currentText = update.state.sliceDoc(m.from, m.to);
+
+                // 安全边界钳制
+                const safeFrom = Math.max(0, Math.min(m.from, update.state.doc.length));
+                const safeTo = Math.max(safeFrom, Math.min(m.to, update.state.doc.length));
+
+                // 按照用户的要求，允许在边界处打字（吸收额外的换行符），
+                // 存入 Zustand 时，我们自动 trimEnd 掉所有尾随的空白和换行
+                const rawText = update.state.sliceDoc(safeFrom, safeTo);
+                const cleanText = rawText.trimEnd();
 
                 // 只有真正发生变化时才提交 update transaction
-                if (currentData[m.id]?.content !== currentText) {
+                if (currentData[m.id]?.content !== cleanText) {
                     transactions.push({
                         action: 'update',
                         id: m.id,
-                        content: currentText
+                        content: cleanText
                     });
                 }
             }

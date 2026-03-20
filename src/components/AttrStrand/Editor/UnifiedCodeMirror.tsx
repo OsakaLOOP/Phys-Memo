@@ -21,7 +21,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
     const viewRef = useRef<EditorView | null>(null);
 
     // 缓存上一次同步给外部的数据签名，防止外部数据回来时造成的死循环重全量渲染
-    const lastSyncedSignatureRef = useRef<string>('');
+    // 弃用，改为直接对比当前 view.state 内容
 
     // --- 1. 组装初始的文本与映射表 ---
     const buildInitialState = () => {
@@ -55,9 +55,6 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                 currentOffset += content.length;
             }
         }
-
-        // 生成数据签名用于死循环拦截
-        lastSyncedSignatureRef.current = initialAtomIds.map(id => `${id}:${data[id]?.content || ''}`).join('|');
 
         return { fullText, mappings };
     };
@@ -134,54 +131,78 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
     }, []); // 仅挂载时执行
 
     // --- 3. 处理外部强制更新（如撤销/其他终端同步） ---
-    // 监听 Zustand 数据的变化。如果是用户在当前 CM 打字导致的更新，我们之前在插件里同步过了，这里要拦截。
     useEffect(() => {
         const unsubscribe = useWorkspaceStore.subscribe(
             (state) => {
-                const current = {
-                    ids: state.draftAtomLists[field] || [],
-                    data: state.draftAtomsData
-                };
+                const currentIds = state.draftAtomLists[field] || [];
+                const currentData = state.draftAtomsData;
 
-                if (!viewRef.current) return;
+                const view = viewRef.current;
+                if (!view) return;
 
-                // 计算当前外部数据的签名
-                const currentSignature = current.ids.map((id: string) => `${id}:${current.data[id]?.content || ''}`).join('|');
+                const currentMappings = view.state.field(atomMapField);
 
-                // 如果签名和我们最后一次主动推出去的一样，说明这是自己人干的，忽略。
-                if (currentSignature === lastSyncedSignatureRef.current) {
+                // --- 终极死循环拦截器 ---
+                // 我们直接比对 Zustand 的数据和 CM 当前显示的真实数据。
+                // 如果它们完全一致，说明 Zustand 的更新是由我们 CM 自己触发的（打字同步），
+                // 或者是无意义的重渲染。我们必须立刻 return，绝对不能重置 CM 的 doc！
+
+                let isIdentical = true;
+
+                if (currentIds.length !== currentMappings.length) {
+                    isIdentical = false;
+                } else {
+                    for (let i = 0; i < currentMappings.length; i++) {
+                        const m = currentMappings[i];
+                        if (m.id !== currentIds[i]) {
+                            isIdentical = false; // ID 顺序变了
+                            break;
+                        }
+
+                        // 从 CM 取出现有的文本 (带防越界)
+                        const safeFrom = Math.max(0, Math.min(m.from, view.state.doc.length));
+                        const safeTo = Math.max(safeFrom, Math.min(m.to, view.state.doc.length));
+                        const cmText = view.state.sliceDoc(safeFrom, safeTo).trimEnd();
+
+                        // 从 Zustand 取出预期的文本
+                        const zustandText = currentData[m.id]?.content || '';
+
+                        if (cmText !== zustandText) {
+                            isIdentical = false; // 文本有差异
+                            break;
+                        }
+                    }
+                }
+
+                // 如果两边数据一致，直接无视这次 Zustand 的更新广播
+                if (isIdentical) {
                     return;
                 }
 
-                // 如果不同，说明这是“外部力量”（比如点击了顶部的撤销按钮，或者重新载入了一份草稿）
-                // 我们必须强行用新数据覆盖当前 CM 实例的内容
-
+                // --- 如果不一致，说明真的是从外部（如撤销栈、另一个编辑器）传来的更新 ---
+                // 必须强行用 Zustand 数据重新拼接并覆盖整个 CM
                 let newFullText = '';
                 const newMappings: AtomMapping[] = [];
                 const separator = '\n\n';
                 let currentOffset = 0;
 
-                for (let i = 0; i < current.ids.length; i++) {
-                    const id = current.ids[i];
-                    const content = current.data[id]?.content || '';
+                for (let i = 0; i < currentIds.length; i++) {
+                    const id = currentIds[i];
+                    const content = currentData[id]?.content || '';
 
                     const from = currentOffset;
                     const to = currentOffset + content.length;
                     newMappings.push({ id, from, to });
 
                     newFullText += content;
-                    if (i < current.ids.length - 1) {
+                    if (i < currentIds.length - 1) {
                         newFullText += separator;
                         currentOffset += content.length + separator.length;
                     }
                 }
 
-                // 更新签名缓存
-                lastSyncedSignatureRef.current = currentSignature;
-
-                // 派发带有 'external_sync' 标记的全量替换事务，这样内部的 syncPlugin 就不会再反向推回 Zustand
-                viewRef.current.dispatch({
-                    changes: { from: 0, to: viewRef.current.state.doc.length, insert: newFullText },
+                view.dispatch({
+                    changes: { from: 0, to: view.state.doc.length, insert: newFullText },
                     effects: setAtomMapEffect.of(newMappings),
                     annotations: Transaction.userEvent.of('external_sync')
                 });

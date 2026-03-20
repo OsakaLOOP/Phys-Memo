@@ -1,5 +1,5 @@
 import { StateField, StateEffect, Transaction, RangeSetBuilder } from '@codemirror/state';
-import { EditorView, Decoration, ViewPlugin, ViewUpdate, WidgetType, gutter, GutterMarker } from '@codemirror/view';
+import { EditorView, Decoration, ViewPlugin, ViewUpdate, gutter, GutterMarker } from '@codemirror/view';
 import type { DecorationSet } from '@codemirror/view';
 import type { DraftId, ContentAtomField } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
@@ -105,30 +105,6 @@ export const syncToZustandPlugin = (field: ContentAtomField) => ViewPlugin.fromC
 });
 
 // === 4. Visual Decorations: 渲染 Atom 块边界样式 ===
-
-// 这是一个极其简单的占位 Widget，证明我们可以在边界插入 UI
-class AtomBoundaryWidget extends WidgetType {
-    id: string;
-    isStart: boolean;
-    constructor(id: string, isStart: boolean) {
-        super();
-        this.id = id;
-        this.isStart = isStart;
-    }
-
-    eq(other: AtomBoundaryWidget) {
-        return other.id === this.id && other.isStart === this.isStart;
-    }
-
-    toDOM() {
-        const wrap = document.createElement("div");
-        // 暂时只加一条微弱的分割线或者完全透明，主要为了后续挂载 React UI 留坑
-        wrap.className = this.isStart
-            ? "cm-atom-boundary-top h-1 w-full bg-transparent hover:bg-indigo-50 transition-colors pointer-events-none"
-            : "cm-atom-boundary-bottom h-1 w-full bg-transparent";
-        return wrap;
-    }
-}
 
 export const blockDecorations = ViewPlugin.fromClass(class {
     decorations: DecorationSet;

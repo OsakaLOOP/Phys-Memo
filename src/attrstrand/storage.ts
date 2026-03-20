@@ -56,66 +56,56 @@ export class LocalStorageMock implements IStorage {
 
     // --- Concept Operations ---
     async saveConcept(concept: IConceptRoot): Promise<void> {
-        console.log(`[API Call] storage.saveConcept: ${concept.id}`, concept);
         const data = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
         data[concept.id] = concept;
         this.save(STORAGE_KEYS.CONCEPTS, data);
     }
 
     async getConcept(id: string): Promise<IConceptRoot | null> {
-        console.log(`[API Call] storage.getConcept: ${id}`);
         const data = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
         return data[id] || null;
     }
 
     async getAllConcepts(): Promise<IConceptRoot[]> {
-        console.log(`[API Call] storage.getAllConcepts`);
         const data = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
         return Object.values(data);
     }
 
     // --- Edition Operations ---
     async saveEdition(edition: IEdition): Promise<void> {
-        console.log(`[API Call] storage.saveEdition: ${edition.id}`, edition);
         const data = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
         data[edition.id] = edition;
         this.save(STORAGE_KEYS.EDITIONS, data);
     }
 
     async getEdition(id: string): Promise<IEdition | null> {
-        console.log(`[API Call] storage.getEdition: ${id}`);
         const data = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
         return data[id] || null;
     }
 
     async getEditionsByConcept(conceptId: string): Promise<IEdition[]> {
-        console.log(`[API Call] storage.getEditionsByConcept: ${conceptId}`);
         const data = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
         return Object.values(data).filter(e => e.conceptId === conceptId);
     }
 
     // --- Atom Operations ---
     async saveAtom(atom: IContentAtom): Promise<void> {
-        console.log(`[API Call] storage.saveAtom: ${atom.id}`, atom);
         const data = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
         data[atom.id] = atom;
         this.save(STORAGE_KEYS.ATOMS, data);
     }
 
     async getAtom(id: string): Promise<IContentAtom | null> {
-        console.log(`[API Call] storage.getAtom: ${id}`);
         const data = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
         return data[id] || null;
     }
 
     async getAtoms(ids: string[]): Promise<IContentAtom[]> {
-        console.log(`[API Call] storage.getAtoms: ${ids.length} ids`);
         const data = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
         return ids.map(id => data[id]).filter(a => a !== undefined);
     }
 
     async getAllAtoms(): Promise<IContentAtom[]> {
-        console.log('[API Call] storage.getAllAtoms');
         const atoms = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
         return Object.values(atoms);
     }
@@ -152,26 +142,22 @@ export class LocalStorageMock implements IStorage {
 
     // --- Discipline Operations ---
     async saveDiscipline(discipline: DisciplineData): Promise<void> {
-        console.log(`[API Call] storage.saveDiscipline: ${discipline.name}`, discipline);
         const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
         data[discipline.name] = discipline;
         this.save(STORAGE_KEYS.DISCIPLINES, data);
     }
 
     async getDiscipline(name: string): Promise<DisciplineData | null> {
-        console.log(`[API Call] storage.getDiscipline: ${name}`);
         const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
         return data[name] || null;
     }
 
     async getAllDisciplines(): Promise<DisciplineData[]> {
-        console.log(`[API Call] storage.getAllDisciplines`);
         const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
         return Object.values(data);
     }
 
     async deleteDiscipline(name: string): Promise<void> {
-        console.log(`[API Call] storage.deleteDiscipline: ${name}`);
         const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
         if (data[name]) {
             delete data[name];
@@ -181,32 +167,27 @@ export class LocalStorageMock implements IStorage {
 
     // --- Cleanup Operations ---
     async runCleanup(_thresholdTimestamp: number): Promise<number> {
-        console.log(`[API Call] storage.runCleanup: threshold=${_thresholdTimestamp}`);
         const concepts = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
         const editions = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
         const atoms = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
 
         let deletedCount = 0;
 
-        // 1. Identify active editions (heads of branches)
-        const activeEditionIds = new Set<string>();
+                const activeEditionIds = new Set<string>();
         Object.values(concepts).forEach(c => {
             Object.keys(c.currentHeads).forEach(headId => activeEditionIds.add(headId));
         });
 
-        // 2. Mark reachable editions
-        const keptEditionIds = new Set<string>();
+                const keptEditionIds = new Set<string>();
         const queue = [...activeEditionIds];
 
-        // Keep explicitly saved/published editions
-        Object.values(editions).forEach(e => {
+                Object.values(editions).forEach(e => {
             if (e.saveType !== 'autosave') {
                 queue.push(e.id);
             }
         });
 
-        // BFS to find all ancestors
-        while(queue.length > 0) {
+                while(queue.length > 0) {
             const id = queue.shift()!;
             if (keptEditionIds.has(id)) continue;
             keptEditionIds.add(id);
@@ -217,16 +198,14 @@ export class LocalStorageMock implements IStorage {
             }
         }
 
-        // Delete editions not in keptEditionIds
-        Object.keys(editions).forEach(id => {
+                Object.keys(editions).forEach(id => {
             if (!keptEditionIds.has(id)) {
                 delete editions[id];
                 deletedCount++;
             }
         });
 
-        // Collect referenced atoms from kept editions
-        const referencedAtomIds = new Set<string>();
+                const referencedAtomIds = new Set<string>();
         Object.values(editions).forEach(e => {
             e.coreAtomIds.forEach(id => referencedAtomIds.add(id));
             e.docAtomIds.forEach(id => referencedAtomIds.add(id));
@@ -235,8 +214,7 @@ export class LocalStorageMock implements IStorage {
             e.relsAtomIds.forEach(id => referencedAtomIds.add(id));
         });
 
-        // Delete unreferenced atoms
-        Object.keys(atoms).forEach(id => {
+                Object.keys(atoms).forEach(id => {
             if (!referencedAtomIds.has(id)) {
                 delete atoms[id];
                 deletedCount++;

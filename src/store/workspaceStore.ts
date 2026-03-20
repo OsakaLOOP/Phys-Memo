@@ -34,6 +34,14 @@ interface WorkspaceState extends IWorkspaceDraft {
     // Atom 自身操作
     updateAtomContent: (id: DraftId, content: string) => void;
 
+    // 批量更新 Atom 状态 (用于单实例编辑器)
+    applyAtomTransactions: (field: ContentAtomField, transactions: {
+        id: DraftId;
+        action: 'update' | 'create' | 'delete';
+        content?: string;
+        index?: number; // 对于 create
+    }[], newOrder?: DraftId[]) => void;
+
     // Commit 触发的更新操作
     markCommitted: (newBaseEditionId: string, oldToNewMap: Record<string, string>) => void;
 
@@ -141,11 +149,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     list.push(id);
                 }
 
-                // Ensure atom exists in data map
-                const newData = { ...state.draftAtomsData };
+                                const newData = { ...state.draftAtomsData };
                 if (!newData[id]) {
-                    // Default type mapping
-                    let type: ContentAtomType = 'markdown';
+                                        let type: ContentAtomType = 'markdown';
                     if (field === 'core') type = 'latex';
                     if (field === 'tags' || field === 'rels') type = 'inline';
                     if (field === 'refs') type = 'sources';
@@ -187,8 +193,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         updateAtomContent: (id: DraftId, content: string) => {
             set((state) => {
                 const atom = state.draftAtomsData[id];
-                if (!atom) return state; // Should not happen
-
+                if (!atom) return state;
                 const updatedAtom = { ...atom, content, isDirty: true };
 
                 // 维持 derivedFromId不变, 以便提交时溯源. 在 markCommitted 时才会更新指向新的 Hash.
@@ -197,6 +202,88 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     draftAtomsData: { ...state.draftAtomsData, [id]: updatedAtom },
                     lastEdited: new Date().toISOString()
                 };
+            });
+        },
+
+        applyAtomTransactions: (field: ContentAtomField, transactions: {
+            id: DraftId;
+            action: 'update' | 'create' | 'delete';
+            content?: string;
+            index?: number; // 对于 create
+        }[], newOrder?: DraftId[]) => {
+            set((state) => {
+                let currentList = [...(state.draftAtomLists[field] || [])];
+                const newData = { ...state.draftAtomsData };
+
+                let orderChanged = false;
+
+                for (const t of transactions) {
+                    if (t.action === 'update' && t.content !== undefined) {
+                        const atom = newData[t.id];
+                        if (atom && atom.content !== t.content) {
+                            newData[t.id] = { ...atom, content: t.content, isDirty: true };
+                        }
+                    } else if (t.action === 'create') {
+                        let type: ContentAtomType = 'markdown';
+                        if (field === 'core') type = 'latex';
+                        if (field === 'tags' || field === 'rels') type = 'inline';
+                        if (field === 'refs') type = 'sources';
+
+                        newData[t.id] = {
+                            id: t.id,
+                            field,
+                            type,
+                            content: t.content || '',
+                            creatorId: 'user',
+                            derivedFromId: null,
+                            frontMeta: {},
+                            isDirty: true,
+                        };
+
+                        // Default insert behavior if newOrder is not provided
+                        if (!newOrder) {
+                            if (t.index !== undefined) {
+                                if (t.index === -1) {
+                                    currentList.unshift(t.id);
+                                } else if (t.index >= 0) {
+                                    currentList.splice(t.index + 1, 0, t.id);
+                                } else {
+                                    currentList.push(t.id);
+                                }
+                            } else {
+                                currentList.push(t.id);
+                            }
+                            orderChanged = true;
+                        }
+                    } else if (t.action === 'delete') {
+                        if (!newOrder) {
+                            const idx = currentList.indexOf(t.id);
+                            if (idx > -1) {
+                                currentList.splice(idx, 1);
+                                orderChanged = true;
+                            }
+                        }
+                        // We intentionally don't delete from draftAtomsData to avoid breaking undo
+                    }
+                }
+
+                if (newOrder) {
+                     currentList = [...newOrder];
+                     orderChanged = true;
+                }
+
+                // Optimization: only update state if something actually changed
+                // (transactions might just be no-op updates)
+                const stateChanges: Partial<WorkspaceState> = {};
+                if (orderChanged) {
+                     stateChanges.draftAtomLists = { ...state.draftAtomLists, [field]: currentList };
+                }
+
+                // Shallow compare data changes - simplified check since we mutated newData
+                stateChanges.draftAtomsData = newData;
+                stateChanges.lastEdited = new Date().toISOString();
+
+                return stateChanges as Partial<WorkspaceState>;
             });
         },
 
@@ -214,15 +301,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                      rels: mapList(state.draftAtomLists.rels || []),
                  };
 
-                 // Keep data mapped to new IDs
-                 for (const oldId of Object.keys(state.draftAtomsData)) {
+                                  for (const oldId of Object.keys(state.draftAtomsData)) {
                      const newId = oldToNewMap[oldId] || oldId;
                      newData[newId] = {
                          ...state.draftAtomsData[oldId],
                          id: newId,
-                         isDirty: false, // Clean slate
-                         derivedFromId: newId // Ready for next edits
-                     };
+                         isDirty: false,                          derivedFromId: newId                      };
                  }
 
                  return {

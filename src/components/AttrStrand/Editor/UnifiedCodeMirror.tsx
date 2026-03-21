@@ -20,6 +20,7 @@ interface UnifiedCodeMirrorProps {
 
 export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, initialAtomIds }) => {
     const editorRef = useRef<HTMLDivElement>(null);
+    const activeEditor = useWorkspaceStore(state => state.activeEditor);
     const viewRef = useRef<EditorView | null>(null);
 
     // --- 1. 组装初始的文本与映射表 ---
@@ -81,7 +82,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                 ]),
                 // 核心状态机与装饰器
                 atomMapField,
-                blockDecorations,
+                blockDecorations(field),
                 blockActionGutter, // 预留的左侧操作区和拖拽手柄
                 // Linting 插件
                 lintGutter(),
@@ -132,13 +133,49 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
 
         viewRef.current = view;
 
+        // 如果有初始焦点，立即滚动并聚焦
+        if (activeEditor?.field === field && activeEditor?.id) {
+            const mappings = view.state.field(atomMapField);
+            const target = mappings.find(m => m.id === activeEditor.id);
+            if (target) {
+                view.dispatch({
+                    selection: { anchor: target.from },
+                    scrollIntoView: true
+                });
+                view.focus();
+            }
+        }
+
         return () => {
             view.destroy();
             viewRef.current = null;
         };
     }, []); // 仅挂载时执行
 
-    // --- 3. 处理外部强制更新（如撤销/其他终端同步） ---
+    // --- 3. 监听初始焦点的变化 ---
+    useEffect(() => {
+        if (!viewRef.current || !activeEditor || activeEditor.field !== field) return;
+        const view = viewRef.current;
+        const mappings = view.state.field(atomMapField);
+        const target = mappings.find(m => m.id === activeEditor.id);
+
+        if (target) {
+            // Check if cursor is already within the target atom
+            const mainSelection = view.state.selection.main;
+            const isWithinTarget = mainSelection.from >= target.from && mainSelection.to <= target.to;
+            if (!isWithinTarget) {
+                view.dispatch({
+                    selection: { anchor: target.from },
+                    scrollIntoView: true
+                });
+                if (!view.hasFocus) {
+                    view.focus();
+                }
+            }
+        }
+    }, [activeEditor?.id, field]);
+
+    // --- 4. 处理外部强制更新（如撤销/其他终端同步） ---
     // 监听 Zustand 数据的变化。如果是用户在当前 CM 打字导致的更新，我们之前在插件里同步过了，这里要拦截。
     useEffect(() => {
         const unsubscribe = useWorkspaceStore.subscribe(

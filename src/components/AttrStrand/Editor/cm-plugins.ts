@@ -119,21 +119,30 @@ export const blockDecorations = ViewPlugin.fromClass(class {
         const builder = new RangeSetBuilder<Decoration>();
         const mappings = view.state.field(atomMapField);
 
-        // 1. 为所有的映射区间添加视觉标记
-        // 在 CodeMirror 6 中，通过 RangeSetBuilder 构建的装饰器必须严格按位置升序排序！
-        // 因为 m.to 和下一个元素的 m.from 可能因为换行符紧密相邻，
-        // 且由于 line 装饰器和 widget 装饰器混用，必须按照 from 升序且分类处理。
-        // 不过在这里我们每次添加的都是单调递增的位置。
+        // 遍历所有行，检查属于块内还是块间的空隙，
+        // 并给块间空隙标记特殊样式（非标准 \n\n 间距则标红警示）
+        let nextGapStart = 0;
 
-        // CodeMirror 的错误: "RangeError: Block decorations may not be specified via plugins"
-        // 意味着 block: true 的 widget 不能通过普通的 ViewPlugin 的 decorations 返回，
-        // 而必须通过 StateField<DecorationSet> 提供并在 EditorState 的 extensions 中注册，
-        // 或者直接作为 line 装饰器的一部分。但在普通的 ViewPlugin 中，如果要渲染 block widget，
-        // 需要使用 StateField 和 provide: EditorView.decorations。
-        // 为了简化和解决报错，我们将 blockDecorations 改为提供普通 line 装饰器，
-        // 而放弃在 ViewPlugin 中动态生成带有 block: true 的 Widget 装饰器，改用内联 widget 或者外置。
-        // 其实这里只是加一些样式和占位，我们只保留行级的高亮装饰。
         for (const m of mappings) {
+            if (nextGapStart < m.from) {
+                const gapText = view.state.doc.sliceString(nextGapStart, m.from);
+                const isError = gapText !== '\n\n';
+
+                let pos = nextGapStart;
+                while (pos < m.from) {
+                    const line = view.state.doc.lineAt(pos);
+                    if (line.from >= nextGapStart && line.to <= m.from) {
+                        if (isError) {
+                            builder.add(line.from, line.from, Decoration.line({
+                                class: 'cm-atom-gap-error'
+                            }));
+                        }
+                    }
+                    pos = line.to + 1;
+                    if (pos > view.state.doc.length) break;
+                }
+            }
+
             if (m.from < m.to) { // 正常的块
                 // 为属于这个 Atom 的每一行加上行级样式（左侧边框/背景）
                 let pos = m.from;
@@ -148,6 +157,28 @@ export const blockDecorations = ViewPlugin.fromClass(class {
                     pos = line.to + 1;
                     if (pos > view.state.doc.length) break;
                 }
+            }
+
+            nextGapStart = m.to;
+        }
+
+        // 结尾处的额外内容标红
+        if (nextGapStart < view.state.doc.length) {
+            const gapText = view.state.doc.sliceString(nextGapStart, view.state.doc.length);
+            const isError = gapText.length > 0 && gapText !== '\n';
+
+            let pos = nextGapStart;
+            while (pos <= view.state.doc.length) {
+                const line = view.state.doc.lineAt(pos);
+                if (line.from >= nextGapStart) {
+                    if (isError) {
+                         builder.add(line.from, line.from, Decoration.line({
+                             class: 'cm-atom-gap-error'
+                         }));
+                    }
+                }
+                pos = line.to + 1;
+                if (pos > view.state.doc.length) break;
             }
         }
 

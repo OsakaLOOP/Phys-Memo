@@ -826,7 +826,8 @@ const PhysMemosApp: FC = () => {
       return ids.map(id => {
         const atom = state.draftAtomsData[id];
         return {
-          contentPayload: atom.content,
+          // auto-strip spaces/newlines to handle "MissingLineBreak" and "RedundantLineBreak"
+          contentPayload: atom.content.trim(),
           field: atom.field,
           type: atom.type,
           derivedFromId: atom.derivedFromId,

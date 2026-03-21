@@ -18,18 +18,29 @@ export const atomBoundaryLinter = (field: ContentAtomField) => linter((view: Edi
         const gapFrom = currentAtom.to;
         const gapTo = nextAtom.from;
 
+        const doc = view.state.doc;
+
+        let reportFrom = gapFrom;
+        let reportTo = gapTo;
+
         if (gapFrom < gapTo) {
             const gapText = view.state.sliceDoc(gapFrom, gapTo);
             
-            // Expected is exactly "\n\n"
+            // 将错误标记精确定位到段落之间的空行，避免标在上一段结尾
+            if (gapText.startsWith('\n')) reportFrom = Math.min(gapFrom + 1, gapTo);
+            if (gapText.endsWith('\n') && reportTo > reportFrom) reportTo = Math.max(reportTo - 1, reportFrom);
+
+            if (reportFrom === reportTo && reportFrom < doc.length && doc.sliceString(reportFrom, reportFrom+1) === '\n') {
+                 reportTo = reportFrom + 1;
+            }
+
             if (gapText !== '\n\n') {
-                // Determine the exact error type
                 if (!/^[\n]*$/.test(gapText)) {
                     // Contains characters other than newline
                     hasUnexpectedInterruption = true;
                     diagnostics.push({
-                        from: gapFrom,
-                        to: gapTo,
+                        from: reportFrom,
+                        to: reportTo,
                         severity: 'error',
                         message: 'AtomBlockBoundaryError: UnexpectedInterruption (段落间发现意外的非空字符，提交时将被拦截)',
                         source: 'boundary-linter'
@@ -37,8 +48,8 @@ export const atomBoundaryLinter = (field: ContentAtomField) => linter((view: Edi
                 } else if (gapText.length < 2) {
                     // Only newlines, but too few
                     diagnostics.push({
-                        from: gapFrom,
-                        to: gapTo,
+                        from: reportFrom,
+                        to: reportTo,
                         severity: 'error',
                         message: 'AtomBlockBoundaryError: MissingLineBreak (缺少换行符，应有两行空白，保存时将自动修正)',
                         source: 'boundary-linter'
@@ -46,8 +57,8 @@ export const atomBoundaryLinter = (field: ContentAtomField) => linter((view: Edi
                 } else if (gapText.length > 2) {
                     // Only newlines, but too many
                     diagnostics.push({
-                        from: gapFrom,
-                        to: gapTo,
+                        from: reportFrom,
+                        to: reportTo,
                         severity: 'error',
                         message: 'AtomBlockBoundaryError: RedundantLineBreak (多余的换行符，保存时将自动修正)',
                         source: 'boundary-linter'
@@ -55,7 +66,6 @@ export const atomBoundaryLinter = (field: ContentAtomField) => linter((view: Edi
                 }
             }
         } else if (gapFrom === gapTo) {
-            // No gap at all, missing newlines
             diagnostics.push({
                 from: gapFrom,
                 to: gapTo,

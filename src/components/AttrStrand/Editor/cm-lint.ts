@@ -66,10 +66,7 @@ export const atomBoundaryLinter = (field: ContentAtomField) => linter((view: Edi
         }
     }
 
-    // Since linter runs in a CodeMirror update cycle asynchronously, 
-    // it's safe to update Zustand here. 
-    // Wait, let's use a timeout or ensure we are not inside a reducer.
-    // The linter is called asynchronously.
+    
     const currentErrorState = useWorkspaceStore.getState().fieldLintErrors[field];
     if (currentErrorState !== hasUnexpectedInterruption) {
         useWorkspaceStore.getState().setFieldLintError(field, hasUnexpectedInterruption);

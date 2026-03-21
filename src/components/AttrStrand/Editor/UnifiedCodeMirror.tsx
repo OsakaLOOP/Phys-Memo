@@ -105,6 +105,12 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                         position: "relative",
                         backgroundColor: "#fafafa" // 模拟轻微的高亮包裹感
                     },
+                    ".cm-atom-gap-error": {
+                        background: "repeating-linear-gradient(45deg, rgba(255,0,0,0.05), rgba(255,0,0,0.05) 10px, rgba(255,0,0,0) 10px, rgba(255,0,0,0) 20px)",
+                        borderLeft: "2px solid rgba(255,0,0,0.3)",
+                        marginLeft: "8px",
+                        paddingLeft: "8px"
+                    },
                     ".cm-block-action-gutter": {
                         width: '24px',
                         display: 'flex',

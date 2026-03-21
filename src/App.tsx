@@ -859,6 +859,10 @@ const PhysMemosApp: FC = () => {
 
          // Force update network store cache so that when users switch to history view it shows the newly submitted branch
          useNetworkStore.getState().fetchData(edition.conceptId, true);
+
+         // 提交成功后给予明确的成功反馈，并退出纯编辑模式以体现流程终结。
+         window.alert("版本已成功保存！");
+         setViewMode('history');
     }
   };
 

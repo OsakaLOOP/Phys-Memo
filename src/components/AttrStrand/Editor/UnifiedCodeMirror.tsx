@@ -107,6 +107,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                     },
                     ".cm-atom-gap-error": {
                         background: "repeating-linear-gradient(45deg, rgba(255,0,0,0.05), rgba(255,0,0,0.05) 10px, rgba(255,0,0,0) 10px, rgba(255,0,0,0) 20px)",
+                        backgroundAttachment: "fixed",
                         borderLeft: "2px solid rgba(255,0,0,0.3)",
                         marginLeft: "8px",
                         paddingLeft: "8px"

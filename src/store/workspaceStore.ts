@@ -45,6 +45,10 @@ interface WorkspaceState extends IWorkspaceDraft {
     // Commit 触发的更新操作
     markCommitted: (newBaseEditionId: string, oldToNewMap: Record<string, string>) => void;
 
+    // Lint state per field
+    fieldLintErrors: Record<ContentAtomField, boolean>;
+    setFieldLintError: (field: ContentAtomField, hasError: boolean) => void;
+
     // Editor UI State
     activeEditor: { field: ContentAtomField, id: DraftId } | null;
     setActiveEditor: (editor: { field: ContentAtomField, id: DraftId } | null) => void;
@@ -64,6 +68,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
         draftAtomsData: {},
+
+        fieldLintErrors: {
+            core: false,
+            doc: false,
+            tags: false,
+            refs: false,
+            rels: false,
+        },
+        setFieldLintError: (field, hasError) => set((state) => ({
+            fieldLintErrors: { ...state.fieldLintErrors, [field]: hasError }
+        })),
 
         activeEditor: null,
         setActiveEditor: (editor) => set({ activeEditor: editor }),

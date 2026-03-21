@@ -48,6 +48,10 @@ interface WorkspaceState extends IWorkspaceDraft {
     // Editor UI State
     activeEditor: { field: ContentAtomField, id: DraftId } | null;
     setActiveEditor: (editor: { field: ContentAtomField, id: DraftId } | null) => void;
+
+    // Lint State
+    fieldLintErrors: Record<ContentAtomField, boolean>;
+    setFieldLintError: (field: ContentAtomField, hasError: boolean) => void;
 }
 
 // 来自 uuid 的 DraftId
@@ -64,9 +68,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
         draftAtomsData: {},
+        fieldLintErrors: { core: false, doc: false, tags: false, refs: false, rels: false },
 
         activeEditor: null,
         setActiveEditor: (editor) => set({ activeEditor: editor }),
+        setFieldLintError: (field, hasError) => set((state) => ({ fieldLintErrors: { ...state.fieldLintErrors, [field]: hasError } })),
 
         initWorkspace: (edition: IPopulatedEdition | null, conceptId: string, conceptName: string, conceptTopic: string, conceptDisciplines: string[]) => {
             if (!edition) {
@@ -80,6 +86,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     lastEdited: new Date().toISOString(),
                     draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
                     draftAtomsData: {},
+                    fieldLintErrors: { core: false, doc: false, tags: false, refs: false, rels: false },
                 activeEditor: null,
                 });
                 return;
@@ -128,6 +135,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     rels: mapIds(edition.relsAtoms),
                 },
                 draftAtomsData,
+                fieldLintErrors: { core: false, doc: false, tags: false, refs: false, rels: false },
                 activeEditor: null,
             });
         },

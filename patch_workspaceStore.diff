@@ -1,0 +1,57 @@
+--- src/store/workspaceStore.ts
++++ src/store/workspaceStore.ts
+@@ -47,6 +47,9 @@
+     // Editor UI State
+     activeEditor: { field: ContentAtomField, id: DraftId } | null;
+     setActiveEditor: (editor: { field: ContentAtomField, id: DraftId } | null) => void;
++
++    // Lint State
++    fieldLintErrors: Record<ContentAtomField, boolean>;
++    setFieldLintError: (field: ContentAtomField, hasError: boolean) => void;
+ }
+
+ // 来自 uuid 的 DraftId
+@@ -62,11 +65,14 @@
+         draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
+         draftAtomsData: {},
+
++        fieldLintErrors: { core: false, doc: false, tags: false, refs: false, rels: false },
++
+         activeEditor: null,
+         setActiveEditor: (editor) => set({ activeEditor: editor }),
++        setFieldLintError: (field, hasError) => set((state) => ({ fieldLintErrors: { ...state.fieldLintErrors, [field]: hasError } })),
+
+         initWorkspace: (edition: IPopulatedEdition | null, conceptId: string, conceptName: string, conceptTopic: string, conceptDisciplines: string[]) => {
+             if (!edition) {
+                 // 新建空白 Workspace
+                 set({
+                     conceptId,
+@@ -75,6 +81,7 @@
+                     conceptTopic,
+                     conceptDisciplines,
+                     lastEdited: new Date().toISOString(),
+                     draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
+                     draftAtomsData: {},
++                    fieldLintErrors: { core: false, doc: false, tags: false, refs: false, rels: false },
+                 activeEditor: null,
+                 });
+                 return;
+@@ -107,6 +114,7 @@
+                 conceptTopic: edition.conceptTopic,
+                 conceptDisciplines: edition.conceptDisciplines || [],
+                 lastEdited: edition.timestampISO,
+                 draftAtomLists,
+                 draftAtomsData,
++                fieldLintErrors: { core: false, doc: false, tags: false, refs: false, rels: false },
+                 activeEditor: null,
+             });
+         },
+@@ -282,7 +290,7 @@
+     })),
+     {
+         name: 'workspace-storage',
+-        partialize: (state) => ({
++        partialize: (state) => ({
+             conceptName: state.conceptName,
+             conceptTopic: state.conceptTopic,
+             conceptDisciplines: state.conceptDisciplines,

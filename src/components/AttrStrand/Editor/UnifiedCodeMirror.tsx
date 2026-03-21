@@ -10,6 +10,8 @@ import type { ContentAtomField, DraftId } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
 import { atomMapField, blockDecorations, setAtomMapEffect, syncToZustandPlugin, blockActionGutter } from './cm-plugins';
 import type { AtomMapping } from './cm-plugins';
+import { lintGutter } from '@codemirror/lint';
+import { atomBoundaryLinter } from './cm-lint';
 
 interface UnifiedCodeMirrorProps {
     field: ContentAtomField;
@@ -81,6 +83,9 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                 atomMapField,
                 blockDecorations,
                 blockActionGutter, // 预留的左侧操作区和拖拽手柄
+                // Linting 插件
+                lintGutter(),
+                atomBoundaryLinter(field),
                 // 同步插件（负责打字时防抖更新 Zustand）
                 syncToZustandPlugin(field),
                 // 初始化时注入当前的映射表

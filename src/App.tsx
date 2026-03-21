@@ -814,6 +814,14 @@ const PhysMemosApp: FC = () => {
   const submitWorkspace = async () => {
     // Collect data to submit
     const state = useWorkspaceStore.getState();
+    
+    // Check for UnexpectedInterruption (Lint Errors)
+    const hasLintErrors = Object.values(state.fieldLintErrors).some(hasError => hasError);
+    if (hasLintErrors) {
+        window.alert("发现意外的非空字符间隔 (UnexpectedInterruption)，请在标红处修正后再保存。");
+        return;
+    }
+
     const buildSubmission = (ids: string[]) => {
       return ids.map(id => {
         const atom = state.draftAtomsData[id];

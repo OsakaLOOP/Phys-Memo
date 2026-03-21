@@ -4,7 +4,7 @@ import type { DecorationSet } from '@codemirror/view';
 import type { DraftId, ContentAtomField } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
 
-// === 1. Data Structures ===
+// 基础数据
 
 export interface AtomMapping {
     id: DraftId;
@@ -12,18 +12,16 @@ export interface AtomMapping {
     to: number;
 }
 
-// === 2. State Effects & Fields ===
-
-// Effect: 外部强制更新（例如初始化或 Undo/Redo）时，派发完整的 Atom 映射列表
+// 状态机和 Effect
 export const setAtomMapEffect = StateEffect.define<AtomMapping[]>();
 
-// StateField: 核心状态机，维护每个 Atom 在文档中的精确 [from, to] 范围
+// 维护[from, to] 
 export const atomMapField = StateField.define<AtomMapping[]>({
     create() {
         return [];
     },
     update(mappings, tr: Transaction) {
-        // 1. 如果有外部下发的全新映射（如初始化），直接替换
+        // 1. 如果有外部下发的全新映射, 直接替换
         for (const e of tr.effects) {
             if (e.is(setAtomMapEffect)) {
                 return e.value;
@@ -45,7 +43,7 @@ export const atomMapField = StateField.define<AtomMapping[]>({
     }
 });
 
-// === 3. Sync Plugin: 监听变化，反向同步到 Zustand ===
+// 监听变化，反向同步到 Zustand
 
 export const syncToZustandPlugin = (field: ContentAtomField) => ViewPlugin.fromClass(class {
     updateTimeout: number | null = null;
@@ -77,11 +75,8 @@ export const syncToZustandPlugin = (field: ContentAtomField) => ViewPlugin.fromC
 
             // 遍历映射表，精准切出每个 Atom 的当前文本，与 Zustand 对比
             for (const m of mappings) {
-                // 如果用户删除了两个块之间的所有内容，from 可能会等于 to
-                // sliceDoc 会安全地返回空字符串
                 const currentText = update.state.sliceDoc(m.from, m.to);
 
-                // 只有真正发生变化时才提交 update transaction
                 if (currentData[m.id]?.content !== currentText) {
                     transactions.push({
                         action: 'update',

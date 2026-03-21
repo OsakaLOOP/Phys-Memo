@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { ContentAtomField } from '../../attrstrand/types';
 import RichTextRenderer from '../RichTextRenderer';
 import { UnifiedCodeMirror } from './Editor/UnifiedCodeMirror';
-import { Edit3, Plus } from 'lucide-react';
+import { Check, Edit3, Plus } from 'lucide-react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { CopyrightTooltip } from './CopyrightTooltip';
 import { genTempId } from '../../store/workspaceStore';
@@ -23,6 +23,30 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
     const atomIds = useWorkspaceStore(state => state.draftAtomLists[field] || []);
     const atomsData = useWorkspaceStore(state => state.draftAtomsData);
     const addAtomId = useWorkspaceStore(state => state.addAtomId);
+
+    // 悬停状态
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+    const handlePointerOver = (e: React.PointerEvent) => {
+        const target = e.target as HTMLElement;
+        const item = target.closest('[data-index]') as HTMLElement | null;
+        if (item) {
+            const index = parseInt(item.getAttribute('data-index') || '', 10);
+            if (!Number.isNaN(index) && hoveredIndex !== index) {
+                setHoveredIndex(index);
+            }
+        } else {
+            setHoveredIndex(null);
+        }
+    };
+
+    const handlePointerLeave = (e: React.PointerEvent<HTMLDivElement>) => {
+        const related = e.relatedTarget as Node | null;
+        if (related && related instanceof Node && e.currentTarget.contains(related)) {
+            return;
+        }
+        setHoveredIndex(null);
+    };
 
     const handleContainerClick = (e: React.MouseEvent) => {
         if (readOnly || isEditing) return;
@@ -57,9 +81,9 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                 <div className="absolute top-2 right-2 flex gap-1 z-10">
                     <button
                         onClick={() => setActiveEditor(null)}
-                        className="px-3 py-1 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded text-sm font-medium transition-colors shadow-sm"
+                        className="p-1 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded text-sm font-medium transition-colors shadow-sm"
                     >
-                        完成
+                        <Check size={16}/> 
                     </button>
                 </div>
             </div>
@@ -70,6 +94,8 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
     return (
         <div
             onClick={handleContainerClick}
+            onPointerOver={handlePointerOver}
+            onPointerLeave={handlePointerLeave}
             className={`
                 group/field relative w-full rounded-lg transition-all
                 ${!readOnly ? 'cursor-text hover:bg-slate-50 ring-1 ring-transparent hover:ring-slate-200' : ''}
@@ -95,10 +121,14 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                         const attr = atom?.attr || null;
 
                         return (
-                            <div key={id} className="relative group/block">
+                            <div 
+                                key={id} 
+                                className="relative group/block"
+                                data-index={index}
+                            >
                                 {/* 块顶部插入按钮 */}
                                 {!readOnly && index === 0 && (
-                                    <div className="absolute -top-[14px] left-0 w-full flex justify-center opacity-0 group-hover/block:opacity-100 transition-opacity z-10 pointer-events-none">
+                                    <div className={`absolute -top-[14px] left-0 w-full flex justify-center opacity-0 ${(hoveredIndex === index) && 'opacity-100'} transition-opacity z-10 pointer-events-none`}>
                                         <button
                                             onClick={(e) => handleAdd(e, -1)}
                                             className="pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm"
@@ -116,13 +146,13 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                                 </div>
 
                                 {/* 块版权信息浮窗 (非编辑状态悬浮) */}
-                                {attr && attr.authors && Object.keys(attr.authors).length > 0 && (
+                                {attr && Object.keys(attr).length > 0 && (
                                     <div className="absolute left-3 top-full mt-1 opacity-0 group-hover/block:opacity-100 transition-opacity pointer-events-none z-20">
                                         <CopyrightTooltip
-                                            authors={Object.entries(attr.authors).map(([author, share]) => ({ author, share: Number(share) }))}
-                                            diffAdded={attr.diffAdded || 0}
-                                            diffDeleted={attr.diffDeleted || 0}
-                                            diffRetained={attr.diffRetained || 0}
+                                            authors={Object.entries(attr).map(([author, share]) => ({ author, share: Number(share) }))}
+                                            diffAdded={atom?.diffAdded || 0}
+                                            diffDeleted={atom?.diffDeleted || 0}
+                                            diffRetained={atom?.diffRetained || 0}
                                             itemId={id}
                                         />
                                     </div>
@@ -130,7 +160,7 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
 
                                 {/* 块底部插入按钮 */}
                                 {!readOnly && (
-                                    <div className="absolute -bottom-[14px] left-0 w-full flex justify-center opacity-0 group-hover/block:opacity-100 transition-opacity z-10 pointer-events-none">
+                                    <div className={`absolute -bottom-[14px] left-0 w-full flex justify-center opacity-0 ${((hoveredIndex === index) || hoveredIndex === index + 1) && 'opacity-100'} transition-opacity z-10 pointer-events-none`}>
                                         <button
                                             onClick={(e) => handleAdd(e, index)}
                                             className="pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm"

@@ -3,7 +3,7 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { ContentAtomField } from '../../attrstrand/types';
 import RichTextRenderer from '../RichTextRenderer';
 import { UnifiedCodeMirror } from './Editor/UnifiedCodeMirror';
-import { Check, Edit3, Plus } from 'lucide-react';
+import { Check, Edit3, Plus, AlertTriangle } from 'lucide-react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { CopyrightTooltip } from './CopyrightTooltip';
 import { genTempId } from '../../store/workspaceStore';
@@ -24,8 +24,14 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
     const atomsData = useWorkspaceStore(state => state.draftAtomsData);
     const addAtomId = useWorkspaceStore(state => state.addAtomId);
 
+    // 获取当前 field 的 lint 错误
+    const fieldLintErrors = useWorkspaceStore(state => state.fieldLintErrors[field] || false);
+
     // 悬停状态
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    
+    // 弹窗状态
+    const [showErrorDialog, setShowErrorDialog] = useState(false);
 
     const handlePointerOver = (e: React.PointerEvent) => {
         const target = e.target as HTMLElement;
@@ -70,6 +76,16 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
         setActiveEditor({ field, id: newId });
     };
 
+    const handleCompleteEdit = () => {
+        // 如果有 lint 错误，显示警告弹窗，阻止编辑完成
+        if (fieldLintErrors) {
+            setShowErrorDialog(true);
+            return;
+        }
+        // 无错误，直接完成编辑
+        setActiveEditor(null);
+    };
+
     if (isEditing) {
         return (
             <div className={`relative w-full ${className}`}>
@@ -80,12 +96,55 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                 {/* 右上角操作按钮：完成编辑 */}
                 <div className="absolute top-2 right-2 flex gap-1 z-10">
                     <button
-                        onClick={() => setActiveEditor(null)}
-                        className="p-1 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded text-sm font-medium transition-colors shadow-sm"
+                        onClick={handleCompleteEdit}
+                        className={`p-1 rounded text-sm font-medium transition-colors shadow-sm ${
+                            fieldLintErrors
+                                ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                                : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                        }`}
                     >
                         <Check size={16}/> 
                     </button>
                 </div>
+
+                {/* 错误警告弹窗 */}
+                {showErrorDialog && (
+                    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+                            {/* 弹窗头部 */}
+                            <div className="flex items-center gap-3 p-4 border-b border-slate-200">
+                                <AlertTriangle size={20} className="text-orange-500 flex-shrink-0" />
+                                <h2 className="text-lg font-semibold text-slate-900">编辑验证失败</h2>
+                            </div>
+
+                            {/* 弹窗内容 */}
+                            <div className="p-4">
+                                <p className="text-slate-700">
+                                    检测到编辑错误：段落间存在问题（未正确使用双换行符分隔或包含非法字符）。请检查并修复后再提交。
+                                </p>
+                            </div>
+
+                            {/* 弹窗底部操作 */}
+                            <div className="flex gap-2 p-4 border-t border-slate-200 justify-end">
+                                <button
+                                    onClick={() => setShowErrorDialog(false)}
+                                    className="px-4 py-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded font-medium transition-colors"
+                                >
+                                    继续编辑
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowErrorDialog(false);
+                                        setActiveEditor(null);
+                                    }}
+                                    className="px-4 py-2 text-slate-700 bg-orange-100 hover:bg-orange-200 rounded font-medium transition-colors"
+                                >
+                                    放弃更改
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }

@@ -120,13 +120,13 @@ export const blockDecorations = (field: ContentAtomField) => ViewPlugin.fromClas
         const mappings = view.state.field(atomMapField);
 
         // 遍历所有行，检查属于块内还是块间的空隙，
-        // 并给块间空隙标记特殊样式（非标准 \n\n 间距则标红警示）
+        // 并给块间空隙标记特殊样式（非标准 \n 间距则标红警示）
         let nextGapStart = 0;
 
         for (const m of mappings) {
             if (nextGapStart < m.from) {
                 const gapText = view.state.doc.sliceString(nextGapStart, m.from);
-                const isError = gapText !== '\n\n';
+                const isError = gapText !== '\n';
 
                 let pos = nextGapStart;
                 while (pos < m.from) {
@@ -167,18 +167,17 @@ export const blockDecorations = (field: ContentAtomField) => ViewPlugin.fromClas
         }
 
         // 添加中间间隙的 + 按钮 Widget
-        // 由于需要悬浮展示并不占据额外的高度影响布局，我们将它注入在换行符中间
         for (let i = 0; i < mappings.length - 1; i++) {
             const current = mappings[i];
             const next = mappings[i + 1];
 
-            // 确保中间有间隔 (通常是 \n\n)
-            if (next.from - current.to >= 2) {
-                // 我们把按钮放在两段之间的第一行 (空行)
-                const line = view.state.doc.lineAt(current.to + 1);
-                decorations.push({ from: line.from, to: line.to, dec: Decoration.widget({
-                    widget: new AddButtonWidget(field, i),
-                    side: 0
+            // 确保中间有间隔 (通常是 \n)
+            if (next.from - current.to >= 1) {
+                // 作为一个占据独立行高的 block widget 插入
+                decorations.push({ from: current.to, to: current.to, dec: Decoration.widget({
+                    widget: new AddButtonWidget(field, i, 'middle'),
+                    side: 1,
+                    block: true
                 })});
             }
         }
@@ -296,27 +295,51 @@ class AddButtonWidget extends WidgetType {
         const btn = document.createElement("button");
 
         if (this.position === 'middle') {
-            // 中间间隙：inline widget，relative定位，按钮绝对定位在行顶部居中
-            wrap.className = "cm-add-btn-wrapper relative h-0 pointer-events-none z-10 opacity-0 group-hover/cmline-gap:opacity-100 transition-opacity duration-200";
-            btn.className = "absolute pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm cursor-pointer";
-            btn.style.top = "0";
-            btn.style.left = "50%";
-            btn.style.transform = "translateX(-50%)";
+            // 中间间隙：占据一整行，flex 布局，内容居中
+            wrap.className = "cm-add-btn-wrapper relative w-full flex justify-center items-center h-[28px] pointer-events-none z-10 opacity-0 hover:opacity-100 transition-opacity duration-200 gap-2";
+            btn.className = "pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm cursor-pointer";
+
+            const swapBtn = document.createElement("button");
+            swapBtn.className = "pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm cursor-pointer";
+            swapBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-down"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>`;
+
+            swapBtn.onmousedown = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const state = useWorkspaceStore.getState();
+                const list = [...(state.draftAtomLists[this.field] || [])];
+
+                if (this.index >= 0 && this.index < list.length - 1) {
+                    const temp = list[this.index];
+                    list[this.index] = list[this.index + 1];
+                    list[this.index + 1] = temp;
+                    state.applyAtomTransactions(this.field, [], list);
+                }
+            };
+
+            wrap.appendChild(btn);
+            wrap.appendChild(swapBtn);
+
+            // 确保其父级也有这个 class，以支持之前的 group-hover 逻辑，虽然这里也加了 hover:opacity-100
+            wrap.classList.add('group-hover/cmline-gap:opacity-100');
+
         } else {
             // 顶部/底部：block widget，relative定位，按钮绝对偏移
             wrap.className = "cm-add-btn-wrapper relative w-full flex justify-center h-0 overflow-visible pointer-events-none z-10 opacity-0 group-hover/cmline:opacity-100 transition-opacity duration-200";
             btn.className = "absolute pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm cursor-pointer";
-        }
-        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
 
-        // 调整位置保持与内容一定距离，不改变垂直排版
-        if (this.position === 'top') {
-            btn.style.top = "-24px";
-        } else if (this.position === 'bottom') {
-            btn.style.bottom = "-24px";
-        } else {
-            // 中间间隙，已由flex居中，不需要额外设置
+            // 调整位置保持与内容一定距离，不改变垂直排版
+            if (this.position === 'top') {
+                btn.style.top = "-24px";
+            } else if (this.position === 'bottom') {
+                btn.style.bottom = "-24px";
+            }
+
+            wrap.appendChild(btn);
         }
+
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
 
         btn.onmousedown = (e) => {
             e.preventDefault();
@@ -331,7 +354,6 @@ class AddButtonWidget extends WidgetType {
             state.setActiveEditor({ field: this.field, id: newId });
         };
 
-        wrap.appendChild(btn);
 
         return wrap;
     }

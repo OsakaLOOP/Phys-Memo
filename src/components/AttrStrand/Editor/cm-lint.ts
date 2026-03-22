@@ -34,7 +34,7 @@ export const atomBoundaryLinter = (field: ContentAtomField) => linter((view: Edi
                  reportTo = reportFrom + 1;
             }
 
-            if (gapText !== '\n\n') {
+            if (gapText !== '\n') {
                 if (!/^[\n]*$/.test(gapText)) {
                     // Contains characters other than newline
                     hasUnexpectedInterruption = true;
@@ -45,16 +45,16 @@ export const atomBoundaryLinter = (field: ContentAtomField) => linter((view: Edi
                         message: 'AtomBlockBoundaryError: UnexpectedInterruption (段落间发现意外的非空字符，提交时将被拦截)',
                         source: 'boundary-linter'
                     });
-                } else if (gapText.length < 2) {
+                } else if (gapText.length < 1) {
                     // Only newlines, but too few
                     diagnostics.push({
                         from: reportFrom,
                         to: reportTo,
                         severity: 'error',
-                        message: 'AtomBlockBoundaryError: MissingLineBreak (缺少换行符，应有两行空白，保存时将自动修正)',
+                        message: 'AtomBlockBoundaryError: MissingLineBreak (缺少换行符，应有一行空白，保存时将自动修正)',
                         source: 'boundary-linter'
                     });
-                } else if (gapText.length > 2) {
+                } else if (gapText.length > 1) {
                     // Only newlines, but too many
                     diagnostics.push({
                         from: reportFrom,
@@ -70,7 +70,7 @@ export const atomBoundaryLinter = (field: ContentAtomField) => linter((view: Edi
                 from: gapFrom,
                 to: gapTo,
                 severity: 'error',
-                message: 'AtomBlockBoundaryError: MissingLineBreak (缺少换行符，应有两行空白，保存时将自动修正)',
+                message: 'AtomBlockBoundaryError: MissingLineBreak (缺少换行符，应有一行空白，保存时将自动修正)',
                 source: 'boundary-linter'
             });
         }

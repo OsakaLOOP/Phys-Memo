@@ -31,8 +31,8 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
         let fullText = '';
         const mappings: AtomMapping[] = [];
 
-        // 核心：使用标准的 Markdown 双换行作为物理拼接符
-        const separator = '\n\n';
+        // 核心：使用单换行作为物理拼接符
+        const separator = '\n';
         let currentOffset = 0;
 
         for (let i = 0; i < initialAtomIds.length; i++) {
@@ -210,7 +210,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
 
                 let newFullText = '';
                 const newMappings: AtomMapping[] = [];
-                const separator = '\n\n';
+                const separator = '\n';
                 let currentOffset = 0;
 
                 for (let i = 0; i < current.ids.length; i++) {

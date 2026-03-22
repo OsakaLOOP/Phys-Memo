@@ -8,7 +8,7 @@ import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@cod
 
 import type { ContentAtomField, DraftId } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
-import { atomMapField, blockDecorations, setAtomMapEffect, addAtomEffect, removeAtomEffect, swapAtomEffect, syncToZustandPlugin, blockActionGutter } from './cm-plugins';
+import { atomMapField, blockDecorations, setAtomMapEffect, syncToZustandPlugin, blockActionGutter } from './cm-plugins';
 import type { AtomMapping } from './cm-plugins';
 import { lintGutter } from '@codemirror/lint';
 import { atomBoundaryLinter } from './cm-lint';
@@ -102,18 +102,12 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                 // 核心状态机与装饰器
                 atomMapField,
                 // 提供 invertedEffects 以支持自定义 Effect 的撤销/重做
+                // 当通过 setAtomMapEffect 进行全量重组时，它的反转效果就是恢复回之前的旧映射表
                 invertedEffects.of(tr => {
                     const inverted = [];
                     for (const e of tr.effects) {
-                        if (e.is(addAtomEffect)) {
-                            inverted.push(removeAtomEffect.of({ id: e.value.id }));
-                        } else if (e.is(removeAtomEffect)) {
-                            // 注意：由于我们在组件内实现插入，这里实际上应该恢复原有的文本
-                            // 但为简单起见，只要把 ID 恢复到原来位置即可
-                            // 因为 removeAtomEffect 尚未在 UI 中使用（这里仅作占位预留）
-                        } else if (e.is(swapAtomEffect)) {
-                            // 交换的逆操作还是交换同样的两个 index
-                            inverted.push(swapAtomEffect.of({ indexA: e.value.indexA, indexB: e.value.indexB }));
+                        if (e.is(setAtomMapEffect)) {
+                            inverted.push(setAtomMapEffect.of(tr.startState.field(atomMapField)));
                         }
                     }
                     return inverted;
@@ -237,83 +231,84 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
         }
     }, [activeEditor?.id, field]);
 
-    // --- 4. 处理外部强制更新（如撤销/其他终端同步） ---
-    // 监听 Zustand 主追踪数据 (draftAtomLists / draftAtomsData) 的变化。
-    // 如果主状态发生变化（比如点击了全局的 Undo 按钮，且当前 Editor 没激活，或是切换了草稿），
-    // 并且这和 CM 当前的平行状态有本质不同，我们需要用这个新数据强制刷新 CodeMirror。
+    // --- 4. 监听重组标志进行完整解析替换 ---
+    // 当在 UI 点击“新增/交换”或者全局 Undo 导致外部状态变化时，
+    // cmStructuralRebuildFlag 会改变，触发 CodeMirror 进行全量重建。
+    // 这将被计入 CM 的 history，且可通过 Cmd+Z 完美撤销。
     useEffect(() => {
-        // 我们需要保留上一次我们同步后的签名，以避免死循环或无谓更新
+        let lastFlag = useWorkspaceStore.getState().cmStructuralRebuildFlag[field];
+
+        const unsubscribe = useWorkspaceStore.subscribe(
+            (state) => {
+                if (!viewRef.current) return;
+                const currentFlag = state.cmStructuralRebuildFlag[field];
+
+                if (currentFlag !== lastFlag) {
+                    lastFlag = currentFlag;
+
+                    const view = viewRef.current;
+                    const currentList = state.cmDraftAtomLists[field] || [];
+                    const currentData = state.cmDraftAtomsData;
+
+                    let newFullText = '';
+                    const newMappings: AtomMapping[] = [];
+                    const separator = '\n';
+                    let currentOffset = 0;
+
+                    for (let i = 0; i < currentList.length; i++) {
+                        const id = currentList[i];
+                        const content = currentData[id]?.content || '';
+
+                        const from = currentOffset;
+                        const to = currentOffset + content.length;
+                        newMappings.push({ id, from, to });
+
+                        newFullText += content;
+                        if (i < currentList.length - 1) {
+                            newFullText += separator;
+                            currentOffset += content.length + separator.length;
+                        }
+                    }
+
+                    // 派发全量替换事务
+                    // 注意：这里我们不使用 external_sync，而是使用 structural_rebuild
+                    // 这样 syncToZustandPlugin 会正常处理它，但因为它和我们刚构建的状态一样，不会引发死循环。
+                    // 并且因为我们在 invertedEffects 里注册了 setAtomMapEffect，这个 Transaction 可以被 CM 完美 Undo！
+                    view.dispatch({
+                        changes: { from: 0, to: view.state.doc.length, insert: newFullText },
+                        effects: setAtomMapEffect.of(newMappings),
+                        annotations: Transaction.userEvent.of('structural_rebuild')
+                    });
+                }
+            }
+        );
+
+        return () => unsubscribe();
+    }, [field]);
+
+    // --- 5. 处理外部主追踪数据的强制更新（如撤销/其他终端同步） ---
+    // 如果主状态发生变化（比如点击了全局的 Undo 按钮，且当前 Editor 没激活，或是切换了草稿），
+    // 我们只需将其重置到 平行状态，然后 initParallelState 内部会增加 rebuild 标志，
+    // 从而触发上面的 useEffect 负责重建。
+    useEffect(() => {
         let lastTrackedSignature = '';
 
         const unsubscribe = useWorkspaceStore.subscribe(
             (state, prevState) => {
-                if (!viewRef.current) return;
-
-                // 我们只关心 tracked (Zundo tracked) 的状态发生了变化
                 const currentList = state.draftAtomLists[field] || [];
                 const prevList = prevState.draftAtomLists[field] || [];
 
-                // 1. 如果列表引用和数据对象引用都没有变化，说明可能是 activeEditor 或者平行状态改变，忽略
                 if (currentList === prevList && state.draftAtomsData === prevState.draftAtomsData) {
                      return;
                 }
 
-                // 计算当前 tracked 外部数据的签名
                 const trackedSignature = currentList.map((id: string) => `${id}:${state.draftAtomsData[id]?.content || ''}`).join('|');
-
-                // 如果签名没有任何变化（比如只是其他 field 发生了变化，或者空更新），跳过
                 if (trackedSignature === lastTrackedSignature) {
                     return;
                 }
 
-                // 提取当前 CodeMirror 实例中的数据签名
-                const view = viewRef.current;
-                const mappings = view.state.field(atomMapField);
-                const currentCMSignature = mappings.map(m => {
-                    const text = view.state.sliceDoc(m.from, m.to);
-                    return `${m.id}:${text}`;
-                }).join('|');
-
-                // 2. 只有当 tracked 状态确实变了，且和当前 CM 里的状态不一样时，才执行覆盖
-                // (如果相等，可能是我们自己刚刚 commit 回主状态的，没必要重置)
-                if (trackedSignature === currentCMSignature) {
-                    lastTrackedSignature = trackedSignature;
-                    return;
-                }
-
-                // 如果不同，说明这是“外部力量”（比如点击了顶部的全局撤销按钮）
-                // 我们必须强行用新数据覆盖当前 CM 实例的内容，并且重置平行状态。
-
-                // --- 重置平行状态 ---
+                // --- 重置平行状态并触发重建标志 ---
                 useWorkspaceStore.getState().initParallelState(field);
-
-                let newFullText = '';
-                const newMappings: AtomMapping[] = [];
-                const separator = '\n';
-                let currentOffset = 0;
-
-                for (let i = 0; i < currentList.length; i++) {
-                    const id = currentList[i];
-                    const content = state.draftAtomsData[id]?.content || '';
-
-                    const from = currentOffset;
-                    const to = currentOffset + content.length;
-                    newMappings.push({ id, from, to });
-
-                    newFullText += content;
-                    if (i < currentList.length - 1) {
-                        newFullText += separator;
-                        currentOffset += content.length + separator.length;
-                    }
-                }
-
-                // 派发带有 'external_sync' 标记的全量替换事务，这样内部的 syncPlugin 就不会再反向推回 Zustand
-                viewRef.current.dispatch({
-                    changes: { from: 0, to: viewRef.current.state.doc.length, insert: newFullText },
-                    effects: setAtomMapEffect.of(newMappings),
-                    annotations: Transaction.userEvent.of('external_sync')
-                });
-
                 lastTrackedSignature = trackedSignature;
             }
         );

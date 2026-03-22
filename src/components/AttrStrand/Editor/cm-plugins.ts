@@ -134,11 +134,11 @@ export const blockDecorations = (field: ContentAtomField) => ViewPlugin.fromClas
                     if (line.from >= nextGapStart && line.to <= m.from) {
                         if (isError) {
                             decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                                class: 'cm-atom-gap-error group/cmline'
+                                class: 'cm-atom-gap-error group/cmline-gap'
                             })});
                         } else {
                             decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                                class: 'group/cmline'
+                                class: 'group/cmline-gap'
                             })});
                         }
                     }
@@ -176,9 +176,9 @@ export const blockDecorations = (field: ContentAtomField) => ViewPlugin.fromClas
             if (next.from - current.to >= 2) {
                 // 我们把按钮放在两段之间的第一行 (空行)
                 const line = view.state.doc.lineAt(current.to + 1);
-                decorations.push({ from: line.from, to: line.from, dec: Decoration.widget({
+                decorations.push({ from: line.from, to: line.to, dec: Decoration.widget({
                     widget: new AddButtonWidget(field, i),
-                    side: 1
+                    side: 0
                 })});
             }
         }
@@ -293,11 +293,20 @@ class AddButtonWidget extends WidgetType {
 
     toDOM() {
         const wrap = document.createElement("div");
-        // 改为由 group-hover/cmline 控制透明度显示，而不是依赖内部 h-0 元素的悬浮
-        wrap.className = "cm-add-btn-wrapper relative w-full flex justify-center h-0 overflow-visible pointer-events-none z-10 opacity-0 group-hover/cmline:opacity-100 transition-opacity duration-200";
-
         const btn = document.createElement("button");
-        btn.className = "absolute pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm cursor-pointer";
+
+        if (this.position === 'middle') {
+            // 中间间隙：inline widget，relative定位，按钮绝对定位在行顶部居中
+            wrap.className = "cm-add-btn-wrapper relative h-0 pointer-events-none z-10 opacity-0 group-hover/cmline-gap:opacity-100 transition-opacity duration-200";
+            btn.className = "absolute pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm cursor-pointer";
+            btn.style.top = "0";
+            btn.style.left = "50%";
+            btn.style.transform = "translateX(-50%)";
+        } else {
+            // 顶部/底部：block widget，relative定位，按钮绝对偏移
+            wrap.className = "cm-add-btn-wrapper relative w-full flex justify-center h-0 overflow-visible pointer-events-none z-10 opacity-0 group-hover/cmline:opacity-100 transition-opacity duration-200";
+            btn.className = "absolute pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm cursor-pointer";
+        }
         btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
 
         // 调整位置保持与内容一定距离，不改变垂直排版
@@ -306,8 +315,7 @@ class AddButtonWidget extends WidgetType {
         } else if (this.position === 'bottom') {
             btn.style.bottom = "-24px";
         } else {
-            // 中间间隙
-            btn.style.top = "-14px";
+            // 中间间隙，已由flex居中，不需要额外设置
         }
 
         btn.onmousedown = (e) => {

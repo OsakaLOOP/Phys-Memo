@@ -1,4 +1,4 @@
-import { StateField, StateEffect, Transaction, RangeSetBuilder } from '@codemirror/state';
+import { StateField, StateEffect, Transaction, RangeSetBuilder, EditorState } from '@codemirror/state';
 import { EditorView, Decoration, ViewPlugin, ViewUpdate, gutter, GutterMarker, WidgetType } from '@codemirror/view';
 import type { DecorationSet } from '@codemirror/view';
 import type { DraftId, ContentAtomField } from '../../../attrstrand/types';
@@ -101,165 +101,158 @@ export const syncToZustandPlugin = (field: ContentAtomField) => ViewPlugin.fromC
 
 // === 4. Visual Decorations: 渲染 Atom 块边界样式 ===
 
-export const blockDecorations = (field: ContentAtomField) => ViewPlugin.fromClass(class {
-    decorations: DecorationSet;
+// Helper: Build decorations based on state
+function buildDecorations(state: EditorState, field: ContentAtomField): DecorationSet {
+    const decorations: { from: number; to: number; dec: Decoration }[] = [];
+    const mappings = state.field(atomMapField);
 
-    constructor(view: EditorView) {
-        this.decorations = this.buildDecorations(view);
-    }
+    let nextGapStart = 0;
 
-    update(update: ViewUpdate) {
-        // 当文档内容变化、或者视口滚动时重新计算可见区域的装饰器
-        if (update.docChanged || update.viewportChanged) {
-            this.decorations = this.buildDecorations(update.view);
-        }
-    }
-
-    buildDecorations(view: EditorView) {
-        const decorations: { from: number; to: number; dec: Decoration }[] = [];
-        const mappings = view.state.field(atomMapField);
-
-        // 遍历所有行，检查属于块内还是块间的空隙，
-        // 并给块间空隙标记特殊样式（非标准 \n 间距则标红警示）
-        let nextGapStart = 0;
-
-        for (const m of mappings) {
-            if (nextGapStart < m.from) {
-                const gapText = view.state.doc.sliceString(nextGapStart, m.from);
-                const isError = gapText !== '\n';
-
-                let pos = nextGapStart;
-                while (pos < m.from) {
-                    const line = view.state.doc.lineAt(pos);
-                    if (line.from >= nextGapStart && line.to <= m.from) {
-                        if (isError) {
-                            decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                                class: 'cm-atom-gap-error group/cmline-gap'
-                            })});
-                        } else {
-                            decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                                class: 'group/cmline-gap'
-                            })});
-                        }
-                    }
-                    pos = line.to + 1;
-                    if (pos > view.state.doc.length) break;
-                }
-            }
-
-            if (m.from < m.to) { // 正常的块
-                // 为属于这个 Atom 的每一行加上行级样式（左侧边框/背景）
-                let pos = m.from;
-                while (pos <= m.to) {
-                    const line = view.state.doc.lineAt(pos);
-                    // 仅当这行真的属于这个块时添加 class
-                    if (line.from >= m.from && line.to <= m.to) {
-                        decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                            class: 'cm-atom-line ml-2 pl-2'
-                        })});
-                    }
-                    pos = line.to + 1;
-                    if (pos > view.state.doc.length) break;
-                }
-            }
-
-            nextGapStart = m.to;
-        }
-
-        // 添加中间间隙的 + 按钮 Widget
-        for (let i = 0; i < mappings.length - 1; i++) {
-            const current = mappings[i];
-            const next = mappings[i + 1];
-
-            // 确保中间有间隔 (通常是 \n)
-            if (next.from - current.to >= 1) {
-                // 作为一个占据独立行高的 block widget 插入
-                decorations.push({ from: current.to, to: current.to, dec: Decoration.widget({
-                    widget: new AddButtonWidget(field, i, 'middle'),
-                    side: 1,
-                    block: true
-                })});
-            }
-        }
-
-        // 添加顶部 + 按钮
-        if (mappings.length > 0) {
-            const firstLine = view.state.doc.lineAt(0);
-            decorations.push({ from: firstLine.from, to: firstLine.from, dec: Decoration.widget({
-                widget: new AddButtonWidget(field, -1, 'top'),
-                side: -1
-            })});
-            // 第一行的 group/cmline 会在上面的块内逻辑处理，或者在这里确保有
-            if (!decorations.some(d => d.from === firstLine.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
-                decorations.push({ from: firstLine.from, to: firstLine.from, dec: Decoration.line({
-                    class: 'group/cmline'
-                })});
-            }
-        }
-
-        // 结尾处的额外内容标红
-        if (nextGapStart < view.state.doc.length) {
-            const gapText = view.state.doc.sliceString(nextGapStart, view.state.doc.length);
-            const isError = gapText.length > 0 && gapText !== '\n';
+    for (const m of mappings) {
+        if (nextGapStart < m.from) {
+            const gapText = state.doc.sliceString(nextGapStart, m.from);
+            const isError = gapText !== '\n';
 
             let pos = nextGapStart;
-            while (pos <= view.state.doc.length) {
-                const line = view.state.doc.lineAt(pos);
-                if (line.from >= nextGapStart) {
+            while (pos < m.from) {
+                const line = state.doc.lineAt(pos);
+                if (line.from >= nextGapStart && line.to <= m.from) {
                     if (isError) {
-                         decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                             class: 'cm-atom-gap-error group/cmline'
-                         })});
+                        decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
+                            class: 'cm-atom-gap-error group/cmline-gap'
+                        })});
                     } else {
-                         decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                             class: 'group/cmline'
-                         })});
+                        decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
+                            class: 'group/cmline-gap'
+                        })});
                     }
                 }
                 pos = line.to + 1;
-                if (pos > view.state.doc.length) break;
+                if (pos > state.doc.length) break;
             }
         }
 
-        // 添加底部 + 按钮
-        if (mappings.length > 0) {
-            const lastMapping = mappings[mappings.length - 1];
-            // 在最后一行的下方
-            const lastLine = view.state.doc.lineAt(lastMapping.to);
-            decorations.push({ from: lastLine.to, to: lastLine.to, dec: Decoration.widget({
-                widget: new AddButtonWidget(field, mappings.length - 1, 'bottom'),
-                side: 1
-            })});
-            if (!decorations.some(d => d.from === lastLine.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
-                decorations.push({ from: lastLine.from, to: lastLine.from, dec: Decoration.line({
-                    class: 'group/cmline'
-                })});
-            }
-        } else {
-            // 如果为空，在第一行显示
-            decorations.push({ from: 0, to: 0, dec: Decoration.widget({
-                widget: new AddButtonWidget(field, -1, 'bottom'),
-                side: 1
-            })});
-            const line = view.state.doc.lineAt(0);
-            if (!decorations.some(d => d.from === line.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
-                decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                    class: 'group/cmline'
-                })});
+        if (m.from < m.to) { // 正常的块
+            // 为属于这个 Atom 的每一行加上行级样式（左侧边框/背景）
+            let pos = m.from;
+            while (pos <= m.to) {
+                const line = state.doc.lineAt(pos);
+                // 仅当这行真的属于这个块时添加 class
+                if (line.from >= m.from && line.to <= m.to) {
+                    decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
+                        class: 'cm-atom-line border-l-2 border-slate-200 ml-2 pl-2'
+                    })});
+                }
+                pos = line.to + 1;
+                if (pos > state.doc.length) break;
             }
         }
 
-        // 使用 Decoration.set 自动排序处理重复
-        return Decoration.set(decorations.sort((a, b) => a.from - b.from).map(d => {
-            const range = d.dec.range(d.from, d.to);
-            return range;
-        }), true);
+        nextGapStart = m.to;
     }
-}, {
-    decorations: v => v.decorations
+
+    // 添加中间间隙的 + 按钮 Widget
+    for (let i = 0; i < mappings.length - 1; i++) {
+        const current = mappings[i];
+        const next = mappings[i + 1];
+
+        // 确保中间有间隔 (通常是 \n)
+        if (next.from - current.to >= 1) {
+            // 作为一个占据独立行高的 block widget 插入
+            decorations.push({ from: current.to, to: current.to, dec: Decoration.widget({
+                widget: new AddButtonWidget(field, i, 'middle'),
+                side: 1,
+                block: true
+            })});
+        }
+    }
+
+    // 添加顶部 + 按钮
+    if (mappings.length > 0) {
+        const firstLine = state.doc.lineAt(0);
+        decorations.push({ from: firstLine.from, to: firstLine.from, dec: Decoration.widget({
+            widget: new AddButtonWidget(field, -1, 'top'),
+            side: -1
+        })});
+        // 第一行的 group/cmline 会在上面的块内逻辑处理，或者在这里确保有
+        if (!decorations.some(d => d.from === firstLine.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
+            decorations.push({ from: firstLine.from, to: firstLine.from, dec: Decoration.line({
+                class: 'group/cmline'
+            })});
+        }
+    }
+
+    // 结尾处的额外内容标红
+    if (nextGapStart < state.doc.length) {
+        const gapText = state.doc.sliceString(nextGapStart, state.doc.length);
+        const isError = gapText.length > 0 && gapText !== '\n';
+
+        let pos = nextGapStart;
+        while (pos <= state.doc.length) {
+            const line = state.doc.lineAt(pos);
+            if (line.from >= nextGapStart) {
+                if (isError) {
+                     decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
+                         class: 'cm-atom-gap-error group/cmline'
+                     })});
+                } else {
+                     decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
+                         class: 'group/cmline'
+                     })});
+                }
+            }
+            pos = line.to + 1;
+            if (pos > state.doc.length) break;
+        }
+    }
+
+    // 添加底部 + 按钮
+    if (mappings.length > 0) {
+        const lastMapping = mappings[mappings.length - 1];
+        // 在最后一行的下方
+        const lastLine = state.doc.lineAt(lastMapping.to);
+        decorations.push({ from: lastLine.to, to: lastLine.to, dec: Decoration.widget({
+            widget: new AddButtonWidget(field, mappings.length - 1, 'bottom'),
+            side: 1
+        })});
+        if (!decorations.some(d => d.from === lastLine.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
+            decorations.push({ from: lastLine.from, to: lastLine.from, dec: Decoration.line({
+                class: 'group/cmline'
+            })});
+        }
+    } else {
+        // 如果为空，在第一行显示
+        decorations.push({ from: 0, to: 0, dec: Decoration.widget({
+            widget: new AddButtonWidget(field, -1, 'bottom'),
+            side: 1
+        })});
+        const line = state.doc.lineAt(0);
+        if (!decorations.some(d => d.from === line.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
+            decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
+                class: 'group/cmline'
+            })});
+        }
+    }
+
+    return Decoration.set(decorations.sort((a, b) => a.from - b.from).map(d => {
+        return d.dec.range(d.from); // for widget and line, to is the same as from, range(pos) is sufficient
+    }));
+}
+
+export const blockDecorations = (field: ContentAtomField) => StateField.define<DecorationSet>({
+    create(state) {
+        return buildDecorations(state, field);
+    },
+    update(value, tr) {
+        // Because mappings are recalculated based on doc structure,
+        // we can just re-build on doc changes.
+        if (tr.docChanged || tr.selection) { // re-evaluating on any transaction to be safe with mapping changes
+            return buildDecorations(tr.state, field);
+        }
+        return value;
+    },
+    provide: f => EditorView.decorations.from(f)
 });
-
-
 // === 5. Gutter 占位 (预留未来拖拽和操作区域) ===
 
 // 这是一个空白的 Marker

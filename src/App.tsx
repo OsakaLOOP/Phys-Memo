@@ -810,6 +810,7 @@ const PhysMemosApp: FC = () => {
   const futureStatesLength = useStore(useWorkspaceStore.temporal, (state) => state.futureStates.length);
   const undo = useStore(useWorkspaceStore.temporal, (state) => state.undo);
   const redo = useStore(useWorkspaceStore.temporal, (state) => state.redo);
+  const activeEditor = useWorkspaceStore(state => state.activeEditor);
 
   const submitWorkspace = async () => {
     // Collect data to submit
@@ -1688,18 +1689,33 @@ const PhysMemosApp: FC = () => {
                   <div className="flex justify-between items-center mb-4 gap-4">
                        <div className="flex items-center gap-2">
                            <button
-                                onClick={() => undo()}
-                                disabled={pastStatesLength === 0}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    if (activeEditor) {
+                                         // Dispatch undo to the currently active CodeMirror editor view
+                                         document.dispatchEvent(new CustomEvent('editor-undo'));
+                                    } else {
+                                        undo();
+                                    }
+                                }}
+                                disabled={pastStatesLength === 0 && !activeEditor}
                                 className="w-8 h-8 rounded-full flex items-center justify-center border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-colors"
-                                title="撤销"
+                                title={activeEditor ? "撤销 (编辑器内)" : "撤销"}
                            >
                                 <Undo2 className="w-4 h-4" />
                            </button>
                            <button
-                                onClick={() => redo()}
-                                disabled={futureStatesLength === 0}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    if (activeEditor) {
+                                         document.dispatchEvent(new CustomEvent('editor-redo'));
+                                    } else {
+                                        redo();
+                                    }
+                                }}
+                                disabled={futureStatesLength === 0 && !activeEditor}
                                 className="w-8 h-8 rounded-full flex items-center justify-center border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-colors"
-                                title="重做"
+                                title={activeEditor ? "重做 (编辑器内)" : "重做"}
                            >
                                 <Redo2 className="w-4 h-4" />
                            </button>

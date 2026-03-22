@@ -238,53 +238,70 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
     }, [activeEditor?.id, field]);
 
     // --- 4. 处理外部强制更新（如撤销/其他终端同步） ---
-    // 监听 Zustand 数据的变化。如果是用户在当前 CM 打字导致的更新，我们之前在插件里同步过了，这里要拦截。
+    // 监听 Zustand 主追踪数据 (draftAtomLists / draftAtomsData) 的变化。
+    // 如果主状态发生变化（比如点击了全局的 Undo 按钮，且当前 Editor 没激活，或是切换了草稿），
+    // 并且这和 CM 当前的平行状态有本质不同，我们需要用这个新数据强制刷新 CodeMirror。
     useEffect(() => {
-        const unsubscribe = useWorkspaceStore.subscribe(
-            (state) => {
-                const current = {
-                    ids: state.draftAtomLists[field] || [],
-                    data: state.draftAtomsData
-                };
+        // 我们需要保留上一次我们同步后的签名，以避免死循环或无谓更新
+        let lastTrackedSignature = '';
 
+        const unsubscribe = useWorkspaceStore.subscribe(
+            (state, prevState) => {
                 if (!viewRef.current) return;
 
-                // 计算当前外部数据的签名
-                const currentSignature = current.ids.map((id: string) => `${id}:${current.data[id]?.content || ''}`).join('|');
+                // 我们只关心 tracked (Zundo tracked) 的状态发生了变化
+                const currentList = state.draftAtomLists[field] || [];
+                const prevList = prevState.draftAtomLists[field] || [];
 
-                // 实时提取当前 CodeMirror 实例中的数据签名，直接与 Zustand 的新签名比对
+                // 1. 如果列表引用和数据对象引用都没有变化，说明可能是 activeEditor 或者平行状态改变，忽略
+                if (currentList === prevList && state.draftAtomsData === prevState.draftAtomsData) {
+                     return;
+                }
+
+                // 计算当前 tracked 外部数据的签名
+                const trackedSignature = currentList.map((id: string) => `${id}:${state.draftAtomsData[id]?.content || ''}`).join('|');
+
+                // 如果签名没有任何变化（比如只是其他 field 发生了变化，或者空更新），跳过
+                if (trackedSignature === lastTrackedSignature) {
+                    return;
+                }
+
+                // 提取当前 CodeMirror 实例中的数据签名
                 const view = viewRef.current;
                 const mappings = view.state.field(atomMapField);
-                // 必须保证当前的映射数量和顺序与我们要同步的 ids 一致（或者仅对比内容，但严格来说数量顺序也代表状态）
                 const currentCMSignature = mappings.map(m => {
-                    // sliceDoc 获取当前块内的最新文本
                     const text = view.state.sliceDoc(m.from, m.to);
                     return `${m.id}:${text}`;
                 }).join('|');
 
-                // 如果签名完全一样，说明 CM 已经是最新状态，跳过更新，防止光标重置
-                if (currentSignature === currentCMSignature) {
+                // 2. 只有当 tracked 状态确实变了，且和当前 CM 里的状态不一样时，才执行覆盖
+                // (如果相等，可能是我们自己刚刚 commit 回主状态的，没必要重置)
+                if (trackedSignature === currentCMSignature) {
+                    lastTrackedSignature = trackedSignature;
                     return;
                 }
 
-                // 如果不同，说明这是“外部力量”（比如点击了顶部的撤销按钮，或者重新载入了一份草稿）
-                // 我们必须强行用新数据覆盖当前 CM 实例的内容
+                // 如果不同，说明这是“外部力量”（比如点击了顶部的全局撤销按钮）
+                // 我们必须强行用新数据覆盖当前 CM 实例的内容，并且重置平行状态。
+
+                // --- 重置平行状态 ---
+                useWorkspaceStore.getState().initParallelState(field);
 
                 let newFullText = '';
                 const newMappings: AtomMapping[] = [];
                 const separator = '\n';
                 let currentOffset = 0;
 
-                for (let i = 0; i < current.ids.length; i++) {
-                    const id = current.ids[i];
-                    const content = current.data[id]?.content || '';
+                for (let i = 0; i < currentList.length; i++) {
+                    const id = currentList[i];
+                    const content = state.draftAtomsData[id]?.content || '';
 
                     const from = currentOffset;
                     const to = currentOffset + content.length;
                     newMappings.push({ id, from, to });
 
                     newFullText += content;
-                    if (i < current.ids.length - 1) {
+                    if (i < currentList.length - 1) {
                         newFullText += separator;
                         currentOffset += content.length + separator.length;
                     }
@@ -296,6 +313,8 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                     effects: setAtomMapEffect.of(newMappings),
                     annotations: Transaction.userEvent.of('external_sync')
                 });
+
+                lastTrackedSignature = trackedSignature;
             }
         );
 

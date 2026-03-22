@@ -14,6 +14,9 @@ export interface AtomMapping {
 
 // 状态机和 Effect
 export const setAtomMapEffect = StateEffect.define<AtomMapping[]>();
+export const addAtomEffect = StateEffect.define<{ id: string, index: number, insertPos: number, length: number }>();
+export const removeAtomEffect = StateEffect.define<{ id: string }>();
+export const swapAtomEffect = StateEffect.define<{ indexA: number, indexB: number }>();
 
 // 维护[from, to] 
 export const atomMapField = StateField.define<AtomMapping[]>({
@@ -21,25 +24,56 @@ export const atomMapField = StateField.define<AtomMapping[]>({
         return [];
     },
     update(mappings, tr: Transaction) {
-        // 1. 如果有外部下发的全新映射, 直接替换
+        let nextMappings = [...mappings];
+
+        // 1. 处理结构性操作 Effects
         for (const e of tr.effects) {
             if (e.is(setAtomMapEffect)) {
-                return e.value;
+                nextMappings = e.value; // 直接覆盖，但不 return 以免类型报错或错过 docChanged
+                break;
+            } else if (e.is(addAtomEffect)) {
+                const { id, index, insertPos } = e.value;
+                // 使用传入的真实插入位置和长度作为初始边界。
+                // 如果后续有 docChanged，这里已经是应用插入后的正确边界。
+                // 这里的 from/to 对应的是新块 *自身内容* 的边界（不含分隔符）
+                // 我们在 add_atom 时插入的是 \n 等，这里精确设置其起始点。
+                const from = insertPos;
+                const to = insertPos; // 刚插入时内容为空
+
+                const newMapping: AtomMapping = { id, from, to };
+                if (index === -1) {
+                    nextMappings.unshift(newMapping);
+                } else if (index >= 0) {
+                    nextMappings.splice(index + 1, 0, newMapping);
+                } else {
+                    nextMappings.push(newMapping);
+                }
+            } else if (e.is(removeAtomEffect)) {
+                const { id } = e.value;
+                nextMappings = nextMappings.filter(m => m.id !== id);
+            } else if (e.is(swapAtomEffect)) {
+                const { indexA, indexB } = e.value;
+                if (indexA >= 0 && indexB >= 0 && indexA < nextMappings.length && indexB < nextMappings.length) {
+                    const temp = nextMappings[indexA];
+                    nextMappings[indexA] = nextMappings[indexB];
+                    nextMappings[indexB] = temp;
+                }
             }
         }
 
         // 2. 如果文档发生了修改，利用 CM 的 changes.map 自动调整所有 from/to 边界
         if (tr.docChanged) {
-            return mappings.map(m => {
-                // mapPos 自动处理插入/删除带来的偏移量
-                // assoc: -1 (from 倾向于左侧), assoc: 1 (to 倾向于右侧)
+            nextMappings = nextMappings.map(m => {
+                // 如果是新插入的，from/to 可能是 0，但我们需要精确地根据当前 doc 的分隔符重建它
+                // 因为 changes.mapPos 有时对全新插入的段落处理不够完美。
+                // 不过简单起见，这里我们保留之前的 mapPos 逻辑（对于已存在的 Atom），并在 `syncToZustandPlugin` 中精确重建
                 const newFrom = tr.changes.mapPos(m.from, -1);
                 const newTo = tr.changes.mapPos(m.to, 1);
                 return { ...m, from: newFrom, to: newTo };
             });
         }
 
-        return mappings;
+        return nextMappings;
     }
 });
 
@@ -67,28 +101,47 @@ export const syncToZustandPlugin = (field: ContentAtomField) => ViewPlugin.fromC
 
         this.updateTimeout = window.setTimeout(() => {
             const mappings = update.state.field(atomMapField);
-
             const state = useWorkspaceStore.getState();
-            const transactions: Parameters<typeof state.applyAtomTransactions>[1] = [];
 
-            const currentData = state.draftAtomsData;
+            // Sync to the parallel state
+            const newList = mappings.map(m => m.id);
+            const newAtomsData = { ...state.cmDraftAtomsData };
+            const fallbackData = state.draftAtomsData; // Fallback to zundo-tracked data if not in parallel
 
-            // 遍历映射表，精准切出每个 Atom 的当前文本，与 Zustand 对比
+            let type: import('../../../attrstrand/types').ContentAtomType = 'markdown';
+            if (field === 'core') type = 'latex';
+            if (field === 'tags' || field === 'rels') type = 'inline';
+            if (field === 'refs') type = 'sources';
+
             for (const m of mappings) {
                 const currentText = update.state.sliceDoc(m.from, m.to);
+                const existingAtom = newAtomsData[m.id] || fallbackData[m.id];
 
-                if (currentData[m.id]?.content !== currentText) {
-                    transactions.push({
-                        action: 'update',
+                if (existingAtom) {
+                    if (existingAtom.content !== currentText) {
+                        newAtomsData[m.id] = { ...existingAtom, content: currentText, isDirty: true };
+                    } else if (!newAtomsData[m.id]) {
+                         // Carry over from fallback to parallel state
+                         newAtomsData[m.id] = existingAtom;
+                    }
+                } else {
+                    // It's a brand new atom from CM UI
+                    newAtomsData[m.id] = {
                         id: m.id,
-                        content: currentText
-                    });
+                        field,
+                        type,
+                        content: currentText,
+                        creatorId: 'user',
+                        derivedFromId: null,
+                        frontMeta: {},
+                        isDirty: true
+                    };
                 }
             }
 
-            if (transactions.length > 0) {
-                state.applyAtomTransactions(field, transactions);
-            }
+            // Sync the parallel state
+            state.syncCMToParallelState(field, newList, newAtomsData);
+
         }, 500);
     }
 
@@ -310,14 +363,34 @@ class AddButtonWidget extends WidgetType {
                 e.preventDefault();
                 e.stopPropagation();
 
-                const state = useWorkspaceStore.getState();
-                const list = [...(state.draftAtomLists[this.field] || [])];
+                // 通过 CodeMirror API 执行交换，以支持原生的撤销/重做
+                // 我们需要从 DOM 事件往上找到 EditorView，这里暂时用比较 hack 的方式
+                // 最好的做法是在创建 Widget 时传入 view，或者抛出 CustomEvent
+                const view = EditorView.findFromDOM(wrap);
+                if (!view) return;
 
-                if (this.index >= 0 && this.index < list.length - 1) {
-                    const temp = list[this.index];
-                    list[this.index] = list[this.index + 1];
-                    list[this.index + 1] = temp;
-                    state.applyAtomTransactions(this.field, [], list);
+                const mappings = view.state.field(atomMapField);
+                if (this.index >= 0 && this.index < mappings.length - 1) {
+                    const currentMap = mappings[this.index];
+                    const nextMap = mappings[this.index + 1];
+
+                    const textA = view.state.sliceDoc(currentMap.from, currentMap.to);
+                    const textB = view.state.sliceDoc(nextMap.from, nextMap.to);
+
+                    // Never merge them into a single big change, otherwise mapPos will destroy the boundary mapping of the middle \n
+                    // ALWAYS use two separate changes. Since we replace text exactly within each mapping's [from, to],
+                    // the intermediate \n remains untouched and mapPos works flawlessly.
+                    // Important: Apply the later change first to avoid offsets shifting during the transaction application
+                    const changes = [
+                        { from: nextMap.from, to: nextMap.to, insert: textA },
+                        { from: currentMap.from, to: currentMap.to, insert: textB }
+                    ];
+
+                    view.dispatch({
+                        changes,
+                        effects: swapAtomEffect.of({ indexA: this.index, indexB: this.index + 1 }),
+                        annotations: Transaction.userEvent.of('swap_atom')
+                    });
                 }
             };
 
@@ -348,12 +421,47 @@ class AddButtonWidget extends WidgetType {
             e.preventDefault();
             e.stopPropagation();
 
-            // Generate a new temporary ID
             const newId = `temp_${crypto.randomUUID().replace(/-/g, '')}`;
+            const view = EditorView.findFromDOM(wrap);
+            if (!view) return;
 
-            // Ensure we update workspace state synchronously via WorkspaceStore
+            const mappings = view.state.field(atomMapField);
+            let insertPos = 0;
+            let insertText = '\n'; // Default separator
+
+            if (this.position === 'top') {
+                insertPos = 0;
+                insertText = '\n'; // Insert newline after
+            } else if (this.position === 'middle') {
+                if (this.index >= 0 && this.index < mappings.length) {
+                    insertPos = mappings[this.index].to + 1; // skip \n
+                    insertText = '\n';
+                }
+            } else if (this.position === 'bottom') {
+                insertPos = view.state.doc.length;
+                if (view.state.doc.length > 0 && view.state.sliceDoc(view.state.doc.length - 1) !== '\n') {
+                    insertText = '\n\n'; // ensure gap
+                } else {
+                    insertText = '\n';
+                }
+            }
+
+            // 对于 addAtomEffect，我们需要知道这个块内容本身的起始点。
+            // 因为 insertText 通常是 '\n' (作为和前一个块或者后一个块的分隔)，
+            // 新块的内容从插入后的哪个位置开始？
+            // 比如在中间插入 \n，相当于在原来 \n 的位置多加了一个 \n，新块内容在两个 \n 之间，所以 from = insertPos。
+            let atomFrom = insertPos;
+            if (this.position === 'bottom' && insertText === '\n\n') {
+                 atomFrom = insertPos + 1; // skip first \n which separates previous block
+            }
+
+            view.dispatch({
+                changes: { from: insertPos, to: insertPos, insert: insertText },
+                effects: addAtomEffect.of({ id: newId, index: this.index, insertPos: atomFrom, length: 0 }),
+                annotations: Transaction.userEvent.of('add_atom')
+            });
+
             const state = useWorkspaceStore.getState();
-            state.addAtomId(this.field, newId, this.index);
             state.setActiveEditor({ field: this.field, id: newId });
         };
 

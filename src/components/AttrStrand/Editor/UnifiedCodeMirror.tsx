@@ -1,14 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { EditorState, Transaction } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentWithTab, invertedEffects, undo, redo } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
 
 import type { ContentAtomField, DraftId } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
-import { atomMapField, blockDecorations, setAtomMapEffect, syncToZustandPlugin, blockActionGutter } from './cm-plugins';
+import { atomMapField, blockDecorations, setAtomMapEffect, addAtomEffect, removeAtomEffect, swapAtomEffect, syncToZustandPlugin, blockActionGutter } from './cm-plugins';
 import type { AtomMapping } from './cm-plugins';
 import { lintGutter } from '@codemirror/lint';
 import { atomBoundaryLinter } from './cm-lint';
@@ -63,11 +63,30 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
     useEffect(() => {
         if (!editorRef.current) return;
 
+        // Initialize parallel state for this field
+        useWorkspaceStore.getState().initParallelState(field);
+
         const { fullText, mappings } = buildInitialState();
+
+        // 处理失去焦点时正式提交 Parallel State 到 Zundo (以及其他 EditorView 相关的监听)
+        const blurCommitExtension = EditorView.domEventHandlers({
+            blur: (event, view) => {
+                // If blur is triggered by clicking something *inside* the editor (like the add button),
+                // we should NOT commit and exit. The relatedTarget points to the element getting focus.
+                if (event.relatedTarget && view.dom.contains(event.relatedTarget as Node)) {
+                    return false;
+                }
+
+                // Commit parallel state back to main zundo-tracked state
+                useWorkspaceStore.getState().commitCMStateToZundo(field);
+                return false;
+            }
+        });
 
         const startState = EditorState.create({
             doc: fullText,
             extensions: [
+                blurCommitExtension,
                 lineNumbers(),
                 highlightActiveLineGutter(),
                 history(),
@@ -82,6 +101,23 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                 ]),
                 // 核心状态机与装饰器
                 atomMapField,
+                // 提供 invertedEffects 以支持自定义 Effect 的撤销/重做
+                invertedEffects.of(tr => {
+                    const inverted = [];
+                    for (const e of tr.effects) {
+                        if (e.is(addAtomEffect)) {
+                            inverted.push(removeAtomEffect.of({ id: e.value.id }));
+                        } else if (e.is(removeAtomEffect)) {
+                            // 注意：由于我们在组件内实现插入，这里实际上应该恢复原有的文本
+                            // 但为简单起见，只要把 ID 恢复到原来位置即可
+                            // 因为 removeAtomEffect 尚未在 UI 中使用（这里仅作占位预留）
+                        } else if (e.is(swapAtomEffect)) {
+                            // 交换的逆操作还是交换同样的两个 index
+                            inverted.push(swapAtomEffect.of({ indexA: e.value.indexA, indexB: e.value.indexB }));
+                        }
+                    }
+                    return inverted;
+                }),
                 blockDecorations(field),
                 blockActionGutter, // 预留的左侧操作区和拖拽手柄
                 // Linting 插件
@@ -146,10 +182,37 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
         }
 
         return () => {
+            // Also commit when the component unmounts entirely (e.g. switching views)
+            useWorkspaceStore.getState().commitCMStateToZundo(field);
             view.destroy();
             viewRef.current = null;
         };
-    }, []); // 仅挂载时执行
+    }, [field]); // 挂载时执行, field 变化时重新执行（虽然通常不变化）
+
+    // --- 2.5 监听全局 Undo/Redo 事件 ---
+    useEffect(() => {
+        if (!viewRef.current) return;
+        const view = viewRef.current;
+
+        const handleUndo = () => {
+            if (activeEditor?.field === field) {
+                undo({ state: view.state, dispatch: view.dispatch });
+            }
+        };
+        const handleRedo = () => {
+            if (activeEditor?.field === field) {
+                redo({ state: view.state, dispatch: view.dispatch });
+            }
+        };
+
+        document.addEventListener('editor-undo', handleUndo);
+        document.addEventListener('editor-redo', handleRedo);
+
+        return () => {
+            document.removeEventListener('editor-undo', handleUndo);
+            document.removeEventListener('editor-redo', handleRedo);
+        };
+    }, [activeEditor?.field, field]);
 
     // --- 3. 监听初始焦点的变化 ---
     useEffect(() => {

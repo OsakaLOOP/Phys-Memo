@@ -52,6 +52,13 @@ interface WorkspaceState extends IWorkspaceDraft {
     // Editor UI State
     activeEditor: { field: ContentAtomField, id: DraftId } | null;
     setActiveEditor: (editor: { field: ContentAtomField, id: DraftId } | null) => void;
+
+    // CM Parallel State (NOT tracked by zundo)
+    cmDraftAtomLists: Record<ContentAtomField, string[]>;
+    cmDraftAtomsData: Record<DraftId, AtomDraft>;
+    syncCMToParallelState: (field: ContentAtomField, newList: string[], newAtomsData: Record<DraftId, AtomDraft>) => void;
+    commitCMStateToZundo: (field: ContentAtomField) => void;
+    initParallelState: (field: ContentAtomField) => void;
 }
 
 // 来自 uuid 的 DraftId
@@ -83,6 +90,68 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         activeEditor: null,
         setActiveEditor: (editor) => set({ activeEditor: editor }),
 
+        cmDraftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
+        cmDraftAtomsData: {},
+
+        syncCMToParallelState: (field: ContentAtomField, newList: string[], newAtomsData: Record<DraftId, AtomDraft>) => {
+            set((state) => ({
+                cmDraftAtomLists: { ...state.cmDraftAtomLists, [field]: newList },
+                cmDraftAtomsData: { ...state.cmDraftAtomsData, ...newAtomsData }
+            }));
+        },
+
+        commitCMStateToZundo: (field: ContentAtomField) => {
+            set((state) => {
+                const list = state.cmDraftAtomLists[field];
+                // Only commit if there is parallel state for this field
+                if (!list || list.length === 0 && (!state.draftAtomLists[field] || state.draftAtomLists[field].length === 0)) {
+                    return state;
+                }
+
+                // Check if anything actually changed before committing to avoid empty history states
+                const currentTrackedList = state.draftAtomLists[field] || [];
+                const isListEqual = list.length === currentTrackedList.length && list.every((val, index) => val === currentTrackedList[index]);
+
+                let isDataEqual = true;
+                if (isListEqual) {
+                     for (const id of list) {
+                         const cmData = state.cmDraftAtomsData[id];
+                         const trackedData = state.draftAtomsData[id];
+                         if (!cmData || !trackedData || cmData.content !== trackedData.content) {
+                             isDataEqual = false;
+                             break;
+                         }
+                     }
+                }
+
+                if (isListEqual && isDataEqual) {
+                     return state;
+                }
+
+                // Merge ONLY the atoms for this specific field to prevent cross-field leaks
+                const updatedAtomsData = { ...state.draftAtomsData };
+                for (const id of list) {
+                    if (state.cmDraftAtomsData[id]) {
+                        updatedAtomsData[id] = state.cmDraftAtomsData[id];
+                    }
+                }
+
+                // Push parallel state into tracked state
+                return {
+                    draftAtomLists: { ...state.draftAtomLists, [field]: [...list] },
+                    draftAtomsData: updatedAtomsData,
+                    lastEdited: new Date().toISOString()
+                };
+            });
+        },
+
+        initParallelState: (field: ContentAtomField) => {
+            set((state) => ({
+                cmDraftAtomLists: { ...state.cmDraftAtomLists, [field]: [...(state.draftAtomLists[field] || [])] },
+                cmDraftAtomsData: { ...state.cmDraftAtomsData, ...state.draftAtomsData }
+            }));
+        },
+
         initWorkspace: (edition: IPopulatedEdition | null, conceptId: string, conceptName: string, conceptTopic: string, conceptDisciplines: string[]) => {
             if (!edition) {
                 // 新建空白 Workspace
@@ -95,6 +164,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     lastEdited: new Date().toISOString(),
                     draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
                     draftAtomsData: {},
+                cmDraftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
+                cmDraftAtomsData: {},
                 activeEditor: null,
                 });
                 return;
@@ -143,6 +214,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     rels: mapIds(edition.relsAtoms),
                 },
                 draftAtomsData,
+                cmDraftAtomLists: {
+                    core: mapIds(edition.coreAtoms),
+                    doc: mapIds(edition.docAtoms),
+                    tags: mapIds(edition.tagsAtoms),
+                    refs: mapIds(edition.refsAtoms),
+                    rels: mapIds(edition.relsAtoms),
+                },
+                cmDraftAtomsData: { ...draftAtomsData },
                 activeEditor: null,
             });
         },
@@ -318,6 +397,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                      rels: mapList(state.draftAtomLists.rels || []),
                  };
 
+                 const cmDraftAtomLists = { ...draftAtomLists };
+
                                   for (const oldId of Object.keys(state.draftAtomsData)) {
                      const newId = oldToNewMap[oldId] || oldId;
                      newData[newId] = {
@@ -330,6 +411,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                      baseEditionId: newBaseEditionId,
                      draftAtomLists,
                      draftAtomsData: newData,
+                     cmDraftAtomLists,
+                     cmDraftAtomsData: { ...newData }
                  };
              });
         }

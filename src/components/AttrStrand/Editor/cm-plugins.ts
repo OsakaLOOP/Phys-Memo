@@ -14,6 +14,10 @@ export interface AtomMapping {
 
 // 状态机和 Effect
 export const setAtomMapEffect = StateEffect.define<AtomMapping[]>();
+export const addAtomEffect = StateEffect.define<{ id: string, index: number, insertPos: number }>();
+export const removeAtomEffect = StateEffect.define<{ id: string }>();
+export const swapAtomEffect = StateEffect.define<{ indexA: number, indexB: number }>();
+
 // 维护[from, to] 
 export const atomMapField = StateField.define<AtomMapping[]>({
     create() {
@@ -26,15 +30,32 @@ export const atomMapField = StateField.define<AtomMapping[]>({
         for (const e of tr.effects) {
             if (e.is(setAtomMapEffect)) {
                 nextMappings = e.value; // 全量覆盖
+            } else if (e.is(addAtomEffect)) {
+                const { id, index, insertPos } = e.value;
+                const newMapping: AtomMapping = { id, from: insertPos, to: insertPos };
+                if (index === -1) {
+                    nextMappings.unshift(newMapping);
+                } else if (index >= 0) {
+                    nextMappings.splice(index + 1, 0, newMapping);
+                } else {
+                    nextMappings.push(newMapping);
+                }
+            } else if (e.is(removeAtomEffect)) {
+                const { id } = e.value;
+                nextMappings = nextMappings.filter(m => m.id !== id);
+            } else if (e.is(swapAtomEffect)) {
+                const { indexA, indexB } = e.value;
+                if (indexA >= 0 && indexB >= 0 && indexA < nextMappings.length && indexB < nextMappings.length) {
+                    const temp = nextMappings[indexA];
+                    nextMappings[indexA] = nextMappings[indexB];
+                    nextMappings[indexB] = temp;
+                }
             }
         }
 
         // 2. 如果文档发生了修改，利用 CM 的 changes.map 自动调整所有 from/to 边界
         if (tr.docChanged) {
             nextMappings = nextMappings.map(m => {
-                // 如果是新插入的，from/to 可能是 0，但我们需要精确地根据当前 doc 的分隔符重建它
-                // 因为 changes.mapPos 有时对全新插入的段落处理不够完美。
-                // 不过简单起见，这里我们保留之前的 mapPos 逻辑（对于已存在的 Atom），并在 `syncToZustandPlugin` 中精确重建
                 const newFrom = tr.changes.mapPos(m.from, -1);
                 const newTo = tr.changes.mapPos(m.to, 1);
                 return { ...m, from: newFrom, to: newTo };
@@ -331,17 +352,27 @@ class AddButtonWidget extends WidgetType {
                 e.preventDefault();
                 e.stopPropagation();
 
-                const state = useWorkspaceStore.getState();
-                const list = [...(state.cmDraftAtomLists[this.field] || [])];
+                const view = EditorView.findFromDOM(wrap);
+                if (!view) return;
 
-                if (this.index >= 0 && this.index < list.length - 1) {
-                    // Update the parallel state array order
-                    const temp = list[this.index];
-                    list[this.index] = list[this.index + 1];
-                    list[this.index + 1] = temp;
+                const mappings = view.state.field(atomMapField);
+                if (this.index >= 0 && this.index < mappings.length - 1) {
+                    const currentMap = mappings[this.index];
+                    const nextMap = mappings[this.index + 1];
 
-                    // Trigger structural rebuild
-                    state.syncCMToParallelState(this.field, list, state.cmDraftAtomsData, true);
+                    const textA = view.state.sliceDoc(currentMap.from, currentMap.to);
+                    const textB = view.state.sliceDoc(nextMap.from, nextMap.to);
+
+                    const changes = [
+                        { from: nextMap.from, to: nextMap.to, insert: textA },
+                        { from: currentMap.from, to: currentMap.to, insert: textB }
+                    ];
+
+                    view.dispatch({
+                        changes,
+                        effects: swapAtomEffect.of({ indexA: this.index, indexB: this.index + 1 }),
+                        annotations: Transaction.userEvent.of('swap_atom')
+                    });
                 }
             };
 
@@ -373,39 +404,38 @@ class AddButtonWidget extends WidgetType {
             e.stopPropagation();
 
             const newId = `temp_${crypto.randomUUID().replace(/-/g, '')}`;
-            const state = useWorkspaceStore.getState();
+            const view = EditorView.findFromDOM(wrap);
+            if (!view) return;
 
-            const list = [...(state.cmDraftAtomLists[this.field] || [])];
+            const mappings = view.state.field(atomMapField);
+            let insertPos = 0;
+            let insertText = '\n';
 
             if (this.position === 'top') {
-                list.unshift(newId);
+                insertPos = 0;
             } else if (this.position === 'middle') {
-                list.splice(this.index + 1, 0, newId);
+                if (this.index >= 0 && this.index < mappings.length) {
+                    insertPos = mappings[this.index].to + 1; // skip \n
+                }
             } else if (this.position === 'bottom') {
-                list.push(newId);
+                insertPos = view.state.doc.length;
+                if (view.state.doc.length > 0 && view.state.sliceDoc(view.state.doc.length - 1) !== '\n') {
+                    insertText = '\n\n'; // ensure gap
+                }
             }
 
-            let type: import('../../../attrstrand/types').ContentAtomType = 'markdown';
-            if (this.field === 'core') type = 'latex';
-            if (this.field === 'tags' || this.field === 'rels') type = 'inline';
-            if (this.field === 'refs') type = 'sources';
+            let atomFrom = insertPos;
+            if (this.position === 'bottom' && insertText === '\n\n') {
+                 atomFrom = insertPos + 1;
+            }
 
-            const newAtomsData = {
-                ...state.cmDraftAtomsData,
-                [newId]: {
-                    id: newId,
-                    field: this.field,
-                    type,
-                    content: '',
-                    creatorId: 'user',
-                    derivedFromId: null,
-                    frontMeta: {},
-                    isDirty: true
-                }
-            };
+            view.dispatch({
+                changes: { from: insertPos, to: insertPos, insert: insertText },
+                effects: addAtomEffect.of({ id: newId, index: this.index, insertPos: atomFrom }),
+                annotations: Transaction.userEvent.of('add_atom')
+            });
 
-            // Sync structural change to parallel state and trigger rebuild
-            state.syncCMToParallelState(this.field, list, newAtomsData, true);
+            const state = useWorkspaceStore.getState();
             state.setActiveEditor({ field: this.field, id: newId });
         };
 

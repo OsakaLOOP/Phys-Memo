@@ -56,8 +56,7 @@ interface WorkspaceState extends IWorkspaceDraft {
     // CM Parallel State (NOT tracked by zundo)
     cmDraftAtomLists: Record<ContentAtomField, string[]>;
     cmDraftAtomsData: Record<DraftId, AtomDraft>;
-    cmStructuralRebuildFlag: Record<ContentAtomField, number>;
-    syncCMToParallelState: (field: ContentAtomField, newList: string[], newAtomsData: Record<DraftId, AtomDraft>, triggerRebuild?: boolean) => void;
+    syncCMToParallelState: (field: ContentAtomField, newList: string[], newAtomsData: Record<DraftId, AtomDraft>) => void;
     commitCMStateToZundo: (field: ContentAtomField) => void;
     initParallelState: (field: ContentAtomField) => void;
 }
@@ -93,15 +92,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         cmDraftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
         cmDraftAtomsData: {},
-        cmStructuralRebuildFlag: { core: 0, doc: 0, tags: 0, refs: 0, rels: 0 },
 
-        syncCMToParallelState: (field: ContentAtomField, newList: string[], newAtomsData: Record<DraftId, AtomDraft>, triggerRebuild?: boolean) => {
+        syncCMToParallelState: (field: ContentAtomField, newList: string[], newAtomsData: Record<DraftId, AtomDraft>) => {
             set((state) => ({
                 cmDraftAtomLists: { ...state.cmDraftAtomLists, [field]: newList },
-                cmDraftAtomsData: { ...state.cmDraftAtomsData, ...newAtomsData },
-                cmStructuralRebuildFlag: triggerRebuild
-                    ? { ...state.cmStructuralRebuildFlag, [field]: state.cmStructuralRebuildFlag[field] + 1 }
-                    : state.cmStructuralRebuildFlag
+                cmDraftAtomsData: { ...state.cmDraftAtomsData, ...newAtomsData }
             }));
         },
 
@@ -153,8 +148,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         initParallelState: (field: ContentAtomField) => {
             set((state) => ({
                 cmDraftAtomLists: { ...state.cmDraftAtomLists, [field]: [...(state.draftAtomLists[field] || [])] },
-                cmDraftAtomsData: { ...state.cmDraftAtomsData, ...state.draftAtomsData },
-                cmStructuralRebuildFlag: { ...state.cmStructuralRebuildFlag, [field]: state.cmStructuralRebuildFlag[field] + 1 }
+                cmDraftAtomsData: { ...state.cmDraftAtomsData, ...state.draftAtomsData }
             }));
         },
 
@@ -172,7 +166,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     draftAtomsData: {},
                 cmDraftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
                 cmDraftAtomsData: {},
-                cmStructuralRebuildFlag: { core: 0, doc: 0, tags: 0, refs: 0, rels: 0 },
                 activeEditor: null,
                 });
                 return;
@@ -229,7 +222,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     rels: mapIds(edition.relsAtoms),
                 },
                 cmDraftAtomsData: { ...draftAtomsData },
-                cmStructuralRebuildFlag: { core: 0, doc: 0, tags: 0, refs: 0, rels: 0 },
                 activeEditor: null,
             });
         },

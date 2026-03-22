@@ -155,7 +155,7 @@ export const blockDecorations = (field: ContentAtomField) => ViewPlugin.fromClas
                     // 仅当这行真的属于这个块时添加 class
                     if (line.from >= m.from && line.to <= m.to) {
                         decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                            class: 'cm-atom-line border-l-2 border-slate-200 ml-2 pl-2'
+                            class: 'cm-atom-line ml-2 pl-2'
                         })});
                     }
                     pos = line.to + 1;

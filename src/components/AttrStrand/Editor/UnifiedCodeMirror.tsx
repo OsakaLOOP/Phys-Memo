@@ -103,8 +103,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                         padding: "1rem 0"
                     },
                     ".cm-atom-line": {
-                        position: "relative",
-                        backgroundColor: "#fafafa" // 模拟轻微的高亮包裹感
+                        position: "relative"
                     },
                     ".cm-atom-gap-error": {
                         background: "repeating-linear-gradient(45deg, rgba(255,0,0,0.05), rgba(255,0,0,0.05) 2px, rgba(255,0,0,0) 2px, rgba(255,0,0,0) 13.86px)",

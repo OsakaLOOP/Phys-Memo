@@ -299,7 +299,7 @@ class AddButtonWidget extends WidgetType {
 
         if (this.position === 'middle') {
             // 中间间隙：占据一整行，flex 布局，内容居中
-            wrap.className = "cm-add-btn-wrapper relative w-full flex justify-center items-center h-[28px] pointer-events-none z-10 opacity-0 hover:opacity-100 transition-opacity duration-200 gap-2";
+            wrap.className = "cm-add-btn-wrapper relative w-full flex justify-center items-center h-[28px] pointer-events-auto z-10 opacity-0 hover:opacity-100 transition-opacity duration-200 gap-2";
             btn.className = "pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm cursor-pointer";
 
             const swapBtn = document.createElement("button");

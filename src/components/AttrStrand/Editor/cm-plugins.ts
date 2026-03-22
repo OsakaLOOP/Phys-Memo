@@ -234,9 +234,19 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
         }
     }
 
-    return Decoration.set(decorations.sort((a, b) => a.from - b.from).map(d => {
+    return Decoration.set(decorations.sort((a, b) => {
+        if (a.from !== b.from) {
+            return a.from - b.from;
+        }
+        // If they are at the same position, CodeMirror requires them to be sorted by startSide.
+        // A widget with side < 0 should come before a line decoration (side 0) or widget with side > 0.
+        // Let's fallback to the internal startSide property of the decorations.
+        const sideA = (a.dec as any).startSide ?? 0;
+        const sideB = (b.dec as any).startSide ?? 0;
+        return sideA - sideB;
+    }).map(d => {
         return d.dec.range(d.from); // for widget and line, to is the same as from, range(pos) is sufficient
-    }));
+    }), true); // pass true to allow Decoration.set to sort them or handle existing sorted order, but our own sort handles the strict side rules.
 }
 
 export const blockDecorations = (field: ContentAtomField) => StateField.define<DecorationSet>({

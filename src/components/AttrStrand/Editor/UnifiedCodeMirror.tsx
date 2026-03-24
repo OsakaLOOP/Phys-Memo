@@ -115,15 +115,13 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                 invertedEffects.of(tr => {
                     const inverted = [];
                     for (const e of tr.effects) {
-                        if (e.is(setAtomMapEffect)) {
+                        if (e.is(setAtomMapEffect) || e.is(addAtomEffect) || e.is(removeAtomEffect) || e.is(swapAtomEffect)) {
+                            // 任何导致 mapping 数组发生结构性改变的操作，
+                            // 其最完美的撤销/重做手段就是直接利用 `setAtomMapEffect` 将数组恢复至当时的切片快照。
+                            // 这样既能防止由于单向 Effect (如 removeAtomEffect) 丢失重做信息导致的粘连错误，
+                            // 又能在撤销执行时触发 `skipMapPos` 以免被错乱的 mapPos 破坏绝对位置。
                             inverted.push(setAtomMapEffect.of(tr.startState.field(atomMapField)));
-                        } else if (e.is(addAtomEffect)) {
-                            inverted.push(removeAtomEffect.of({ id: e.value.id }));
-                        } else if (e.is(swapAtomEffect)) {
-                            // swapAtomEffect 触发时，附带了 setAtomMapEffect，
-                            // 但 setAtomMapEffect 本身已经被最外层拦截倒置（恢复旧 mapping），
-                            // 所以此时我们不需要也不能逆转 swapAtomEffect，否则会再交换一次！
-                            // 为了安全起见，只要有 setAtomMapEffect 在倒转，这里就不需要重复倒转。
+                            break; // 只要发生结构改变，只记录一次全量快照即可
                         }
                     }
                     return inverted;

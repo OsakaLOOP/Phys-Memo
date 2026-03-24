@@ -42,6 +42,7 @@ export const atomMapField = StateField.define<AtomMapping[]>({
                 } else {
                     nextMappings.push(newMapping);
                 }
+                console.log(newMapping)
             }
             else if (e.is(removeAtomEffect))
             {
@@ -66,6 +67,7 @@ export const atomMapField = StateField.define<AtomMapping[]>({
                 const newTo = tr.changes.mapPos(m.to, 1);
                 return { ...m, from: newFrom, to: newTo };
             });
+            console.log(nextMappings)
         }
 
         return nextMappings;

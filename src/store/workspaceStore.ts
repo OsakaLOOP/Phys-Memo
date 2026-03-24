@@ -448,13 +448,13 @@ export const workspaceActions = {
             return;
         }
 
-        // Search backward through past states
+        // pastStates is a stack where the end of the array is the most recent past state.
+        // We step backwards through the past states.
         let steps = 0;
         for (let i = past.length - 1; i >= 0; i--) {
             steps++;
-            // We keep stepping back as long as the past state has the SAME session ID.
-            // We want to stop AT the first state that has a DIFFERENT session ID.
-            // So if past[i].cmSessionId !== currentSessionId, we stop.
+            // If we hit a state with a DIFFERENT session ID (or null), we stop stepping back
+            // because we've found the boundary of the session.
             if (past[i].cmSessionId !== currentSessionId) {
                 console.log(`Undone ${past[i].cmSessionId} with ${steps} jumps`)
                 break;
@@ -469,24 +469,23 @@ export const workspaceActions = {
         const future = temporalState.futureStates;
         if (future.length === 0) return;
 
-        // Note: futureStates are stored such that index 0 is the NEXT state to redo,
-        // index 1 is the state after that, etc.
-        const nextState = future[0];
+        // Note: futureStates is a stack where the end of the array is the IMMEDIATE NEXT state to redo.
+        // Pop the state at future.length - 1 to redo it.
+        const nextState = future[future.length - 1];
         const nextSessionId = nextState.cmSessionId;
 
-        // If the next state doesn't belong to a session, just normal redo
+        // If the immediate next state doesn't belong to a session, just normal redo
         if (!nextSessionId) {
             temporalState.redo(1);
             return;
         }
 
         // We want to redo all the way to the END of this upcoming session.
+        // That means we keep popping from the end of futureStates as long as the session ID matches.
         let steps = 0;
-        for (let i = 0; i < future.length; i++) {
+        for (let i = future.length - 1; i >= 0; i--) {
             steps++;
-            // If the next state we would redo belongs to a DIFFERENT session, we stop.
-            // Actually, we look ahead. If future[i+1] is a different session, we stop at `steps`.
-            if (i + 1 < future.length && future[i + 1].cmSessionId !== nextSessionId) {
+            if (i - 1 >= 0 && future[i - 1].cmSessionId !== nextSessionId) {
                 console.log(`Redone ${future[i+1].cmSessionId} with ${steps} jumps`)
                 break;
             }

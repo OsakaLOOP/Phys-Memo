@@ -18,6 +18,80 @@ export const addAtomEffect = StateEffect.define<{ id: string, index: number, ins
 export const removeAtomEffect = StateEffect.define<{ id: string }>();
 export const swapAtomEffect = StateEffect.define<{ indexA: number, indexB: number }>();
 
+// 严格编辑拦截器：只允许在单个 mapping 内部的文本修改
+export const strictMappingEditFilter = EditorState.transactionFilter.of((tr) => {
+    // 只有当有文本内容变化时才检查
+    if (!tr.docChanged) return tr;
+
+    // 如果是我们内部系统生成的结构性操作，放行
+    if (tr.isUserEvent('add_atom') || tr.isUserEvent('swap_atom') || tr.isUserEvent('external_sync')) {
+        return tr;
+    }
+
+    const mappings = tr.startState.field(atomMapField);
+    let allowed = true;
+
+    // 检查所有被修改的区间
+    tr.changes.iterChanges((fromA, toA) => {
+        // 判断 [fromA, toA] 是否完全属于且只属于一个 mapping
+        const isInsideOneMapping = mappings.some(m => m.from <= fromA && toA <= m.to);
+
+        if (!isInsideOneMapping) {
+            allowed = false;
+        }
+    });
+
+    if (!allowed) {
+        // 如果不允许，我们忽略本次修改（返回没有 changes 的 transaction）
+        // 但保留 selection 的移动，也就是只屏蔽修改，不屏蔽光标
+        return [tr, { changes: [] }];
+    }
+
+    return tr;
+});
+
+// 复制格式化器：跨越多个 mapping 时，用 \n\n 分隔
+export const copyFormatterPlugin = EditorView.domEventHandlers({
+    copy: (event, view) => {
+        const selection = view.state.selection.main;
+        if (selection.empty || !event.clipboardData) return false; // let default handle
+
+        const mappings = view.state.field(atomMapField);
+        const { from, to } = selection;
+
+        // 找出所有被选中的 mapping（即使只是部分选中）
+        const selectedMappings = mappings.filter(m => m.from < to && m.to > from);
+
+        if (selectedMappings.length <= 1) {
+            return false; // 如果只在一个 mapping 内，走默认复制逻辑
+        }
+
+        // 处理跨越多个 mapping 的情况
+        let copiedText = "";
+        for (let i = 0; i < selectedMappings.length; i++) {
+            const m = selectedMappings[i];
+
+            // 提取被选中的当前 mapping 的实际文本内容
+            // 要截断在选择的边界
+            const partFrom = Math.max(m.from, from);
+            const partTo = Math.min(m.to, to);
+
+            const textPart = view.state.sliceDoc(partFrom, partTo);
+            copiedText += textPart;
+
+            // 在相邻的两个 mapping 之间，插入 \n\n (双换行)，而不是原文档的单一 \n
+            if (i < selectedMappings.length - 1) {
+                copiedText += "\n\n";
+            }
+        }
+
+        event.clipboardData.setData('text/plain', copiedText);
+        event.preventDefault(); // 拦截默认复制行为
+        return true;
+    }
+});
+
+
 // 维护[from, to] 
 export const atomMapField = StateField.define<AtomMapping[]>({
     create() {
@@ -25,6 +99,7 @@ export const atomMapField = StateField.define<AtomMapping[]>({
     },
     update(mappings, tr: Transaction) {
         let nextMappings = [...mappings];
+        const newAddedIds = new Set<string>();
 
         // 1. 处理结构性操作 Effects
         for (const e of tr.effects) {
@@ -42,7 +117,11 @@ export const atomMapField = StateField.define<AtomMapping[]>({
                 } else {
                     nextMappings.push(newMapping);
                 }
+<<<<<<< HEAD
                 console.log(newMapping)
+=======
+                newAddedIds.add(id);
+>>>>>>> caeb286158601c442443466bd1542150aa5ca149
             }
             else if (e.is(removeAtomEffect))
             {
@@ -62,9 +141,21 @@ export const atomMapField = StateField.define<AtomMapping[]>({
 
         // 2. 如果文档发生了修改，利用 CM 的 changes.map 自动调整所有 from/to 边界
         if (tr.docChanged) {
+            const isStructuralAdd = tr.isUserEvent('add_atom');
+
             nextMappings = nextMappings.map(m => {
-                const newFrom = tr.changes.mapPos(m.from, -1);
-                const newTo = tr.changes.mapPos(m.to, 1);
+                if (newAddedIds.has(m.id)) {
+                    return m;
+                }
+
+                // 对于已有的块：
+                // 结构性插入 (\n) 时，反转 assoc 方向，使得块被推开以避免边界粘连。
+                const fromAssoc = isStructuralAdd ? 1 : -1;
+                const toAssoc = isStructuralAdd ? -1 : 1;
+
+                const newFrom = tr.changes.mapPos(m.from, fromAssoc);
+                const newTo = tr.changes.mapPos(m.to, toAssoc);
+
                 return { ...m, from: newFrom, to: newTo };
             });
             console.log(nextMappings)

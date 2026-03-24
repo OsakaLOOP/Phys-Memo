@@ -33,20 +33,6 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
         }
     };
 
-    // Attach to the complete action (which unmounts or blurs depending on parent logic)
-    // Actually, we'll expose this via a ref or let the parent component trigger it.
-    // However, the simplest way is to listen to the activeEditor change or just commit on unmount.
-    // The requirement is: "在 UI 层实现明确的完成编辑按钮。点击时提交最终状态"。
-    // If the component unmounts when the user clicks 'Check' (because activeEditor becomes null),
-    // we can safely commit snapshots in the unmount effect!
-    useEffect(() => {
-        return () => {
-             // Because activeEditor controls whether UnifiedCodeMirror is mounted in FieldEditor,
-             // when the user clicks "Check", this component will unmount.
-             commitSnapshots();
-        };
-    }, []);
-
     // 初始化文本, 映射表
     const buildInitialState = () => {
         const state = useWorkspaceStore.getState();
@@ -193,6 +179,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
         }
 
         return () => {
+            commitSnapshots();
             view.destroy();
             viewRef.current = null;
         };

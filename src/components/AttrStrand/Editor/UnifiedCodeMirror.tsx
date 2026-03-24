@@ -18,12 +18,18 @@ interface UnifiedCodeMirrorProps {
     initialAtomIds: DraftId[];
 }
 
+interface EditorSnapshot {
+    list: string[];
+    data: Record<string, { id: string; content: string;  }>;
+}
+
 export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, initialAtomIds }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const activeEditor = useWorkspaceStore(state => state.activeEditor);
     const viewRef = useRef<EditorView | null>(null);
+    const sessionSnapshots = useRef<EditorSnapshot[]>([]);
 
-    // --- 1. 组装初始的文本与映射表 ---
+    // 初始化文本, 映射表
     const buildInitialState = () => {
         const state = useWorkspaceStore.getState();
         const data = state.draftAtomsData;
@@ -31,7 +37,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
         let fullText = '';
         const mappings: AtomMapping[] = [];
 
-        // 核心：使用单换行作为物理拼接符
+        // 使用单换行拼接
         const separator = '\n';
         let currentOffset = 0;
 
@@ -39,14 +45,14 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
             const id = initialAtomIds[i];
             const content = data[id]?.content || '';
 
-            // 记录此 Atom 在全文中的精确起止位置 [from, to]
-            // 注意：我们只记录 content 本身的范围，把 separator 留在映射范围之外
+            // 记录此 Atom 在原始全文中的精确起止位置 [from, to]
+            // 注意：只记录 content 本身的范围，separator 留在映射范围之外
             const from = currentOffset;
             const to = currentOffset + content.length;
 
             mappings.push({ id, from, to });
 
-            // 拼接入全文
+            // 拼接分割后全文
             fullText += content;
             if (i < initialAtomIds.length - 1) {
                 fullText += separator;
@@ -59,14 +65,15 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
         return { fullText, mappings };
     };
 
-    // --- 2. 初始化 CodeMirror 实例 ---
+    // 初始化 CodeMirror 实例
     useEffect(() => {
         if (!editorRef.current) return;
 
-        // Initialize parallel state for this field
+        // 初始化平行状态
         useWorkspaceStore.getState().initParallelState(field);
-
         const { fullText, mappings } = buildInitialState();
+
+        sessionSnapshots.current = [];
 
         // 处理失去焦点时正式提交 Parallel State 到 Zundo (以及其他 EditorView 相关的监听)
         const blurCommitExtension = EditorView.domEventHandlers({

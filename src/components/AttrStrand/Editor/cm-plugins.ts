@@ -30,7 +30,9 @@ export const atomMapField = StateField.define<AtomMapping[]>({
         for (const e of tr.effects) {
             if (e.is(setAtomMapEffect)) {
                 nextMappings = e.value; // 全量覆盖
-            } else if (e.is(addAtomEffect)) {
+            }
+            else if (e.is(addAtomEffect)) 
+            {
                 const { id, index, insertPos } = e.value;
                 const newMapping: AtomMapping = { id, from: insertPos, to: insertPos };
                 if (index === -1) {
@@ -40,10 +42,14 @@ export const atomMapField = StateField.define<AtomMapping[]>({
                 } else {
                     nextMappings.push(newMapping);
                 }
-            } else if (e.is(removeAtomEffect)) {
+            }
+            else if (e.is(removeAtomEffect))
+            {
                 const { id } = e.value;
                 nextMappings = nextMappings.filter(m => m.id !== id);
-            } else if (e.is(swapAtomEffect)) {
+            }
+            else if (e.is(swapAtomEffect))
+            {
                 const { indexA, indexB } = e.value;
                 if (indexA >= 0 && indexB >= 0 && indexA < nextMappings.length && indexB < nextMappings.length) {
                     const temp = nextMappings[indexA];

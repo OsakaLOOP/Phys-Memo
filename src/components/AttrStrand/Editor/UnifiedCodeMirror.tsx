@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { EditorState, Transaction } from '@codemirror/state';
+import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab, invertedEffects, undo, redo } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
@@ -8,8 +8,8 @@ import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@cod
 
 import type { ContentAtomField, DraftId } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
-import { atomMapField, blockDecorations, setAtomMapEffect, addAtomEffect, removeAtomEffect, swapAtomEffect, syncToZustandPlugin, blockActionGutter, strictMappingEditFilter, copyFormatterPlugin, crossMappingSelectionPlugin } from './cm-plugins';
-import type { AtomMapping } from './cm-plugins';
+import { atomMapField, blockDecorations, setAtomMapEffect, addAtomEffect, removeAtomEffect, swapAtomEffect, syncAndSnapshotPlugin, blockActionGutter, strictMappingEditFilter, copyFormatterPlugin, crossMappingSelectionPlugin } from './cm-plugins';
+import type { AtomMapping, EditorSnapshot } from './cm-plugins';
 import { lintGutter } from '@codemirror/lint';
 import { atomBoundaryLinter } from './cm-lint';
 
@@ -18,10 +18,6 @@ interface UnifiedCodeMirrorProps {
     initialAtomIds: DraftId[];
 }
 
-interface EditorSnapshot {
-    list: string[];
-    data: Record<string, { id: string; content: string;  }>;
-}
 
 export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, initialAtomIds }) => {
     const editorRef = useRef<HTMLDivElement>(null);
@@ -83,25 +79,9 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
 
         sessionSnapshots.current = [];
 
-        // 处理失去焦点时正式提交 Parallel State 到 Zundo (以及其他 EditorView 相关的监听)
-        const blurCommitExtension = EditorView.domEventHandlers({
-            blur: (event, view) => {
-                // If blur is triggered by clicking something *inside* the editor (like the add button),
-                // we should NOT commit and exit. The relatedTarget points to the element getting focus.
-                if (event.relatedTarget && view.dom.contains(event.relatedTarget as Node)) {
-                    return false;
-                }
-
-                // Commit parallel state back to main zundo-tracked state
-                useWorkspaceStore.getState().commitCMStateToZundo(field);
-                return false;
-            }
-        });
-
         const startState = EditorState.create({
             doc: fullText,
             extensions: [
-                blurCommitExtension,
                 lineNumbers(),
                 highlightActiveLineGutter(),
                 history(),
@@ -141,8 +121,10 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                 // Linting 插件
                 lintGutter(),
                 atomBoundaryLinter(field),
-                // 同步插件（负责打字时防抖更新 Zustand）
-                syncToZustandPlugin(field),
+                // 同步插件（负责打字时防抖更新 UI，并记录内部 Snapshot）
+                syncAndSnapshotPlugin(field, (snapshot) => {
+                    sessionSnapshots.current.push(snapshot);
+                }),
                 // 初始化时注入当前的映射表
                 atomMapField.init(() => mappings),
 
@@ -254,88 +236,6 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
         }
     }, [activeEditor?.id, field]);
 
-    // --- 4. 处理外部主追踪数据的强制更新（如撤销/其他终端同步） ---
-    // 监听 Zustand 主追踪数据 (draftAtomLists / draftAtomsData) 的变化。
-    // 如果主状态发生变化（比如点击了全局的 Undo 按钮，且当前 Editor 没激活，或是切换了草稿），
-    // 并且这和 CM 当前的平行状态有本质不同，我们需要用这个新数据强制刷新 CodeMirror。
-    useEffect(() => {
-        let lastTrackedSignature = '';
-
-        const unsubscribe = useWorkspaceStore.subscribe(
-            (state, prevState) => {
-                if (!viewRef.current) return;
-
-                // 我们只关心 tracked (Zundo tracked) 的状态发生了变化
-                const currentList = state.draftAtomLists[field] || [];
-                const prevList = prevState.draftAtomLists[field] || [];
-
-                // 如果列表引用和数据对象引用都没有变化，说明可能是 activeEditor 或者平行状态改变，忽略
-                if (currentList === prevList && state.draftAtomsData === prevState.draftAtomsData) {
-                     return;
-                }
-
-                // 计算当前 tracked 外部数据的签名
-                const trackedSignature = currentList.map((id: string) => `${id}:${state.draftAtomsData[id]?.content || ''}`).join('|');
-
-                // 如果签名没有任何变化（比如只是其他 field 发生了变化，或者空更新），跳过
-                if (trackedSignature === lastTrackedSignature) {
-                    return;
-                }
-
-                // 提取当前 CodeMirror 实例中的数据签名
-                const view = viewRef.current;
-                const mappings = view.state.field(atomMapField);
-                const currentCMSignature = mappings.map(m => {
-                    const text = view.state.sliceDoc(m.from, m.to);
-                    return `${m.id}:${text}`;
-                }).join('|');
-
-                // 只有当 tracked 状态确实变了，且和当前 CM 里的状态不一样时，才执行覆盖
-                // (如果相等，可能是我们自己刚刚 commit 回主状态的，没必要重置)
-                if (trackedSignature === currentCMSignature) {
-                    lastTrackedSignature = trackedSignature;
-                    return;
-                }
-
-                // 如果不同，说明这是“外部力量”（比如点击了顶部的全局撤销按钮）
-                // 我们必须强行用新数据覆盖当前 CM 实例的内容，并且重置平行状态。
-
-                // --- 重置平行状态 ---
-                useWorkspaceStore.getState().initParallelState(field);
-
-                let newFullText = '';
-                const newMappings: AtomMapping[] = [];
-                const separator = '\n';
-                let currentOffset = 0;
-
-                for (let i = 0; i < currentList.length; i++) {
-                    const id = currentList[i];
-                    const content = state.draftAtomsData[id]?.content || '';
-
-                    const from = currentOffset;
-                    const to = currentOffset + content.length;
-                    newMappings.push({ id, from, to });
-
-                    newFullText += content;
-                    if (i < currentList.length - 1) {
-                        newFullText += separator;
-                        currentOffset += content.length + separator.length;
-                    }
-                }
-
-                // 派发带有 'external_sync' 标记的全量替换事务，这样内部的 syncPlugin 就不会再反向推回 Zustand
-                viewRef.current.dispatch({
-                    changes: { from: 0, to: viewRef.current.state.doc.length, insert: newFullText },
-                    effects: setAtomMapEffect.of(newMappings),
-                    annotations: Transaction.userEvent.of('external_sync')
-                });
-
-                lastTrackedSignature = trackedSignature;
-            }
-        );
-
-        return () => unsubscribe();
-    }, [field]);
 
     return (
         <div

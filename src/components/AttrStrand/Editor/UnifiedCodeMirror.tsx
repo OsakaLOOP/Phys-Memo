@@ -29,6 +29,14 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
     const viewRef = useRef<EditorView | null>(null);
     const sessionSnapshots = useRef<EditorSnapshot[]>([]);
 
+    // Define a custom cleanup function to commit snapshots
+    const commitSnapshots = () => {
+        if (sessionSnapshots.current.length > 0) {
+            useWorkspaceStore.getState().applyCMSnapshotsToZundo(field, sessionSnapshots.current);
+            sessionSnapshots.current = []; // Clear after applying
+        }
+    };
+
     // 初始化文本, 映射表
     const buildInitialState = () => {
         const state = useWorkspaceStore.getState();
@@ -189,8 +197,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
         }
 
         return () => {
-            // Also commit when the component unmounts entirely (e.g. switching views)
-            useWorkspaceStore.getState().commitCMStateToZundo(field);
+            commitSnapshots();
             view.destroy();
             viewRef.current = null;
         };

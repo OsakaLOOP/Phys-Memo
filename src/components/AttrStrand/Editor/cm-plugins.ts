@@ -23,8 +23,15 @@ export const strictMappingEditFilter = EditorState.transactionFilter.of((tr) => 
     // 只有当有文本内容变化时才检查
     if (!tr.docChanged) return tr;
 
-    // 如果是我们内部系统生成的结构性操作，放行
-    if (tr.isUserEvent('add_atom') || tr.isUserEvent('swap_atom') || tr.isUserEvent('external_sync')) {
+    // 如果是我们内部系统生成的结构性操作，或者是原生的撤销/重做操作，放行
+    // 因为撤销/重做可能会还原非 mapping 区域（比如两个块中间用于分隔的 \n），这不能被误拦截
+    if (
+        tr.isUserEvent('add_atom') ||
+        tr.isUserEvent('swap_atom') ||
+        tr.isUserEvent('external_sync') ||
+        tr.isUserEvent('undo') ||
+        tr.isUserEvent('redo')
+    ) {
         return tr;
     }
 
@@ -213,7 +220,9 @@ export const atomMapField = StateField.define<AtomMapping[]>({
 
         // 2. 如果文档发生了修改，利用 CM 的 changes.map 自动调整所有 from/to 边界
         if (tr.docChanged) {
-            const isStructuralAdd = tr.isUserEvent('add_atom');
+            // 在重做（Redo）时，userEvent 可能是 'redo'，但 newAddedIds.size 会 > 0（因为 addAtomEffect 会被重播）。
+            // 只要是本次交易中包含新块插入，我们就把它视为一次结构性添加。
+            const isStructuralAdd = tr.isUserEvent('add_atom') || newAddedIds.size > 0;
 
             nextMappings = nextMappings.map(m => {
                 if (newAddedIds.has(m.id)) {

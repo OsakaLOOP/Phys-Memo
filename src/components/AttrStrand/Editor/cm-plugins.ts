@@ -182,11 +182,13 @@ export const atomMapField = StateField.define<AtomMapping[]>({
     update(mappings, tr: Transaction) {
         let nextMappings = [...mappings];
         const newAddedIds = new Set<string>();
+        let skipMapPos = false;
 
         // 1. 处理结构性操作 Effects
         for (const e of tr.effects) {
             if (e.is(setAtomMapEffect)) {
                 nextMappings = e.value; // 全量覆盖
+                skipMapPos = true;
             }
             else if (e.is(addAtomEffect)) 
             {
@@ -209,17 +211,23 @@ export const atomMapField = StateField.define<AtomMapping[]>({
             }
             else if (e.is(swapAtomEffect))
             {
-                const { indexA, indexB } = e.value;
-                if (indexA >= 0 && indexB >= 0 && indexA < nextMappings.length && indexB < nextMappings.length) {
-                    const temp = nextMappings[indexA];
-                    nextMappings[indexA] = nextMappings[indexB];
-                    nextMappings[indexB] = temp;
+                // swapAtomEffect 已经附带了 setAtomMapEffect 精确计算的覆盖。
+                // 这里的数组元素交换逻辑已经被 setAtomMapEffect 替代，
+                // 但保留该 effect 是为了供 UnifiedCodeMirror 的 invertedEffects 使用。
+                // 如果没有 setAtomMapEffect(比如在旧记录或者 undo 中), 我们这里交换:
+                if (!skipMapPos) {
+                    const { indexA, indexB } = e.value;
+                    if (indexA >= 0 && indexB >= 0 && indexA < nextMappings.length && indexB < nextMappings.length) {
+                        const temp = nextMappings[indexA];
+                        nextMappings[indexA] = nextMappings[indexB];
+                        nextMappings[indexB] = temp;
+                    }
                 }
             }
         }
 
         // 2. 如果文档发生了修改，利用 CM 的 changes.map 自动调整所有 from/to 边界
-        if (tr.docChanged) {
+        if (tr.docChanged && !skipMapPos && !tr.isUserEvent('swap_atom')) {
             // 在重做（Redo）时，userEvent 可能是 'redo'，但 newAddedIds.size 会 > 0（因为 addAtomEffect 会被重播）。
             // 只要是本次交易中包含新块插入，我们就把它视为一次结构性添加。
             const isStructuralAdd = tr.isUserEvent('add_atom') || newAddedIds.size > 0;
@@ -235,7 +243,12 @@ export const atomMapField = StateField.define<AtomMapping[]>({
                 const toAssoc = isStructuralAdd ? -1 : 1;
 
                 const newFrom = tr.changes.mapPos(m.from, fromAssoc);
-                const newTo = tr.changes.mapPos(m.to, toAssoc);
+                let newTo = tr.changes.mapPos(m.to, toAssoc);
+
+                // 防御性修正：针对空块上方插入换行符，可能导致 mapped to 停留在 from 左侧发生倒挂
+                if (newFrom > newTo) {
+                    newTo = newFrom;
+                }
 
                 return { ...m, from: newFrom, to: newTo };
             });
@@ -542,6 +555,34 @@ class AddButtonWidget extends WidgetType {
 
                     const textA = view.state.sliceDoc(currentMap.from, currentMap.to);
                     const textB = view.state.sliceDoc(nextMap.from, nextMap.to);
+                    const gapText = view.state.sliceDoc(currentMap.to, nextMap.from);
+
+                    // 计算新的绝对映射
+                    const newMappings = [...mappings];
+
+                    // 新的 currentMap (原本是 nextMap 的内容)
+                    const newCurrentTo = currentMap.from + textB.length;
+                    newMappings[this.index] = {
+                        id: nextMap.id,
+                        from: currentMap.from,
+                        to: newCurrentTo
+                    };
+
+                    // 新的 nextMap (原本是 currentMap 的内容)
+                    const newNextFrom = newCurrentTo + gapText.length;
+                    const newNextTo = newNextFrom + textA.length;
+                    newMappings[this.index + 1] = {
+                        id: currentMap.id,
+                        from: newNextFrom,
+                        to: newNextTo
+                    };
+
+                    // 修改后续所有块的偏移量
+                    // 原本这两个块及中间间隙占据的长度: (nextMap.to - currentMap.from)
+                    // 互换后由于只是交换，总长度肯定是一样的，但是这仅仅是在本例中。
+                    // 实际上文本长度差异导致的 offset 变化：
+                    // 注意：因为只交换 A 和 B，A+B+gap 的总长必定等于 B+A+gap，
+                    // 所以后续 mapping 的位置不受影响！
 
                     const changes = [
                         { from: nextMap.from, to: nextMap.to, insert: textA },
@@ -550,7 +591,10 @@ class AddButtonWidget extends WidgetType {
 
                     view.dispatch({
                         changes,
-                        effects: swapAtomEffect.of({ indexA: this.index, indexB: this.index + 1 }),
+                        effects: [
+                            setAtomMapEffect.of(newMappings),
+                            swapAtomEffect.of({ indexA: this.index, indexB: this.index + 1 })
+                        ],
                         annotations: Transaction.userEvent.of('swap_atom')
                     });
                 }

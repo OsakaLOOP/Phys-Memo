@@ -1694,10 +1694,13 @@ const PhysMemosApp: FC = () => {
                                 onClick={(e) => {
                                     e.preventDefault();
                                     if (activeEditor) {
-                                         // Dispatch undo to the currently active CodeMirror editor view
-                                         document.dispatchEvent(new CustomEvent('editor-undo'));
+                                         document.dispatchEvent(new CustomEvent('editor-undo', { detail: { shift: e.shiftKey } }));
                                     } else {
-                                        undo();
+                                        if (e.shiftKey) {
+                                            workspaceActions.jumpSessionUndo();
+                                        } else {
+                                            undo();
+                                        }
                                     }
                                 }}
                                 disabled={activeEditor ? cmUndoDepth === 0 : pastStatesLength === 0}
@@ -1710,9 +1713,13 @@ const PhysMemosApp: FC = () => {
                                 onClick={(e) => {
                                     e.preventDefault();
                                     if (activeEditor) {
-                                         document.dispatchEvent(new CustomEvent('editor-redo'));
+                                         document.dispatchEvent(new CustomEvent('editor-redo', { detail: { shift: e.shiftKey } }));
                                     } else {
-                                        redo();
+                                        if (e.shiftKey) {
+                                            workspaceActions.jumpSessionRedo();
+                                        } else {
+                                            redo();
+                                        }
                                     }
                                 }}
                                 disabled={activeEditor ? cmRedoDepth === 0 : futureStatesLength === 0}

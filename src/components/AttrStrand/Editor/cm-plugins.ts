@@ -25,6 +25,7 @@ export const atomMapField = StateField.define<AtomMapping[]>({
     },
     update(mappings, tr: Transaction) {
         let nextMappings = [...mappings];
+        const newAddedIds = new Set<string>();
 
         // 1. 处理结构性操作 Effects
         for (const e of tr.effects) {
@@ -42,6 +43,7 @@ export const atomMapField = StateField.define<AtomMapping[]>({
                 } else {
                     nextMappings.push(newMapping);
                 }
+                newAddedIds.add(id);
             }
             else if (e.is(removeAtomEffect))
             {
@@ -61,9 +63,21 @@ export const atomMapField = StateField.define<AtomMapping[]>({
 
         // 2. 如果文档发生了修改，利用 CM 的 changes.map 自动调整所有 from/to 边界
         if (tr.docChanged) {
+            const isStructuralAdd = tr.isUserEvent('add_atom');
+
             nextMappings = nextMappings.map(m => {
-                const newFrom = tr.changes.mapPos(m.from, -1);
-                const newTo = tr.changes.mapPos(m.to, 1);
+                if (newAddedIds.has(m.id)) {
+                    return m;
+                }
+
+                // 对于已有的块：
+                // 结构性插入 (\n) 时，反转 assoc 方向，使得块被推开以避免边界粘连。
+                const fromAssoc = isStructuralAdd ? 1 : -1;
+                const toAssoc = isStructuralAdd ? -1 : 1;
+
+                const newFrom = tr.changes.mapPos(m.from, fromAssoc);
+                const newTo = tr.changes.mapPos(m.to, toAssoc);
+
                 return { ...m, from: newFrom, to: newTo };
             });
         }

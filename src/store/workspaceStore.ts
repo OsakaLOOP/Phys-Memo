@@ -53,12 +53,14 @@ interface WorkspaceState extends IWorkspaceDraft {
     activeEditor: { field: ContentAtomField, id: DraftId } | null;
     setActiveEditor: (editor: { field: ContentAtomField, id: DraftId } | null) => void;
 
-    // CM Parallel State (NOT tracked by zundo)
+    // CM Parallel State (NOT tracked by zundo) - 仅用于外界 UI 读取显示
     cmDraftAtomLists: Record<ContentAtomField, string[]>;
     cmDraftAtomsData: Record<DraftId, AtomDraft>;
     syncCMToParallelState: (field: ContentAtomField, newList: string[], newAtomsData: Record<DraftId, AtomDraft>) => void;
-    commitCMStateToZundo: (field: ContentAtomField) => void;
     initParallelState: (field: ContentAtomField) => void;
+
+    // 应用 CM 产生的批量快照到 Zundo 历史
+    applyCMSnapshotsToZundo: (field: ContentAtomField, snapshots: { list: string[], data: Record<string, AtomDraft> }[]) => void;
 }
 
 // 来自 uuid 的 DraftId
@@ -100,56 +102,31 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             }));
         },
 
-        commitCMStateToZundo: (field: ContentAtomField) => {
-            set((state) => {
-                const list = state.cmDraftAtomLists[field];
-                // Only commit if there is parallel state for this field
-                if (!list || list.length === 0 && (!state.draftAtomLists[field] || state.draftAtomLists[field].length === 0)) {
-                    return state;
-                }
-
-                // Check if anything actually changed before committing to avoid empty history states
-                const currentTrackedList = state.draftAtomLists[field] || [];
-                const isListEqual = list.length === currentTrackedList.length && list.every((val, index) => val === currentTrackedList[index]);
-
-                let isDataEqual = true;
-                if (isListEqual) {
-                     for (const id of list) {
-                         const cmData = state.cmDraftAtomsData[id];
-                         const trackedData = state.draftAtomsData[id];
-                         if (!cmData || !trackedData || cmData.content !== trackedData.content) {
-                             isDataEqual = false;
-                             break;
-                         }
-                     }
-                }
-
-                if (isListEqual && isDataEqual) {
-                     return state;
-                }
-
-                // Merge ONLY the atoms for this specific field to prevent cross-field leaks
-                const updatedAtomsData = { ...state.draftAtomsData };
-                for (const id of list) {
-                    if (state.cmDraftAtomsData[id]) {
-                        updatedAtomsData[id] = state.cmDraftAtomsData[id];
-                    }
-                }
-
-                // Push parallel state into tracked state
-                return {
-                    draftAtomLists: { ...state.draftAtomLists, [field]: [...list] },
-                    draftAtomsData: updatedAtomsData,
-                    lastEdited: new Date().toISOString()
-                };
-            });
-        },
-
         initParallelState: (field: ContentAtomField) => {
             set((state) => ({
                 cmDraftAtomLists: { ...state.cmDraftAtomLists, [field]: [...(state.draftAtomLists[field] || [])] },
                 cmDraftAtomsData: { ...state.cmDraftAtomsData, ...state.draftAtomsData }
             }));
+        },
+
+        applyCMSnapshotsToZundo: (field: ContentAtomField, snapshots: { list: string[], data: Record<string, AtomDraft> }[]) => {
+            // Apply snapshots sequentially to generate separate history entries
+            for (const snap of snapshots) {
+                set((state) => {
+                    const mergedData = { ...state.draftAtomsData };
+                    for (const id of snap.list) {
+                        if (snap.data[id]) {
+                            mergedData[id] = snap.data[id];
+                        }
+                    }
+
+                    return {
+                        draftAtomLists: { ...state.draftAtomLists, [field]: [...snap.list] },
+                        draftAtomsData: mergedData,
+                        lastEdited: new Date().toISOString()
+                    };
+                });
+            }
         },
 
         initWorkspace: (edition: IPopulatedEdition | null, conceptId: string, conceptName: string, conceptTopic: string, conceptDisciplines: string[]) => {

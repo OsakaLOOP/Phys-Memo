@@ -456,6 +456,7 @@ export const workspaceActions = {
             // We want to stop AT the first state that has a DIFFERENT session ID.
             // So if past[i].cmSessionId !== currentSessionId, we stop.
             if (past[i].cmSessionId !== currentSessionId) {
+                console.log(`Undone ${past[i].cmSessionId} with ${steps} jumps`)
                 break;
             }
         }
@@ -486,6 +487,7 @@ export const workspaceActions = {
             // If the next state we would redo belongs to a DIFFERENT session, we stop.
             // Actually, we look ahead. If future[i+1] is a different session, we stop at `steps`.
             if (i + 1 < future.length && future[i + 1].cmSessionId !== nextSessionId) {
+                console.log(`Redone ${future[i+1].cmSessionId} with ${steps} jumps`)
                 break;
             }
         }

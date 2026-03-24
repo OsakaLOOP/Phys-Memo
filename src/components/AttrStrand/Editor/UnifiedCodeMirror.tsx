@@ -120,8 +120,10 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                         } else if (e.is(addAtomEffect)) {
                             inverted.push(removeAtomEffect.of({ id: e.value.id }));
                         } else if (e.is(swapAtomEffect)) {
-                            // 交换的逆操作还是交换同样的两个 index
-                            inverted.push(swapAtomEffect.of({ indexA: e.value.indexA, indexB: e.value.indexB }));
+                            // swapAtomEffect 触发时，附带了 setAtomMapEffect，
+                            // 但 setAtomMapEffect 本身已经被最外层拦截倒置（恢复旧 mapping），
+                            // 所以此时我们不需要也不能逆转 swapAtomEffect，否则会再交换一次！
+                            // 为了安全起见，只要有 setAtomMapEffect 在倒转，这里就不需要重复倒转。
                         }
                     }
                     return inverted;

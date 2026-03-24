@@ -117,11 +117,8 @@ export const atomMapField = StateField.define<AtomMapping[]>({
                 } else {
                     nextMappings.push(newMapping);
                 }
-<<<<<<< HEAD
                 console.log(newMapping)
-=======
                 newAddedIds.add(id);
->>>>>>> caeb286158601c442443466bd1542150aa5ca149
             }
             else if (e.is(removeAtomEffect))
             {

@@ -50,6 +50,81 @@ export const strictMappingEditFilter = EditorState.transactionFilter.of((tr) => 
     return tr;
 });
 
+// 跨块选择自动扩展插件：
+// 在选择完成时（非鼠标拖动中），如果选区跨越了多个 mapping，
+// 立即将其扩展为包含所有涉及 mapping 的头部到尾部。
+export const crossMappingSelectionPlugin = ViewPlugin.fromClass(class {
+    isDragging = false;
+    view: EditorView;
+
+    constructor(view: EditorView) {
+        this.view = view;
+        // 我们通过原生的 DOM 事件来准确捕获鼠标的按下和抬起状态
+        view.dom.addEventListener('mousedown', this.onMouseDown);
+        window.addEventListener('mouseup', this.onMouseUp);
+    }
+
+    onMouseDown = () => {
+        this.isDragging = true;
+    };
+
+    onMouseUp = () => {
+        this.isDragging = false;
+        // 鼠标抬起时，立即检查并修复当前选区
+        this.checkAndFixSelection(this.view);
+    };
+
+    update(update: ViewUpdate) {
+        // 如果选区发生了改变，并且当前不在拖动中（例如键盘 Shift+方向键选择）
+        if (update.selectionSet && !this.isDragging) {
+            // 延迟一点执行，避免在同一个 update 循环中同步 dispatch 产生冲突
+            requestAnimationFrame(() => {
+                this.checkAndFixSelection(update.view);
+            });
+        }
+    }
+
+    checkAndFixSelection(view: EditorView) {
+        const selection = view.state.selection.main;
+        if (selection.empty) return;
+
+        const mappings = view.state.field(atomMapField);
+        const { from, to } = selection;
+
+        // 找出所有被触及的 mappings（包括部分相交）
+        const selectedMappings = mappings.filter(m => m.from < to && m.to > from);
+
+        if (selectedMappings.length > 1) {
+            const firstMap = selectedMappings[0];
+            const lastMap = selectedMappings[selectedMappings.length - 1];
+
+            // 目标选区应该是第一个 map 的 from 到最后一个 map 的 to
+            const targetFrom = firstMap.from;
+            const targetTo = lastMap.to;
+
+            // 检查当前选区是否已经是完整的目标选区
+            // 注意锚点（anchor）和头部（head）的方向要保留，以符合用户的拖动方向
+            const isForward = selection.anchor <= selection.head;
+            const currentTargetAnchor = isForward ? targetFrom : targetTo;
+            const currentTargetHead = isForward ? targetTo : targetFrom;
+
+            if (selection.anchor !== currentTargetAnchor || selection.head !== currentTargetHead) {
+                view.dispatch({
+                    selection: { anchor: currentTargetAnchor, head: currentTargetHead },
+                    scrollIntoView: true,
+                    annotations: Transaction.userEvent.of('fix_cross_selection')
+                });
+            }
+        }
+    }
+
+    destroy() {
+        this.view.dom.removeEventListener('mousedown', this.onMouseDown);
+        window.removeEventListener('mouseup', this.onMouseUp);
+    }
+});
+
+
 // 复制格式化器：跨越多个 mapping 时，用 \n\n 分隔
 export const copyFormatterPlugin = EditorView.domEventHandlers({
     copy: (event, view) => {

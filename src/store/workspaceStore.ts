@@ -77,6 +77,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         conceptTopic: '未分类',
         conceptDisciplines: [] as string[] as string[],
         lastEdited: new Date().toISOString(),
+        cmSessionId: null,
 
         draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
         draftAtomsData: {},
@@ -116,6 +117,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         },
 
         applyCMSnapshotsToZundo: (field: ContentAtomField, snapshots: { list: string[], data: Record<string, AtomDraft> }[]) => {
+            // All snapshots from this session get the same tag
+            const sessionId = `cm_${crypto.randomUUID().substring(0, 8)}`;
+
             // Apply snapshots sequentially to generate separate history entries
             for (const snap of snapshots) {
                 set((state) => {
@@ -129,7 +133,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     return {
                         draftAtomLists: { ...state.draftAtomLists, [field]: [...snap.list] },
                         draftAtomsData: mergedData,
-                        lastEdited: new Date().toISOString()
+                        lastEdited: new Date().toISOString(),
+                        cmSessionId: sessionId
                     };
                 });
             }
@@ -145,6 +150,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     conceptTopic,
                     conceptDisciplines,
                     lastEdited: new Date().toISOString(),
+                    cmSessionId: null,
                     draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
                     draftAtomsData: {},
                 cmDraftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
@@ -189,6 +195,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 conceptTopic,
                 conceptDisciplines,
                 lastEdited: new Date().toISOString(),
+                cmSessionId: null,
                 draftAtomLists: {
                     core: mapIds(edition.coreAtoms),
                     doc: mapIds(edition.docAtoms),
@@ -250,7 +257,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 return {
                     draftAtomLists: { ...state.draftAtomLists, [field]: list },
                     draftAtomsData: newData,
-                    lastEdited: new Date().toISOString()
+                    lastEdited: new Date().toISOString(),
+                    cmSessionId: null
                 };
             });
         },
@@ -264,7 +272,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
                 return {
                     draftAtomLists: { ...state.draftAtomLists, [field]: list },
-                    lastEdited: new Date().toISOString()
+                    lastEdited: new Date().toISOString(),
+                    cmSessionId: null
                 };
             });
         },
@@ -279,7 +288,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
                 return {
                     draftAtomsData: { ...state.draftAtomsData, [id]: updatedAtom },
-                    lastEdited: new Date().toISOString()
+                    lastEdited: new Date().toISOString(),
+                    cmSessionId: null
                 };
             });
         },
@@ -361,6 +371,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 // Shallow compare data changes - simplified check since we mutated newData
                 stateChanges.draftAtomsData = newData;
                 stateChanges.lastEdited = new Date().toISOString();
+                stateChanges.cmSessionId = null;
 
                 return stateChanges as Partial<WorkspaceState>;
             });
@@ -409,6 +420,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             conceptDisciplines: state.conceptDisciplines,
             draftAtomLists: state.draftAtomLists,
             draftAtomsData: state.draftAtomsData,
+            cmSessionId: state.cmSessionId,
         }),
         handleSet: (handleSet) => {
             // 后续副作用逻辑占位
@@ -423,6 +435,64 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 // Zundo 的清理操作在 Zustand 外部同步执行，确保业务原子性和清空历史的正确性。
 
 export const workspaceActions = {
+    jumpSessionUndo: () => {
+        const temporalState = useWorkspaceStore.temporal.getState();
+        const past = temporalState.pastStates;
+        if (past.length === 0) return;
+
+        const currentSessionId = useWorkspaceStore.getState().cmSessionId;
+
+        // If the current state doesn't have a session ID, just do a normal step undo
+        if (!currentSessionId) {
+            temporalState.undo(1);
+            return;
+        }
+
+        // Search backward through past states
+        let steps = 0;
+        for (let i = past.length - 1; i >= 0; i--) {
+            steps++;
+            // We keep stepping back as long as the past state has the SAME session ID.
+            // We want to stop AT the first state that has a DIFFERENT session ID.
+            // So if past[i].cmSessionId !== currentSessionId, we stop.
+            if (past[i].cmSessionId !== currentSessionId) {
+                break;
+            }
+        }
+
+        temporalState.undo(steps);
+    },
+
+    jumpSessionRedo: () => {
+        const temporalState = useWorkspaceStore.temporal.getState();
+        const future = temporalState.futureStates;
+        if (future.length === 0) return;
+
+        // Note: futureStates are stored such that index 0 is the NEXT state to redo,
+        // index 1 is the state after that, etc.
+        const nextState = future[0];
+        const nextSessionId = nextState.cmSessionId;
+
+        // If the next state doesn't belong to a session, just normal redo
+        if (!nextSessionId) {
+            temporalState.redo(1);
+            return;
+        }
+
+        // We want to redo all the way to the END of this upcoming session.
+        let steps = 0;
+        for (let i = 0; i < future.length; i++) {
+            steps++;
+            // If the next state we would redo belongs to a DIFFERENT session, we stop.
+            // Actually, we look ahead. If future[i+1] is a different session, we stop at `steps`.
+            if (i + 1 < future.length && future[i + 1].cmSessionId !== nextSessionId) {
+                break;
+            }
+        }
+
+        temporalState.redo(steps);
+    },
+
     initWorkspaceAndClear: (
         edition: IPopulatedEdition | null,
         conceptId: string,

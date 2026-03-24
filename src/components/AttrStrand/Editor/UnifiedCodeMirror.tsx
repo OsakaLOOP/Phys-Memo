@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap, indentWithTab, invertedEffects, undo, redo } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentWithTab, invertedEffects, undo, redo, undoDepth, redoDepth } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
@@ -191,14 +191,31 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
         if (!viewRef.current) return;
         const view = viewRef.current;
 
-        const handleUndo = () => {
+        const handleUndo = (e: Event) => {
             if (activeEditor?.field === field) {
-                undo({ state: view.state, dispatch: view.dispatch });
+                const isShift = (e as CustomEvent).detail?.shift;
+                if (isShift) {
+                    // Loop undo until depth is 0
+                    let limit = 500; // prevent infinite loops just in case
+                    while (undoDepth(view.state) > 0 && limit-- > 0) {
+                        undo({ state: view.state, dispatch: view.dispatch });
+                    }
+                } else {
+                    undo({ state: view.state, dispatch: view.dispatch });
+                }
             }
         };
-        const handleRedo = () => {
+        const handleRedo = (e: Event) => {
             if (activeEditor?.field === field) {
-                redo({ state: view.state, dispatch: view.dispatch });
+                const isShift = (e as CustomEvent).detail?.shift;
+                if (isShift) {
+                    let limit = 500;
+                    while (redoDepth(view.state) > 0 && limit-- > 0) {
+                        redo({ state: view.state, dispatch: view.dispatch });
+                    }
+                } else {
+                    redo({ state: view.state, dispatch: view.dispatch });
+                }
             }
         };
 

@@ -125,6 +125,7 @@ export interface IWorkspaceDraft {
     conceptDisciplines: string[];
 
     lastEdited: string;
+    cmSessionId: string | null;
 
     draftAtomLists: Record<ContentAtomField, Array<DraftId>>;
 

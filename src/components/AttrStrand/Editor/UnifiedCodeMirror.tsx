@@ -8,7 +8,7 @@ import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@cod
 
 import type { ContentAtomField, DraftId } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
-import { atomMapField, blockDecorations, setAtomMapEffect, addAtomEffect, removeAtomEffect, swapAtomEffect, syncToZustandPlugin, blockActionGutter, strictMappingEditFilter, copyFormatterPlugin } from './cm-plugins';
+import { atomMapField, blockDecorations, setAtomMapEffect, addAtomEffect, removeAtomEffect, swapAtomEffect, syncToZustandPlugin, blockActionGutter, strictMappingEditFilter, copyFormatterPlugin, crossMappingSelectionPlugin } from './cm-plugins';
 import type { AtomMapping } from './cm-plugins';
 import { lintGutter } from '@codemirror/lint';
 import { atomBoundaryLinter } from './cm-lint';
@@ -118,6 +118,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                 atomMapField,
                 strictMappingEditFilter,
                 copyFormatterPlugin,
+                crossMappingSelectionPlugin,
                 // 提供 invertedEffects 以支持自定义 Effect 的撤销/重做
                 invertedEffects.of(tr => {
                     const inverted = [];

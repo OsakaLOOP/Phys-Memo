@@ -1,5 +1,6 @@
 import { StateField, StateEffect, Transaction, RangeSetBuilder, EditorState } from '@codemirror/state';
 import { EditorView, Decoration, ViewPlugin, ViewUpdate, gutter, GutterMarker, WidgetType } from '@codemirror/view';
+import { undoDepth, redoDepth } from '@codemirror/commands';
 import type { DecorationSet } from '@codemirror/view';
 import type { DraftId, ContentAtomField } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
@@ -181,6 +182,15 @@ export const syncAndSnapshotPlugin = (field: ContentAtomField, onSnapshot: (snap
         // 如果是外部强制同步（通过 dispatch 触发的），忽略它，避免死循环
         if (update.transactions.some(tr => tr.annotation(Transaction.userEvent) === 'external_sync')) {
             return;
+        }
+
+        // Update history depth to UI immediately
+        const state = useWorkspaceStore.getState();
+        const currentUndoDepth = undoDepth(update.state);
+        const currentRedoDepth = redoDepth(update.state);
+
+        if (state.cmUndoDepth !== currentUndoDepth || state.cmRedoDepth !== currentRedoDepth) {
+            state.setCMHistoryDepth(currentUndoDepth, currentRedoDepth);
         }
 
         const isStructuralChange = update.transactions.some(tr =>

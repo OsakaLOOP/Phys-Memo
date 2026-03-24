@@ -811,6 +811,8 @@ const PhysMemosApp: FC = () => {
   const undo = useStore(useWorkspaceStore.temporal, (state) => state.undo);
   const redo = useStore(useWorkspaceStore.temporal, (state) => state.redo);
   const activeEditor = useWorkspaceStore(state => state.activeEditor);
+  const cmUndoDepth = useWorkspaceStore(state => state.cmUndoDepth);
+  const cmRedoDepth = useWorkspaceStore(state => state.cmRedoDepth);
 
   const submitWorkspace = async () => {
     // Collect data to submit
@@ -1698,7 +1700,7 @@ const PhysMemosApp: FC = () => {
                                         undo();
                                     }
                                 }}
-                                disabled={pastStatesLength === 0 && !activeEditor}
+                                disabled={activeEditor ? cmUndoDepth === 0 : pastStatesLength === 0}
                                 className="w-8 h-8 rounded-full flex items-center justify-center border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-colors"
                                 title={activeEditor ? "撤销 (编辑器内)" : "撤销"}
                            >
@@ -1713,7 +1715,7 @@ const PhysMemosApp: FC = () => {
                                         redo();
                                     }
                                 }}
-                                disabled={futureStatesLength === 0 && !activeEditor}
+                                disabled={activeEditor ? cmRedoDepth === 0 : futureStatesLength === 0}
                                 className="w-8 h-8 rounded-full flex items-center justify-center border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-colors"
                                 title={activeEditor ? "重做 (编辑器内)" : "重做"}
                            >

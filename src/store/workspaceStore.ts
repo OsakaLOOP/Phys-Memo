@@ -52,6 +52,9 @@ interface WorkspaceState extends IWorkspaceDraft {
     // Editor UI State
     activeEditor: { field: ContentAtomField, id: DraftId } | null;
     setActiveEditor: (editor: { field: ContentAtomField, id: DraftId } | null) => void;
+    cmUndoDepth: number;
+    cmRedoDepth: number;
+    setCMHistoryDepth: (undoDepth: number, redoDepth: number) => void;
 
     // CM Parallel State (NOT tracked by zundo) - 仅用于外界 UI 读取显示
     cmDraftAtomLists: Record<ContentAtomField, string[]>;
@@ -90,7 +93,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         })),
 
         activeEditor: null,
-        setActiveEditor: (editor) => set({ activeEditor: editor }),
+        setActiveEditor: (editor) => set({ activeEditor: editor, cmUndoDepth: 0, cmRedoDepth: 0 }),
+        cmUndoDepth: 0,
+        cmRedoDepth: 0,
+        setCMHistoryDepth: (undoDepth, redoDepth) => set({ cmUndoDepth: undoDepth, cmRedoDepth: redoDepth }),
 
         cmDraftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
         cmDraftAtomsData: {},

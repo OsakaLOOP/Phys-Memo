@@ -3,8 +3,14 @@ import { EditorView, Decoration, ViewPlugin, ViewUpdate, gutter, GutterMarker, W
 import type { DecorationSet } from '@codemirror/view';
 import type { DraftId, ContentAtomField } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
+import type { AtomDraft } from '../../../attrstrand/types';
 
 // 基础数据
+
+export interface EditorSnapshot {
+    list: string[];
+    data: Record<string, AtomDraft>;
+}
 
 export interface AtomMapping {
     id: DraftId;
@@ -160,9 +166,9 @@ export const atomMapField = StateField.define<AtomMapping[]>({
     }
 });
 
-// 监听变化，反向同步到 Zustand
+// 监听变化，反向同步到 Zustand (仅更新 UI 显示并记录内部 Snapshot)
 
-export const syncToZustandPlugin = (field: ContentAtomField) => ViewPlugin.fromClass(class {
+export const syncAndSnapshotPlugin = (field: ContentAtomField, onSnapshot: (snapshot: EditorSnapshot) => void) => ViewPlugin.fromClass(class {
     updateTimeout: number | null = null;
 
     constructor() {
@@ -177,13 +183,12 @@ export const syncToZustandPlugin = (field: ContentAtomField) => ViewPlugin.fromC
             return;
         }
 
-        // 防抖：用户连续打字时不立刻全量同步，停顿 500ms 后同步
-        if (this.updateTimeout) {
-            window.clearTimeout(this.updateTimeout);
-        }
+        const isStructuralChange = update.transactions.some(tr =>
+            tr.isUserEvent('add_atom') || tr.isUserEvent('swap_atom') || tr.isUserEvent('remove_atom')
+        );
 
-        this.updateTimeout = window.setTimeout(() => {
-            const mappings = update.state.field(atomMapField);
+        const generateAndEmitSnapshot = () => {
+            const mappings = update.view.state.field(atomMapField);
             const state = useWorkspaceStore.getState();
 
             // Sync to the parallel state
@@ -197,7 +202,7 @@ export const syncToZustandPlugin = (field: ContentAtomField) => ViewPlugin.fromC
             if (field === 'refs') type = 'sources';
 
             for (const m of mappings) {
-                const currentText = update.state.sliceDoc(m.from, m.to);
+                const currentText = update.view.state.sliceDoc(m.from, m.to);
                 const existingAtom = newAtomsData[m.id] || fallbackData[m.id];
 
                 if (existingAtom) {
@@ -222,10 +227,34 @@ export const syncToZustandPlugin = (field: ContentAtomField) => ViewPlugin.fromC
                 }
             }
 
-            // Sync the parallel state
+            // Sync the parallel state for UI display
             state.syncCMToParallelState(field, newList, newAtomsData);
 
-        }, 500);
+            // Record snapshot for undo replay later
+            // We only need to save the subset of data that matters for this field
+            const snapshotData: Record<string, AtomDraft> = {};
+            for (const id of newList) {
+                if (newAtomsData[id]) {
+                    snapshotData[id] = newAtomsData[id];
+                }
+            }
+
+            onSnapshot({ list: newList, data: snapshotData });
+        };
+
+        // 如果是结构性改变，立即执行快照；如果是纯文本编辑，防抖执行
+        if (isStructuralChange) {
+            if (this.updateTimeout) {
+                window.clearTimeout(this.updateTimeout);
+            }
+            generateAndEmitSnapshot();
+        } else {
+            if (this.updateTimeout) {
+                window.clearTimeout(this.updateTimeout);
+            }
+
+            this.updateTimeout = window.setTimeout(generateAndEmitSnapshot, 500);
+        }
     }
 
     destroy() {

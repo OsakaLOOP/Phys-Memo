@@ -30,8 +30,7 @@ export const strictMappingEditFilter = EditorState.transactionFilter.of((tr) => 
     // 只有当有文本内容变化时才检查
     if (!tr.docChanged) return tr;
 
-    // 如果是我们内部系统生成的结构性操作，或者是原生的撤销/重做操作，放行
-    // 因为撤销/重做可能会还原非 mapping 区域（比如两个块中间用于分隔的 \n），这不能被误拦截
+    // 允许内部操作
     if (
         tr.isUserEvent('add_atom') ||
         tr.isUserEvent('swap_atom') ||
@@ -45,9 +44,9 @@ export const strictMappingEditFilter = EditorState.transactionFilter.of((tr) => 
     const mappings = tr.startState.field(atomMapField);
     let allowed = true;
 
-    // 检查所有被修改的区间
+    // 检查所有修改区间
     tr.changes.iterChanges((fromA, toA) => {
-        // 判断 [fromA, toA] 是否完全属于且只属于一个 mapping
+        // 判断 [fromA, toA] 是且仅只属于一个 mapping
         const isInsideOneMapping = mappings.some(m => m.from <= fromA && toA <= m.to);
 
         if (!isInsideOneMapping) {
@@ -56,24 +55,21 @@ export const strictMappingEditFilter = EditorState.transactionFilter.of((tr) => 
     });
 
     if (!allowed) {
-        // 如果不允许，我们忽略本次修改（返回没有 changes 的 transaction）
-        // 但保留 selection 的移动，也就是只屏蔽修改，不屏蔽光标
+        // 只屏蔽修改，不屏蔽光标
         return [tr, { changes: [] }];
     }
 
     return tr;
 });
 
-// 跨块选择自动扩展插件：
-// 在选择完成时（非鼠标拖动中），如果选区跨越了多个 mapping，
-// 立即将其扩展为包含所有涉及 mapping 的头部到尾部。
+// 跨块选择自动扩展插件
 export const crossMappingSelectionPlugin = ViewPlugin.fromClass(class {
     isDragging = false;
     view: EditorView;
 
     constructor(view: EditorView) {
         this.view = view;
-        // 我们通过原生的 DOM 事件来准确捕获鼠标的按下和抬起状态
+        // 原生 DOM 事件
         view.dom.addEventListener('mousedown', this.onMouseDown);
         window.addEventListener('mouseup', this.onMouseUp);
     }
@@ -84,14 +80,14 @@ export const crossMappingSelectionPlugin = ViewPlugin.fromClass(class {
 
     onMouseUp = () => {
         this.isDragging = false;
-        // 鼠标抬起时，立即检查并修复当前选区
+        // 检查并修复当前选区
         this.checkAndFixSelection(this.view);
     };
 
     update(update: ViewUpdate) {
-        // 如果选区发生了改变，并且当前不在拖动中（例如键盘 Shift+方向键选择）
+        // 键盘选择
         if (update.selectionSet && !this.isDragging) {
-            // 延迟一点执行，避免在同一个 update 循环中同步 dispatch 产生冲突
+            // 避免在同一个 update 循环中同步 dispatch 产生冲突
             requestAnimationFrame(() => {
                 this.checkAndFixSelection(update.view);
             });
@@ -105,19 +101,19 @@ export const crossMappingSelectionPlugin = ViewPlugin.fromClass(class {
         const mappings = view.state.field(atomMapField);
         const { from, to } = selection;
 
-        // 找出所有被触及的 mappings（包括部分相交）
+        // 找出所有涉及 mappings（包括部分）
         const selectedMappings = mappings.filter(m => m.from < to && m.to > from);
 
         if (selectedMappings.length > 1) {
             const firstMap = selectedMappings[0];
             const lastMap = selectedMappings[selectedMappings.length - 1];
 
-            // 目标选区应该是第一个 map 的 from 到最后一个 map 的 to
+            // 目标选区
             const targetFrom = firstMap.from;
             const targetTo = lastMap.to;
 
-            // 检查当前选区是否已经是完整的目标选区
-            // 注意锚点（anchor）和头部（head）的方向要保留，以符合用户的拖动方向
+            // 检查当前选区完整
+            // 注意锚点（anchor）和头部（head）的方向
             const isForward = selection.anchor <= selection.head;
             const currentTargetAnchor = isForward ? targetFrom : targetTo;
             const currentTargetHead = isForward ? targetTo : targetFrom;
@@ -139,7 +135,7 @@ export const crossMappingSelectionPlugin = ViewPlugin.fromClass(class {
 });
 
 
-// 复制格式化器：跨越多个 mapping 时，用 \n\n 分隔
+// 复制格式化插件
 export const copyFormatterPlugin = EditorView.domEventHandlers({
     copy: (event, view) => {
         const selection = view.state.selection.main;
@@ -148,27 +144,24 @@ export const copyFormatterPlugin = EditorView.domEventHandlers({
         const mappings = view.state.field(atomMapField);
         const { from, to } = selection;
 
-        // 找出所有被选中的 mapping（即使只是部分选中）
         const selectedMappings = mappings.filter(m => m.from < to && m.to > from);
 
         if (selectedMappings.length <= 1) {
             return false; // 如果只在一个 mapping 内，走默认复制逻辑
         }
 
-        // 处理跨越多个 mapping 的情况
+        // 跨 mapping 情况
         let copiedText = "";
         for (let i = 0; i < selectedMappings.length; i++) {
             const m = selectedMappings[i];
 
-            // 提取被选中的当前 mapping 的实际文本内容
-            // 要截断在选择的边界
             const partFrom = Math.max(m.from, from);
             const partTo = Math.min(m.to, to);
 
             const textPart = view.state.sliceDoc(partFrom, partTo);
             copiedText += textPart;
 
-            // 在相邻的两个 mapping 之间，插入 \n\n (双换行)，而不是原文档的单一 \n
+            // 插入 \n\n (双换行)
             if (i < selectedMappings.length - 1) {
                 copiedText += "\n\n";
             }
@@ -191,7 +184,7 @@ export const atomMapField = StateField.define<AtomMapping[]>({
         const newAddedIds = new Set<string>();
         let skipMapPos = false;
 
-        // 1. 处理结构性操作 Effects
+        // 处理结构性操作 Effects
         for (const e of tr.effects) {
             if (e.is(setAtomMapEffect)) {
                 nextMappings = e.value; // 全量覆盖
@@ -218,10 +211,7 @@ export const atomMapField = StateField.define<AtomMapping[]>({
             }
             else if (e.is(swapAtomEffect))
             {
-                // swapAtomEffect 已经附带了 setAtomMapEffect 精确计算的覆盖。
-                // 这里的数组元素交换逻辑已经被 setAtomMapEffect 替代，
-                // 但保留该 effect 是为了供 UnifiedCodeMirror 的 invertedEffects 使用。
-                // 如果没有 setAtomMapEffect(比如在旧记录或者 undo 中), 我们这里交换:
+                //legacy
                 if (!skipMapPos) {
                     const { indexA, indexB } = e.value;
                     if (indexA >= 0 && indexB >= 0 && indexA < nextMappings.length && indexB < nextMappings.length) {
@@ -233,7 +223,7 @@ export const atomMapField = StateField.define<AtomMapping[]>({
             }
         }
 
-        // 2. 如果文档发生了修改，利用 CM 的 changes.map 自动调整所有 from/to 边界
+        // changes.map 自动调整所有 from/to 边界
         if (tr.docChanged && !skipMapPos && !tr.isUserEvent('swap_atom')) {
             // 在重做（Redo）时，userEvent 可能是 'redo'，但 newAddedIds.size 会 > 0（因为 addAtomEffect 会被重播）。
             // 只要是本次交易中包含新块插入，我们就把它视为一次结构性添加。
@@ -252,7 +242,7 @@ export const atomMapField = StateField.define<AtomMapping[]>({
                 const newFrom = tr.changes.mapPos(m.from, fromAssoc);
                 let newTo = tr.changes.mapPos(m.to, toAssoc);
 
-                // 防御性修正：针对空块上方插入换行符，可能导致 mapped to 停留在 from 左侧发生倒挂
+                // 针对空块上方插入换行符
                 if (newFrom > newTo) {
                     newTo = newFrom;
                 }
@@ -278,12 +268,12 @@ export const syncAndSnapshotPlugin = (field: ContentAtomField, onSnapshot: (snap
     update(update: ViewUpdate) {
         if (!update.docChanged) return;
 
-        // 如果是外部强制同步（通过 dispatch 触发的），忽略它，避免死循环
+        // 忽略外部 dispatch 同步, 避免死循环
         if (update.transactions.some(tr => tr.annotation(Transaction.userEvent) === 'external_sync')) {
             return;
         }
 
-        // Update history depth to UI immediately
+        // 更新 UI 状态
         const state = useWorkspaceStore.getState();
         const currentUndoDepth = undoDepth(update.state);
         const currentRedoDepth = redoDepth(update.state);
@@ -351,7 +341,7 @@ export const syncAndSnapshotPlugin = (field: ContentAtomField, onSnapshot: (snap
             onSnapshot({ list: newList, data: snapshotData });
         };
 
-        // 如果是结构性改变，立即执行快照；如果是纯文本编辑，防抖执行
+        // 结构性改变，立即执行；纯文本编辑，防抖执行
         if (isStructuralChange) {
             if (this.updateTimeout) {
                 window.clearTimeout(this.updateTimeout);
@@ -373,7 +363,7 @@ export const syncAndSnapshotPlugin = (field: ContentAtomField, onSnapshot: (snap
     }
 });
 
-// === 4. Visual Decorations: 渲染 Atom 块边界样式 ===
+// 渲染 Atom 块边界样式
 
 // Helper: Build decorations based on state
 function buildDecorations(state: EditorState, field: ContentAtomField): DecorationSet {

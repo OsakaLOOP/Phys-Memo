@@ -31,7 +31,7 @@ const BinaryAtomEditorWrapper: React.FC<{ atomId: string }> = ({ atomId }) => {
                     const fieldList = useWorkspaceStore.getState().cmDraftAtomLists[atom.field];
                     useWorkspaceStore.getState().syncCMToParallelState(atom.field, fieldList, {
                         ...currentParallel,
-                        [atomId]: { ...currentParallel[atomId], blobs: newBlobs }
+                        [atomId]: { ...currentParallel[atomId], blobs: newBlobs } as any
                     });
                 }}
             />

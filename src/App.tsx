@@ -28,7 +28,7 @@ import { FieldEditor } from './components/AttrStrand/FieldEditor';
 import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
 import { TopicChildCard } from './components/AttrStrand/TopicChildCard';
 import { useStore } from 'zustand';
-import { useWorkspaceStore, useGlobalStore, workspaceActions } from './store/workspaceStore';
+import { useWorkspaceStore, useGlobalStore, workspaceActions, logZundoState } from './store/workspaceStore';
 import { useNetworkStore } from './store/networkStore';
 
 // --- Type Definitions ---
@@ -1700,6 +1700,7 @@ const PhysMemosApp: FC = () => {
                                             workspaceActions.jumpSessionUndo();
                                         } else {
                                             undo();
+                                            logZundoState('undo (main UI)');
                                         }
                                     }
                                 }}
@@ -1719,6 +1720,7 @@ const PhysMemosApp: FC = () => {
                                             workspaceActions.jumpSessionRedo();
                                         } else {
                                             redo();
+                                            logZundoState('redo (main UI)');
                                         }
                                     }
                                 }}

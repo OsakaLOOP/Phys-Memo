@@ -438,7 +438,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 // --- Action Helpers ---
 // Zundo 的清理操作在 Zustand 外部同步执行，确保业务原子性和清空历史的正确性。
 
-const logZundoState = (action: string) => {
+export const logZundoState = (action: string) => {
     const temporalState = useWorkspaceStore.temporal.getState();
     const past = temporalState.pastStates;
     const future = temporalState.futureStates;

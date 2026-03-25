@@ -5,6 +5,7 @@ import type { DecorationSet } from '@codemirror/view';
 import type { DraftId, ContentAtomField } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
 import type { AtomDraft } from '../../../attrstrand/types';
+import { BinaryAtomWidget } from './cm-react-widgets';
 
 // 基础数据
 
@@ -531,6 +532,30 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
             decorations.push({ from: firstLine.from, to: firstLine.from, dec: Decoration.line({
                 class: 'group/cmline'
             })});
+        }
+    }
+
+    // 检查并替换 binary atom 的内容
+    // We do this after calculating lines because binary blocks replace text
+    const store = useWorkspaceStore.getState();
+    const atomsData = store.cmDraftAtomsData;
+    const fallbackData = store.draftAtomsData;
+
+    for (const m of mappings) {
+        if (m.from < m.to) {
+            const atom = atomsData[m.id] || fallbackData[m.id];
+            if (atom && atom.type === 'bin') {
+                // If it's a binary atom, we replace its entire content range with a widget
+                decorations.push({
+                    from: m.from,
+                    to: m.to,
+                    dec: Decoration.replace({
+                        widget: new BinaryAtomWidget(m.id),
+                        block: true, // replace as a block widget
+                        inclusive: true
+                    })
+                });
+            }
         }
     }
 

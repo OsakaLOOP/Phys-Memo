@@ -436,7 +436,8 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
         const firstLine = state.doc.lineAt(0);
         decorations.push({ from: firstLine.from, to: firstLine.from, dec: Decoration.widget({
             widget: new AddButtonWidget(field, -1, 'top'),
-            side: -1
+            side: -1,
+            block: true
         })});
         // 第一行的 group/cmline 会在上面的块内逻辑处理，或者在这里确保有
         if (!decorations.some(d => d.from === firstLine.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
@@ -477,7 +478,8 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
         const lastLine = state.doc.lineAt(lastMapping.to);
         decorations.push({ from: lastLine.to, to: lastLine.to, dec: Decoration.widget({
             widget: new AddButtonWidget(field, mappings.length - 1, 'bottom'),
-            side: 1
+            side: 1,
+            block: true
         })});
         if (!decorations.some(d => d.from === lastLine.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
             decorations.push({ from: lastLine.from, to: lastLine.from, dec: Decoration.line({
@@ -488,7 +490,8 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
         // 如果为空，在第一行显示
         decorations.push({ from: 0, to: 0, dec: Decoration.widget({
             widget: new AddButtonWidget(field, -1, 'bottom'),
-            side: 1
+            side: 1,
+            block: true
         })});
         const line = state.doc.lineAt(0);
         if (!decorations.some(d => d.from === line.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
@@ -632,7 +635,7 @@ class AddButtonWidget extends WidgetType {
 
         } else {
             // 顶部/底部：block widget，relative定位，按钮绝对偏移
-            wrap.className = "cm-add-btn-wrapper relative w-full flex justify-center h-0 overflow-visible pointer-events-none z-10 opacity-0 group-hover/cmline:opacity-100 transition-opacity duration-200";
+            wrap.className = "cm-add-btn-wrapper relative w-full flex justify-center h-0 overflow-visible pointer-events-none z-10 opacity-0 group-hover/cmline:opacity-100 hover:opacity-100 transition-opacity duration-200";
             btn.className = "absolute pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm cursor-pointer";
 
             // 调整位置保持与内容一定距离，不改变垂直排版

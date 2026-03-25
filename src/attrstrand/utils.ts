@@ -146,9 +146,18 @@ export async function generateContentHash(content: string): Promise<string> {
         return await sha256(content);
 }
 
-export async function generateBinaryHash(blob: Blob | ArrayBuffer): Promise<string> {
-    const buffer = blob instanceof Blob ? await blob.arrayBuffer() : blob;
-    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+export async function generateBinaryHash(blobs: (Blob | ArrayBuffer)[]): Promise<string> {
+    const buffers = await Promise.all(
+        blobs.map(blob => blob instanceof Blob ? blob.arrayBuffer() : Promise.resolve(blob))
+    );
+    const totalLength = buffers.reduce((acc, buf) => acc + buf.byteLength, 0);
+    const combinedBuffer = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const buf of buffers) {
+        combinedBuffer.set(new Uint8Array(buf), offset);
+        offset += buf.byteLength;
+    }
+    const hashBuffer = await crypto.subtle.digest('SHA-256', combinedBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }

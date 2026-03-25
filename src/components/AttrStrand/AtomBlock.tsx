@@ -5,6 +5,8 @@ import RichTextRenderer from '../RichTextRenderer';
 import { Edit3, Check, X } from 'lucide-react';
 import { calculateDiffStats } from '../../attrstrand/utils';
 import { CopyrightTooltip } from './CopyrightTooltip';
+import { ImageGroupViewer } from './Editor/ImageGroupViewer';
+import { ImageGroupEditor } from './Editor/ImageGroupEditor';
 
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
@@ -44,6 +46,18 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     if (!atom) return null; // Defensive check
 
     const handleSave = (valToSave?: string, exit: boolean = true) => {
+        if (atom.type === 'bin') {
+            if (exit) {
+                if (isMultilineEditor) {
+                    if (useWorkspaceStore.getState().activeEditor?.id === atomId) {
+                        setActiveEditor(null);
+                    }
+                } else {
+                    setIsEditingLocal(false);
+                }
+            }
+            return;
+        }
         const finalVal = valToSave !== undefined ? valToSave : editValue;
         if (finalVal !== atom.content) {
             updateAtomContent(atomId, finalVal);
@@ -163,6 +177,10 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     }, [isEditing, atom.isDirty, initialContent, editValue, atom.content, atom.diffAdded, atom.diffDeleted, atom.diffRetained]);
 
     const renderContent = () => {
+        if (atom.type === 'bin') {
+            return <ImageGroupViewer blobs={atom.blobs || []} meta={atom.frontMeta as any} />;
+        }
+
         if (!atom.content) return <span className="text-slate-300 italic text-sm">点击编辑内容...</span>;
 
         if (isTags) {
@@ -188,6 +206,21 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     };
 
     const renderEditor = () => {
+        if (atom.type === 'bin') {
+            return (
+                <ImageGroupEditor
+                    blobs={atom.blobs || []}
+                    meta={atom.frontMeta as any}
+                    onUpdateMeta={(newMeta) => {
+                        useWorkspaceStore.getState().updateAtomMeta(atomId, newMeta);
+                    }}
+                    onUpdateBlobs={(newBlobs) => {
+                        useWorkspaceStore.getState().updateAtomBlobs(atomId, newBlobs);
+                    }}
+                />
+            );
+        }
+
         if (isTags) {
              return (
                  <input

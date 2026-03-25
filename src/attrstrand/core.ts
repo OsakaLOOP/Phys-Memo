@@ -225,8 +225,13 @@ export class AttrStrandCore {
         const processAtoms = async (field: ContentAtomField, atoms: AtomSubmission[]) => {
             const atomIds: hash[] = [];
             for (const sub of atoms) {
-                const contentHash = await generateContentHash(sub.contentPayload);
-                const contentSimHash = await simhash(sub.contentPayload);
+                let contentHash: string;
+                if (sub.type === 'bin' && sub.blobs && sub.blobs.length > 0) {
+                    contentHash = await generateBinaryHash(sub.blobs);
+                } else {
+                    contentHash = await generateContentHash(sub.contentPayload);
+                }
+                const contentSimHash = sub.type === 'bin' ? null : await simhash(sub.contentPayload);
 
                 let prevAtom: IContentAtom | null = null;
                 if (sub.derivedFromId) {
@@ -279,6 +284,7 @@ export class AttrStrandCore {
                         field,
                         type: sub.type,
                         content: sub.contentPayload,
+                    blobs: sub.blobs,
                         contentHash,
                         contentSimHash,
                         diffAdded,
@@ -369,7 +375,7 @@ export class AttrStrandCore {
 
     // 备用函数: 接受文件 api 和其他必要的 atom 元数据，将二进制流存入 atom，type 为 'bin'
     async saveBinaryAtom(
-        blob: Blob | ArrayBuffer,
+        blobs: (Blob | ArrayBuffer)[],
         fileName: string,
         field: ContentAtomField,
         creatorId: string,
@@ -377,7 +383,7 @@ export class AttrStrandCore {
         frontMeta: Meta = {}
     ): Promise<IContentAtom> {
         // 仅根据文件内容计算 hash
-        const contentHash = await generateBinaryHash(blob);
+        const contentHash = await generateBinaryHash(blobs);
         const contentPayload = fileName; // content 仅保存文件名
         const contentSimHash = null;
 
@@ -397,7 +403,7 @@ export class AttrStrandCore {
             field,
             type: 'bin',
             content: contentPayload,
-            blob: blob,
+            blobs: blobs,
             contentHash,
             contentSimHash,
             diffAdded: 0,

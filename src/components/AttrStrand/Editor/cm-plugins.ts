@@ -136,6 +136,93 @@ export const crossMappingSelectionPlugin = ViewPlugin.fromClass(class {
 
 
 // 复制格式化插件
+export const dragDropImagePlugin = (field: ContentAtomField) => EditorView.domEventHandlers({
+    dragover: (event) => {
+        // Allow dropping files
+        if (event.dataTransfer?.types.includes('Files')) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+        }
+    },
+    drop: (event, view) => {
+        if (!event.dataTransfer?.files || event.dataTransfer.files.length === 0) return false;
+
+        // Only care about image drops
+        const files = Array.from(event.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+        if (files.length === 0) return false;
+
+        event.preventDefault();
+
+        const posInfo = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (!posInfo) return false;
+        const pos = posInfo;
+
+        const mappings = view.state.field(atomMapField);
+
+        // Find which mapping or gap we dropped into
+        let insertPos = pos;
+        let mappingIndex = -1;
+
+        for (let i = 0; i < mappings.length; i++) {
+            if (pos >= mappings[i].from && pos <= mappings[i].to) {
+                // Dropped inside a mapping. Split block or append?
+                // Let's insert after this mapping
+                insertPos = mappings[i].to + 1;
+                mappingIndex = i;
+                break;
+            } else if (i < mappings.length - 1 && pos > mappings[i].to && pos < mappings[i+1].from) {
+                // Dropped in gap
+                insertPos = mappings[i].to + 1;
+                mappingIndex = i;
+                break;
+            }
+        }
+
+        if (mappingIndex === -1 && mappings.length > 0) {
+            if (pos < mappings[0].from) {
+                mappingIndex = -1;
+                insertPos = 0;
+            } else {
+                mappingIndex = mappings.length - 1;
+                insertPos = view.state.doc.length;
+            }
+        }
+
+        const newId = `temp_${crypto.randomUUID().replace(/-/g, '')}`;
+        let insertText = '\n';
+        if (mappingIndex === mappings.length - 1 && view.state.sliceDoc(view.state.doc.length - 1) !== '\n') {
+            insertText = '\n\n';
+        }
+
+        const atomFrom = insertText === '\n\n' ? insertPos + 1 : insertPos;
+
+        // Read files as blobs
+        const blobs = files.map(f => f);
+
+        // Dispatch CM changes to make space for the new block in UI state tracking
+        view.dispatch({
+            changes: { from: insertPos, to: insertPos, insert: insertText },
+            effects: addAtomEffect.of({ id: newId, index: mappingIndex, insertPos: atomFrom }),
+            annotations: Transaction.userEvent.of('add_atom')
+        });
+
+        // Use workspace actions to save blobs
+        const state = useWorkspaceStore.getState();
+
+        // In cm-plugins we are dealing with parallel state directly for UI display.
+        // Wait briefly for CM to sync to parallel state, then update blobs
+        setTimeout(() => {
+            state.updateAtomBlobs(newId, blobs);
+            state.updateAtomMeta(newId, {
+                images: blobs.map((_, i) => ({ id: `img_${i}`, widthRatio: 1, caption: '' }))
+            });
+            state.setActiveEditor({ field, id: newId });
+        }, 50);
+
+        return true;
+    }
+});
+
 export const copyFormatterPlugin = EditorView.domEventHandlers({
     copy: (event, view) => {
         const selection = view.state.selection.main;

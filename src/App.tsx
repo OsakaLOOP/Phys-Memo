@@ -1169,18 +1169,39 @@ const PhysMemosApp: FC = () => {
     setActiveNodeId(null); // Deselect active node when toggling
   };
 
-  const filteredNodes = nodes.filter(n => {
+  const sidebarData = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return (
-      n.title.toLowerCase().includes(q) ||
-      n.type.toLowerCase().includes(q) ||
-      (n.topic || '').toLowerCase().includes(q) ||
-      (n.disciplines || []).some(d => disciplinesMap[d]?.name.toLowerCase().includes(q)) ||
-      (n.constraints && n.constraints.some(c => c.toLowerCase().includes(q)))
-    );
-  });
+    const childrenMap: Record<string, NodeData[]> = {};
+    const foundTopicsSet = new Set<string>();
+    const topicNodesMap: Record<string, NodeData> = {};
 
-  const relevantTopics = Array.from(new Set(filteredNodes.map(n => n.topic))).sort();
+    for (const n of nodes) {
+      // Build TOPIC nodes map in the same pass
+      if (n.type === 'TOPIC') {
+        topicNodesMap[n.title] = n;
+      }
+
+      const matches = (
+        n.title.toLowerCase().includes(q) ||
+        n.type.toLowerCase().includes(q) ||
+        (n.topic || '').toLowerCase().includes(q) ||
+        (n.disciplines || []).some(d => disciplinesMap[d]?.name.toLowerCase().includes(q)) ||
+        (n.constraints && n.constraints.some(c => c.toLowerCase().includes(q)))
+      );
+
+      if (matches) {
+        if (n.type !== 'TOPIC') {
+          if (!childrenMap[n.topic]) childrenMap[n.topic] = [];
+          childrenMap[n.topic].push(n);
+        }
+        foundTopicsSet.add(n.topic);
+      }
+    }
+
+    const relevantTopics = Array.from(foundTopicsSet).sort();
+
+    return { relevantTopics, topicNodesMap, childrenMap };
+  }, [nodes, searchQuery, disciplinesMap]);
 
   return (
     <div className="flex h-screen w-full bg-slate-50 text-slate-800 font-sans overflow-hidden">
@@ -1226,11 +1247,11 @@ const PhysMemosApp: FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {relevantTopics.map(topic => {
+          {sidebarData.relevantTopics.map(topic => {
             // Find Topic Node (Header)
-            const topicNode = nodes.find(n => n.type === 'TOPIC' && n.title === topic);
+            const topicNode = sidebarData.topicNodesMap[topic];
             // Find Children (excluding Topic Node itself, from filtered list)
-            const children = filteredNodes.filter(n => n.topic === topic && n.type !== 'TOPIC');
+            const children = sidebarData.childrenMap[topic] || [];
 
             // If strictly searching (query not empty), always expand. Else check state.
             const isExpanded = searchQuery ? true : !collapsedTopics.has(topic);

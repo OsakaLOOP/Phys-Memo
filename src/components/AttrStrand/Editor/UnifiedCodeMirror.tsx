@@ -8,7 +8,7 @@ import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@cod
 
 import type { ContentAtomField, DraftId } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
-import { atomMapField, blockDecorations, setAtomMapEffect, addAtomEffect, removeAtomEffect, swapAtomEffect, syncAndSnapshotPlugin, blockActionGutter, strictMappingEditFilter, copyFormatterPlugin, crossMappingSelectionPlugin } from './cm-plugins';
+import { atomMapField, blockDecorations, setAtomMapEffect, addAtomEffect, removeAtomEffect, swapAtomEffect, syncAndSnapshotPlugin, blockActionGutter, strictMappingEditFilter, copyFormatterPlugin, dragDropImagePlugin, crossMappingSelectionPlugin } from './cm-plugins';
 import type { AtomMapping, EditorSnapshot } from './cm-plugins';
 import { lintGutter } from '@codemirror/lint';
 import { atomBoundaryLinter } from './cm-lint';
@@ -125,6 +125,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                 }),
                 // 初始化时注入当前的映射表
                 atomMapField.init(() => mappings),
+                dragDropImagePlugin(field),
 
                 // 暂时简单的焦点处理
                 EditorView.theme({

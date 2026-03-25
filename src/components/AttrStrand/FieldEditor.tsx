@@ -7,6 +7,7 @@ import { Check, Edit3, Plus, AlertTriangle } from 'lucide-react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { CopyrightTooltip } from './CopyrightTooltip';
 import { genTempId } from '../../store/workspaceStore';
+import { ImageGroupViewer } from './Editor/ImageGroupViewer';
 
 interface FieldEditorProps {
     field: ContentAtomField;
@@ -59,7 +60,7 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
 
         // 避免点击内部链接或按钮时误触发编辑
         const target = e.target as HTMLElement;
-        if (target.closest('a') || target.closest('button') || target.closest('.ref-link')) {
+        if (target.closest('a') || target.closest('button') || target.closest('.ref-link') || target.closest('.editor-img-container')) {
             return;
         }
 
@@ -73,6 +74,38 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
         e.stopPropagation();
         const newId = genTempId();
         addAtomId(field, newId, index);
+        setActiveEditor({ field, id: newId });
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        if (readOnly) return;
+        if (e.dataTransfer?.types.includes('Files')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+        if (readOnly || isEditing) return;
+        if (!e.dataTransfer?.files || e.dataTransfer.files.length === 0) return;
+
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+        if (files.length === 0) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const blobs = files.map(f => f);
+        const newId = genTempId();
+        addAtomId(field, newId, targetIndex);
+
+        const state = useWorkspaceStore.getState();
+        state.updateAtomBlobs(newId, blobs);
+        state.updateAtomMeta(newId, {
+            images: blobs.map((_, i) => ({ id: `img_${i}`, widthRatio: 1, caption: '' }))
+        });
+
+        // Let it stay in read-only or open editor, here we open editor
         setActiveEditor({ field, id: newId });
     };
 
@@ -168,10 +201,16 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                 </div>
             )}
 
-            <div className="p-4 flex flex-col">
+            <div
+                className="p-4 flex flex-col min-h-[100px]"
+                onDragOver={handleDragOver}
+                onDrop={(e) => {
+                    if (atomIds.length === 0) handleDrop(e, -1);
+                }}
+            >
                 {atomIds.length === 0 ? (
-                    <div className="text-slate-400 text-sm italic py-2">
-                        暂无内容...
+                    <div className="text-slate-400 text-sm italic py-2 pointer-events-none">
+                        暂无内容，或拖拽图片到此处...
                     </div>
                 ) : (
                     atomIds.map((id, index) => {
@@ -200,7 +239,14 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                                 {/* 块内容与左侧边框 */}
                                 <div className="py-2">
                                     <div className="pl-3 border-l-[3px] border-slate-200 group-hover/block:border-indigo-300 transition-colors">
-                                        <RichTextRenderer content={content} enableAnalysis={true} />
+                                        {atom?.type === 'bin' ? (
+                                            <ImageGroupViewer
+                                                blobs={atom.blobs || []}
+                                                meta={atom.frontMeta as any}
+                                            />
+                                        ) : (
+                                            <RichTextRenderer content={content} enableAnalysis={true} />
+                                        )}
                                     </div>
                                 </div>
 
@@ -219,10 +265,15 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
 
                                 {/* 块底部插入按钮 */}
                                 {!readOnly && (
-                                    <div className={`absolute -bottom-[14px] left-0 w-full flex justify-center opacity-0 ${((hoveredIndex === index) || hoveredIndex === index + 1) && 'opacity-100'} transition-opacity z-10 pointer-events-none`}>
+                                    <div
+                                        className={`absolute -bottom-[14px] left-0 w-full flex justify-center opacity-0 ${((hoveredIndex === index) || hoveredIndex === index + 1) && 'opacity-100'} transition-opacity z-10`}
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => handleDrop(e, index)}
+                                    >
+                                        <div className="absolute inset-x-0 h-4 bg-transparent -top-2" />
                                         <button
                                             onClick={(e) => handleAdd(e, index)}
-                                            className="pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm"
+                                            className="relative pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm"
                                         >
                                             <Plus size={12} />
                                         </button>

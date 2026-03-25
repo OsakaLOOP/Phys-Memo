@@ -1,49 +1,190 @@
-import type { IConceptRoot, IEdition, IContentAtom, DisciplineData, ContentAtomField, ContentAtomType } from './types.ts';
+<<<<<<< SEARCH
+export class LocalStorageMock implements IStorage {
+    private load<T>(key: string): Record<string, T> {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : {};
+    }
 
-export interface IStorage {
-    // Concept Operations
-    saveConcept(concept: IConceptRoot): Promise<void>;
-    getConcept(id: string): Promise<IConceptRoot | null>;
-    getAllConcepts(): Promise<IConceptRoot[]>;
+    private save<T>(key: string, data: Record<string, T>) {
+        localStorage.setItem(key, JSON.stringify(data));
+    }
 
-    // Edition Operations
-    saveEdition(edition: IEdition): Promise<void>;
-    getEdition(id: string): Promise<IEdition | null>;
-    getEditionsByConcept(conceptId: string): Promise<IEdition[]>;
+    // --- Concept Operations ---
+    async saveConcept(concept: IConceptRoot): Promise<void> {
+        const data = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
+        data[concept.id] = concept;
+        this.save(STORAGE_KEYS.CONCEPTS, data);
+    }
 
-    // Atom Operations
-    saveAtom(atom: IContentAtom): Promise<void>;
-    getAtom(id: string): Promise<IContentAtom | null>;
-    getAtoms(ids: string[]): Promise<IContentAtom[]>;
-    getAllAtoms(): Promise<IContentAtom[]>;
-    findAtomsByContentHash(contentHash: string): Promise<IContentAtom[]>;
-    findAtomsByField(field: ContentAtomField): Promise<IContentAtom[]>;
-    queryAtoms(filter: {
+    async getConcept(id: string): Promise<IConceptRoot | null> {
+        const data = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
+        return data[id] || null;
+    }
+
+    async getAllConcepts(): Promise<IConceptRoot[]> {
+        const data = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
+        return Object.values(data);
+    }
+
+    // --- Edition Operations ---
+    async saveEdition(edition: IEdition): Promise<void> {
+        const data = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
+        data[edition.id] = edition;
+        this.save(STORAGE_KEYS.EDITIONS, data);
+    }
+
+    async getEdition(id: string): Promise<IEdition | null> {
+        const data = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
+        return data[id] || null;
+    }
+
+    async getEditionsByConcept(conceptId: string): Promise<IEdition[]> {
+        const data = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
+        return Object.values(data).filter(e => e.conceptId === conceptId);
+    }
+
+    // --- Atom Operations ---
+    async saveAtom(atom: IContentAtom): Promise<void> {
+        const data = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
+        data[atom.id] = atom;
+        this.save(STORAGE_KEYS.ATOMS, data);
+    }
+
+    async getAtom(id: string): Promise<IContentAtom | null> {
+        const data = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
+        return data[id] || null;
+    }
+
+    async getAtoms(ids: string[]): Promise<IContentAtom[]> {
+        const data = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
+        return ids.map(id => data[id]).filter(a => a !== undefined);
+    }
+
+    async getAllAtoms(): Promise<IContentAtom[]> {
+        const atoms = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
+        return Object.values(atoms);
+    }
+
+    async findAtomsByContentHash(contentHash: string): Promise<IContentAtom[]> {
+        const allAtoms = await this.getAllAtoms();
+        return allAtoms.filter(atom => atom.contentHash === contentHash);
+    }
+
+    async findAtomsByField(field: ContentAtomField): Promise<IContentAtom[]> {
+        const allAtoms = await this.getAllAtoms();
+        return allAtoms.filter(atom => atom.field === field);
+    }
+
+    async queryAtoms(filter: {
         field?: ContentAtomField;
         type?: ContentAtomType;
         creatorId?: string;
         contentHash?: string;
         contentSimHash?: string;
         contains?: string;
-    }): Promise<IContentAtom[]>;
+    }): Promise<IContentAtom[]> {
+        const allAtoms = await this.getAllAtoms();
+        return allAtoms.filter(atom => {
+            if (filter.field && atom.field !== filter.field) return false;
+            if (filter.type && atom.type !== filter.type) return false;
+            if (filter.creatorId && atom.creatorId !== filter.creatorId) return false;
+            if (filter.contentHash && atom.contentHash !== filter.contentHash) return false;
+            if (filter.contentSimHash && atom.contentSimHash !== filter.contentSimHash) return false;
+            if (filter.contains && !atom.content.includes(filter.contains)) return false;
+            return true;
+        });
+    }
 
-    // Discipline Operations (Flat structure)
-    saveDiscipline(discipline: DisciplineData): Promise<void>;
-    getDiscipline(name: string): Promise<DisciplineData | null>;
-    getAllDisciplines(): Promise<DisciplineData[]>;
-    deleteDiscipline(name: string): Promise<void>;
+    // --- Discipline Operations ---
+    async saveDiscipline(discipline: DisciplineData): Promise<void> {
+        const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
+        data[discipline.name] = discipline;
+        this.save(STORAGE_KEYS.DISCIPLINES, data);
+    }
 
-    // Worker Interface
-    runCleanup(thresholdTimestamp: number): Promise<number>; // Returns number of deleted items
+    async getDiscipline(name: string): Promise<DisciplineData | null> {
+        const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
+        return data[name] || null;
+    }
+
+    async getAllDisciplines(): Promise<DisciplineData[]> {
+        const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
+        return Object.values(data);
+    }
+
+    async deleteDiscipline(name: string): Promise<void> {
+        const data = this.load<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
+        if (data[name]) {
+            delete data[name];
+            this.save(STORAGE_KEYS.DISCIPLINES, data);
+        }
+    }
+
+    // --- Cleanup Operations ---
+    async runCleanup(_thresholdTimestamp: number): Promise<number> {
+        const concepts = this.load<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
+        const editions = this.load<IEdition>(STORAGE_KEYS.EDITIONS);
+        const atoms = this.load<IContentAtom>(STORAGE_KEYS.ATOMS);
+
+        let deletedCount = 0;
+
+                const activeEditionIds = new Set<string>();
+        Object.values(concepts).forEach(c => {
+            Object.keys(c.currentHeads).forEach(headId => activeEditionIds.add(headId));
+        });
+
+                const keptEditionIds = new Set<string>();
+        const queue = [...activeEditionIds];
+
+                Object.values(editions).forEach(e => {
+            if (e.saveType !== 'autosave') {
+                queue.push(e.id);
+            }
+        });
+
+                while(queue.length > 0) {
+            const id = queue.shift()!;
+            if (keptEditionIds.has(id)) continue;
+            keptEditionIds.add(id);
+
+            const edition = editions[id];
+            if (edition && edition.parentEditionId) {
+                queue.push(edition.parentEditionId);
+            }
+        }
+
+                Object.keys(editions).forEach(id => {
+            if (!keptEditionIds.has(id)) {
+                delete editions[id];
+                deletedCount++;
+            }
+        });
+
+                const referencedAtomIds = new Set<string>();
+        Object.values(editions).forEach(e => {
+            e.coreAtomIds.forEach(id => referencedAtomIds.add(id));
+            e.docAtomIds.forEach(id => referencedAtomIds.add(id));
+            e.tagsAtomIds.forEach(id => referencedAtomIds.add(id));
+            e.refsAtomIds.forEach(id => referencedAtomIds.add(id));
+            e.relsAtomIds.forEach(id => referencedAtomIds.add(id));
+        });
+
+                Object.keys(atoms).forEach(id => {
+            if (!referencedAtomIds.has(id)) {
+                delete atoms[id];
+                deletedCount++;
+            }
+        });
+
+        this.save(STORAGE_KEYS.EDITIONS, editions);
+        this.save(STORAGE_KEYS.ATOMS, atoms);
+
+        return deletedCount;
+    }
 }
 
-const STORAGE_KEYS = {
-    CONCEPTS: 'attr_concepts',
-    EDITIONS: 'attr_editions',
-    ATOMS: 'attr_atoms',
-    DISCIPLINES: 'attr_disciplines'
-};
-
+export const storage = new LocalStorageMock();
+=======
 export class IndexedDBStorage implements IStorage {
     private dbName = 'AttrStrandDB';
     private dbVersion = 1;
@@ -78,13 +219,10 @@ export class IndexedDBStorage implements IStorage {
             request.onsuccess = async (event) => {
                 const db = (event.target as IDBOpenDBRequest).result;
 
-                try {
-                    // Migrate from LocalStorage if DB is newly created and empty
-                    await this.migrateFromLocalStorage(db);
-                    resolve(db);
-                } catch (e) {
-                    reject(e);
-                }
+                // Migrate from LocalStorage if DB is newly created and empty
+                await this.migrateFromLocalStorage(db);
+
+                resolve(db);
             };
 
             request.onerror = (event) => {
@@ -114,12 +252,8 @@ export class IndexedDBStorage implements IStorage {
                 if (conceptsCountReq.result === 0) {
                     const rawConcepts = localStorage.getItem(STORAGE_KEYS.CONCEPTS);
                     if (rawConcepts) {
-                        try {
-                            const parsed: Record<string, IConceptRoot> = JSON.parse(rawConcepts);
-                            Object.values(parsed).forEach(concept => conceptsStore.put(concept));
-                        } catch (e) {
-                            console.error("Failed to parse local storage concepts", e);
-                        }
+                        const parsed: Record<string, IConceptRoot> = JSON.parse(rawConcepts);
+                        Object.values(parsed).forEach(concept => conceptsStore.put(concept));
                     }
                 }
             };
@@ -131,12 +265,8 @@ export class IndexedDBStorage implements IStorage {
                 if (editionsCountReq.result === 0) {
                     const rawEditions = localStorage.getItem(STORAGE_KEYS.EDITIONS);
                     if (rawEditions) {
-                        try {
-                            const parsed: Record<string, IEdition> = JSON.parse(rawEditions);
-                            Object.values(parsed).forEach(edition => editionsStore.put(edition));
-                        } catch (e) {
-                            console.error("Failed to parse local storage editions", e);
-                        }
+                        const parsed: Record<string, IEdition> = JSON.parse(rawEditions);
+                        Object.values(parsed).forEach(edition => editionsStore.put(edition));
                     }
                 }
             };
@@ -148,12 +278,8 @@ export class IndexedDBStorage implements IStorage {
                 if (atomsCountReq.result === 0) {
                     const rawAtoms = localStorage.getItem(STORAGE_KEYS.ATOMS);
                     if (rawAtoms) {
-                        try {
-                            const parsed: Record<string, IContentAtom> = JSON.parse(rawAtoms);
-                            Object.values(parsed).forEach(atom => atomsStore.put(atom));
-                        } catch (e) {
-                            console.error("Failed to parse local storage atoms", e);
-                        }
+                        const parsed: Record<string, IContentAtom> = JSON.parse(rawAtoms);
+                        Object.values(parsed).forEach(atom => atomsStore.put(atom));
                     }
                 }
             };
@@ -165,12 +291,8 @@ export class IndexedDBStorage implements IStorage {
                 if (disciplinesCountReq.result === 0) {
                     const rawDisciplines = localStorage.getItem(STORAGE_KEYS.DISCIPLINES);
                     if (rawDisciplines) {
-                        try {
-                            const parsed: Record<string, DisciplineData> = JSON.parse(rawDisciplines);
-                            Object.values(parsed).forEach(discipline => disciplinesStore.put(discipline));
-                        } catch (e) {
-                            console.error("Failed to parse local storage disciplines", e);
-                        }
+                        const parsed: Record<string, DisciplineData> = JSON.parse(rawDisciplines);
+                        Object.values(parsed).forEach(discipline => disciplinesStore.put(discipline));
                     }
                 }
             };
@@ -277,7 +399,6 @@ export class IndexedDBStorage implements IStorage {
 
             const results: IContentAtom[] = [];
             let completed = 0;
-            let errored = false;
 
             if (ids.length === 0) {
                 resolve([]);
@@ -291,24 +412,19 @@ export class IndexedDBStorage implements IStorage {
                         results.push(request.result);
                     }
                     completed++;
-                    if (completed === ids.length && !errored) {
+                    if (completed === ids.length) {
                         resolve(results);
                     }
                 };
                 request.onerror = () => {
-                    if (!errored) {
-                        errored = true;
-                        reject(request.error);
+                    completed++;
+                    if (completed === ids.length) {
+                        resolve(results);
                     }
                 };
             });
 
-            transaction.onerror = () => {
-                if (!errored) {
-                    errored = true;
-                    reject(transaction.error);
-                }
-            };
+            transaction.onerror = () => reject(transaction.error);
         });
     }
 
@@ -455,3 +571,4 @@ export class IndexedDBStorage implements IStorage {
 }
 
 export const storage = new IndexedDBStorage();
+>>>>>>> REPLACE

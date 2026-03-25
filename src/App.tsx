@@ -14,6 +14,7 @@ import {
 
 import * as d3 from 'd3';
 import 'katex/dist/katex.min.css';
+import { Toaster, toast } from 'react-hot-toast';
 
 import RichTextRenderer from './components/RichTextRenderer';
 import EditableBlock from './components/EditableBlock';
@@ -855,15 +856,21 @@ const PhysMemosApp: FC = () => {
         relsAtoms: buildSubmission(state.draftAtomLists.rels),
     };
 
-    const edition = await core.submitEdition(submission, 'user_uuid_here', new Date().toISOString());
-    // Once submitted, ideally we update mapping IDs in store to avoid re-rendering issues
-    // For simplicity here we just re-init the workspace with the new edition
-    const populated = await core.getPopulatedEdition(edition.id);
-    if (populated) {
-         workspaceActions.initWorkspaceAndClear(populated, edition.conceptId, submission.conceptName, submission.conceptTopic, submission.conceptDisciplines);
+    const result = await core.submitEdition(submission, 'user_uuid_here', new Date().toISOString());
 
-         // Force update network store cache so that when users switch to history view it shows the newly submitted branch
-         useNetworkStore.getState().fetchData(edition.conceptId, true);
+    if (result.success && result.edition) {
+        toast.success(result.message || '保存成功');
+        // Once submitted, ideally we update mapping IDs in store to avoid re-rendering issues
+        // For simplicity here we just re-init the workspace with the new edition
+        const populated = await core.getPopulatedEdition(result.edition.id);
+        if (populated) {
+             workspaceActions.initWorkspaceAndClear(populated, result.edition.conceptId, submission.conceptName, submission.conceptTopic, submission.conceptDisciplines);
+
+             // Force update network store cache so that when users switch to history view it shows the newly submitted branch
+             useNetworkStore.getState().fetchData(result.edition.conceptId, true);
+        }
+    } else {
+        toast.error(result.message || '保存失败');
     }
   };
 
@@ -1217,7 +1224,7 @@ const PhysMemosApp: FC = () => {
 
   return (
     <div className="flex h-screen w-full bg-slate-50 text-slate-800 font-sans overflow-hidden">
-      
+      <Toaster position="top-center" />
       <style>{`
         .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; color: #1e293b; }
         .markdown-body h1 { font-size: 1.5em; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3em; }

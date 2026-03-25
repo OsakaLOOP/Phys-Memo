@@ -102,6 +102,8 @@ export interface IStorage {
     deleteDiscipline(name: string): Promise<void>;
 
     runCleanup(thresholdTimestamp: number): Promise<number>;
+
+    submitEditionTransaction(payload: { concept?: IConceptRoot, edition: IEdition, atoms: IContentAtom[] }): Promise<void>;
 }
 
 // Credentials - to be replaced or injected via environment variables
@@ -484,6 +486,101 @@ export class SqlStorage implements IStorage {
 
     async deleteDiscipline(name: string): Promise<void> {
         await executeD1([{ sql: `DELETE FROM disciplines WHERE name = ?`, params: [name] }]);
+    }
+
+    async submitEditionTransaction(payload: { concept?: IConceptRoot, edition: IEdition, atoms: IContentAtom[] }): Promise<void> {
+        const queries: Query[] = [];
+
+        // 1. Concept (if any)
+        if (payload.concept) {
+            queries.push({
+                sql: `INSERT INTO concepts (id, name, topic, creator_id, timestamp_iso, front_meta, back_meta)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)
+                      ON CONFLICT(id) DO UPDATE SET
+                      name=excluded.name, topic=excluded.topic, creator_id=excluded.creator_id,
+                      timestamp_iso=excluded.timestamp_iso, front_meta=excluded.front_meta, back_meta=excluded.back_meta`,
+                params: [
+                    payload.concept.id, payload.concept.name, payload.concept.topic, payload.concept.creatorId, payload.concept.timestampISO,
+                    JSON.stringify(payload.concept.frontMeta || {}), JSON.stringify(payload.concept.backMeta || {})
+                ]
+            });
+
+            queries.push({
+                sql: `DELETE FROM concept_heads WHERE concept_id = ?`,
+                params: [payload.concept.id]
+            });
+            for (const [editionId, sortOrder] of Object.entries(payload.concept.currentHeads)) {
+                queries.push({
+                    sql: `INSERT INTO concept_heads (concept_id, edition_id, sort_order) VALUES (?, ?, ?)`,
+                    params: [payload.concept.id, editionId, sortOrder]
+                });
+            }
+
+            queries.push({
+                sql: `DELETE FROM concept_disciplines WHERE concept_id = ?`,
+                params: [payload.concept.id]
+            });
+            for (const discipline of payload.concept.disciplines) {
+                queries.push({
+                    sql: `INSERT INTO concept_disciplines (concept_id, discipline_name) VALUES (?, ?)`,
+                    params: [payload.concept.id, discipline]
+                });
+            }
+        }
+
+        // 2. Edition
+        queries.push({
+            sql: `INSERT INTO editions (id, concept_id, save_type, creator, timestamp_iso, parent_edition_id, front_meta, back_meta)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                  ON CONFLICT(id) DO UPDATE SET
+                  concept_id=excluded.concept_id, save_type=excluded.save_type, creator=excluded.creator,
+                  timestamp_iso=excluded.timestamp_iso, parent_edition_id=excluded.parent_edition_id,
+                  front_meta=excluded.front_meta, back_meta=excluded.back_meta`,
+            params: [
+                payload.edition.id, payload.edition.conceptId, payload.edition.saveType, payload.edition.creator, payload.edition.timestampISO,
+                payload.edition.parentEditionId, JSON.stringify(payload.edition.frontMeta || {}), JSON.stringify(payload.edition.backMeta || {})
+            ]
+        });
+
+        queries.push({
+            sql: `DELETE FROM edition_atoms WHERE edition_id = ?`,
+            params: [payload.edition.id]
+        });
+
+        const pushAtoms = (atomIds: string[], field: string) => {
+            atomIds.forEach((atomId, sortOrder) => {
+                queries.push({
+                    sql: `INSERT INTO edition_atoms (edition_id, atom_id, field, sort_order) VALUES (?, ?, ?, ?)`,
+                    params: [payload.edition.id, atomId, field, sortOrder]
+                });
+            });
+        };
+
+        pushAtoms(payload.edition.coreAtomIds, 'core');
+        pushAtoms(payload.edition.docAtomIds, 'doc');
+        pushAtoms(payload.edition.tagsAtomIds, 'tags');
+        pushAtoms(payload.edition.refsAtomIds, 'refs');
+        pushAtoms(payload.edition.relsAtomIds, 'rels');
+
+        // 3. Atoms
+        for (const atom of payload.atoms) {
+            queries.push({
+                sql: `INSERT INTO atoms (id, field, type, content, content_hash, content_sim_hash, creator_id, timestamp_iso, attr, derived_from_id, front_meta, back_meta)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                      ON CONFLICT(id) DO UPDATE SET
+                      field=excluded.field, type=excluded.type, content=excluded.content, content_hash=excluded.content_hash,
+                      content_sim_hash=excluded.content_sim_hash, creator_id=excluded.creator_id, timestamp_iso=excluded.timestamp_iso,
+                      attr=excluded.attr, derived_from_id=excluded.derived_from_id, front_meta=excluded.front_meta, back_meta=excluded.back_meta`,
+                params: [
+                    atom.id, atom.field, atom.type, atom.content, atom.contentHash, atom.contentSimHash,
+                    atom.creatorId, atom.timestampISO, JSON.stringify(atom.attr || {}), atom.derivedFromId,
+                    JSON.stringify(atom.frontMeta || {}), JSON.stringify(atom.backMeta || {})
+                ]
+            });
+        }
+
+        // Execute all queries in a single D1 API call to ensure transaction-like atomicity
+        await executeD1(queries);
     }
 
     async runCleanup(thresholdTimestamp: number): Promise<number> {

@@ -37,6 +37,9 @@ export interface IStorage {
 
     // Worker Interface
     runCleanup(thresholdTimestamp: number): Promise<number>; // Returns number of deleted items
+
+    // Transaction Interface
+    submitEditionTransaction(payload: { concept?: IConceptRoot, edition: IEdition, atoms: IContentAtom[] }): Promise<void>;
 }
 
 export interface AttrStrandDB extends DBSchema {
@@ -199,6 +202,32 @@ export class IndexedDBStorage implements IStorage {
     async deleteDiscipline(name: string): Promise<void> {
         const db = await this.getDB();
         await db.delete('attr_disciplines', name);
+    }
+
+    // --- Transaction Operations ---
+    async submitEditionTransaction(payload: { concept?: IConceptRoot, edition: IEdition, atoms: IContentAtom[] }): Promise<void> {
+        const db = await this.getDB();
+        const tx = db.transaction(['attr_concepts', 'attr_editions', 'attr_atoms'], 'readwrite');
+
+        try {
+            const promises: Promise<any>[] = [];
+
+            if (payload.concept) {
+                promises.push(tx.objectStore('attr_concepts').put(payload.concept));
+            }
+
+            promises.push(tx.objectStore('attr_editions').put(payload.edition));
+
+            const atomsStore = tx.objectStore('attr_atoms');
+            for (const atom of payload.atoms) {
+                promises.push(atomsStore.put(atom));
+            }
+
+            await Promise.all([...promises, tx.done]);
+        } catch (error) {
+            tx.abort();
+            throw error;
+        }
     }
 
     // --- Cleanup Operations ---

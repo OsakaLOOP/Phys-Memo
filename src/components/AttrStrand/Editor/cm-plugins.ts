@@ -634,15 +634,15 @@ class AddButtonWidget extends WidgetType {
             wrap.classList.add('group-hover/cmline-gap:opacity-100');
 
         } else {
-            // 顶部/底部：block widget，自身占位，留出上下空间
+            // 顶部/底部：block widget
             wrap.className = "cm-add-btn-wrapper relative w-full flex justify-center pointer-events-auto z-10 opacity-0 group-hover/cmline:opacity-100 hover:opacity-100 transition-opacity duration-200";
             btn.className = "pointer-events-auto bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200 bg-opacity-90 backdrop-blur-sm cursor-pointer";
 
-            // 调整位置与内外边距，确保按钮自身占位并留出16px空间
+            // 调整位置与内外边距
             if (this.position === 'top') {
-                wrap.classList.add("pt-4", "pb-2"); // 上 16px
+                wrap.classList.add("pb-1","pt-1.5"); 
             } else if (this.position === 'bottom') {
-                wrap.classList.add("pt-2", "pb-4"); // 下 16px
+                wrap.classList.add("pb-1.5","pt-1"); 
             }
 
             wrap.appendChild(btn);

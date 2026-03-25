@@ -134,7 +134,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                     },
                     ".cm-content": {
                         fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                        padding: "1rem 0"
+                        padding: "0"
                     },
                     ".cm-atom-line": {
                         position: "relative"
@@ -154,9 +154,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                     },
                     ".cm-line": {
                         paddingLeft: "4px"
-                    },
-                    ".cm-content > .cm-line:first-of-type": {
-                        paddingTop: "16px"}
+                    }
                 })
             ]
         });

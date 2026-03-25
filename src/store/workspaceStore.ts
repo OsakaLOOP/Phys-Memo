@@ -138,6 +138,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     };
                 });
             }
+
+            // At the end of packing all snapshots, print out the final history state
+            logZundoState(`applyCMSnapshotsToZundo (sessionId: ${sessionId}, snapshots: ${snapshots.length})`);
         },
 
         initWorkspace: (edition: IPopulatedEdition | null, conceptId: string, conceptName: string, conceptTopic: string, conceptDisciplines: string[]) => {
@@ -431,10 +434,25 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     })
 );
 
+
 // --- Action Helpers ---
 // Zundo 的清理操作在 Zustand 外部同步执行，确保业务原子性和清空历史的正确性。
 
+const logZundoState = (action: string) => {
+    const temporalState = useWorkspaceStore.temporal.getState();
+    const past = temporalState.pastStates;
+    const future = temporalState.futureStates;
+
+    const formatState = (s: any) => s.cmSessionId ? `[${s.cmSessionId.substring(0, 6)}]` : '[none]';
+
+    const pastStr = past.map(formatState).join(' -> ');
+    const futureStr = future.map(formatState).join(' -> ');
+
+    console.log(`[Zundo] ${action} | Past: ${pastStr || 'empty'} | Future: ${futureStr || 'empty'}`);
+};
+
 export const workspaceActions = {
+
     jumpSessionUndo: () => {
         const temporalState = useWorkspaceStore.temporal.getState();
         const past = temporalState.pastStates;
@@ -445,6 +463,7 @@ export const workspaceActions = {
         // If the current state doesn't have a session ID, just do a normal step undo
         if (!currentSessionId) {
             temporalState.undo(1);
+            logZundoState('jumpSessionUndo (steps: 1)');
             return;
         }
 
@@ -456,12 +475,12 @@ export const workspaceActions = {
             // If we hit a state with a DIFFERENT session ID (or null), we stop stepping back
             // because we've found the boundary of the session.
             if (past[i].cmSessionId !== currentSessionId) {
-                console.log(`Undone ${past[i].cmSessionId} with ${steps} jumps`)
                 break;
             }
         }
 
         temporalState.undo(steps);
+        logZundoState(`jumpSessionUndo (steps: ${steps})`);
     },
 
     jumpSessionRedo: () => {
@@ -477,6 +496,7 @@ export const workspaceActions = {
         // If the immediate next state doesn't belong to a session, just normal redo
         if (!nextSessionId) {
             temporalState.redo(1);
+            logZundoState('jumpSessionRedo (steps: 1)');
             return;
         }
 
@@ -486,12 +506,12 @@ export const workspaceActions = {
         for (let i = future.length - 1; i >= 0; i--) {
             steps++;
             if (i - 1 >= 0 && future[i - 1].cmSessionId !== nextSessionId) {
-                console.log(`Redone ${future[i+1].cmSessionId} with ${steps} jumps`)
                 break;
             }
         }
 
         temporalState.redo(steps);
+        logZundoState(`jumpSessionRedo (steps: ${steps})`);
     },
 
     initWorkspaceAndClear: (

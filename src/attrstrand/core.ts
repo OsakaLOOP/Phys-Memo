@@ -160,217 +160,228 @@ export class AttrStrandCore {
         };
     }
 
-    async submitEdition(submission: EditionSubmission, creatorId: string, timestampISO: string): Promise<IEdition> {
+    async submitEdition(submission: EditionSubmission, creatorId: string, timestampISO: string): Promise<{ success: boolean, edition?: IEdition, message?: string }> {
+        try {
+            let conceptId = submission.conceptId;
+            let isNewConcept = false;
+            let concept: IConceptRoot | null = null;
+            let conceptUpdated = false;
 
-        let conceptId = submission.conceptId;
-        let isNewConcept = false;
-        let concept: IConceptRoot | null = null;
-
-        // 新建 Concept 的处理.
-        if (!conceptId) {
-            conceptId = await generateConceptHash(submission.conceptName, creatorId, timestampISO);// hash 创建
-            isNewConcept = true;
-        } else {
-            concept = await storage.getConcept(conceptId);
-            if (!concept) {
+            // 新建 Concept 的处理.
+            if (!conceptId) {
+                conceptId = await generateConceptHash(submission.conceptName, creatorId, timestampISO);// hash 创建
                 isNewConcept = true;
-            }
-        }
-
-        if (isNewConcept) {
-            concept = {
-                id: conceptId,
-                name: submission.conceptName,
-                topic: submission.conceptTopic,
-                disciplines: submission.conceptDisciplines,
-                creatorId,
-                timestampISO,
-                currentHeads: {},
-                frontMeta: {},
-                backMeta: { createdAt: timestampISO }
-            };
-            await storage.saveConcept(concept);
-        } else {
-            // 检查 concept meta 更新. 后续公共的 meta 将加入审核, 或者绑定到 edition.
-            const concept = await storage.getConcept(conceptId);
-            if (concept) {
-                let updated = false;
-                if (concept.name !== submission.conceptName) { concept.name = submission.conceptName; updated = true; }
-                if (concept.topic !== submission.conceptTopic) { concept.topic = submission.conceptTopic; updated = true; }
-                                if (JSON.stringify(concept.disciplines) !== JSON.stringify(submission.conceptDisciplines)) {
-                    concept.disciplines = submission.conceptDisciplines;
-                    updated = true;
-                }
-                if (updated) {
-                    await storage.saveConcept(concept);
+            } else {
+                concept = await storage.getConcept(conceptId);
+                if (!concept) {
+                    isNewConcept = true;
                 }
             }
-        }// 完成concept入库.
 
-        // 获取 baseEdition 并计算 isFork
-        let isFork = false;
-        let baseEdition: IEdition | null = null;
-        if (submission.baseEditionId) {
-            baseEdition = await storage.getEdition(submission.baseEditionId);
-            if (baseEdition) {
-                if (baseEdition.creator !== creatorId) {
-                    isFork = true;
-                } else {
-                    // 相同用户，默认非fork，除非该节点已经有后续的分支（即baseEdition不在currentHeads中）
-                    isFork = !concept?.currentHeads[submission.baseEditionId];
-                }
-            }
-        }
-
-        const processAtoms = async (field: ContentAtomField, atoms: AtomSubmission[]) => {
-            const atomIds: hash[] = [];
-            for (const sub of atoms) {
-                let contentHash: string;
-                if (sub.type === 'bin' && sub.blobs && sub.blobs.length > 0) {
-                    contentHash = await generateBinaryHash(sub.blobs);
-                } else {
-                    contentHash = await generateContentHash(sub.contentPayload);
-                }
-                const contentSimHash = sub.type === 'bin' ? null : await simhash(sub.contentPayload);
-
-                let prevAtom: IContentAtom | null = null;
-                if (sub.derivedFromId) {
-                    prevAtom = await storage.getAtom(sub.derivedFromId);
-                }
-
-                // 检查内容更新.
-                if (prevAtom && prevAtom.contentHash === contentHash) {
-                    atomIds.push(prevAtom.id);
-                    continue;
-                }
-                // 基于 diff 的变动记录
-                let attr: ContentAtomAttr = { [creatorId]: 1 };
-                let diffAdded: number | undefined;
-                let diffDeleted: number | undefined;
-                let diffRetained: number | undefined;
-
-                if (prevAtom) {
-                    const diffStats = calculateDiffStats(prevAtom.content, sub.contentPayload);
-                    diffAdded = diffStats.added;
-                    diffDeleted = diffStats.deleted;
-                    diffRetained = diffStats.retained;
-
-                    const totalWeight = diffAdded + diffRetained;
-                    const retainedWeight = totalWeight > 0 ? diffRetained / totalWeight : 0;
-
-                    attr = this.calculateAttribution(prevAtom.attr, retainedWeight, creatorId);
-                } else {
-                    diffAdded = sub.contentPayload.length;
-                    diffDeleted = 0;
-                    diffRetained = 0;
-                }
-
-                const atomId = await generateAtomHash(
-                    field,
-                    sub.type,
-                    contentHash,
+            if (isNewConcept) {
+                concept = {
+                    id: conceptId,
+                    name: submission.conceptName,
+                    topic: submission.conceptTopic,
+                    disciplines: submission.conceptDisciplines,
                     creatorId,
-                    sub.derivedFromId || null,
-                    attr
-                );
-
-                // 检查是否与历史 atom 完全一致.
-                const existingAtom = await storage.getAtom(atomId);
-                if (existingAtom) {
-                    atomIds.push(existingAtom.id);
-                } else {
-                    const newAtom: IContentAtom = {
-                        id: atomId,
-                        field,
-                        type: sub.type,
-                        content: sub.contentPayload,
-                    blobs: sub.blobs,
-                        contentHash,
-                        contentSimHash,
-                        diffAdded,
-                        diffDeleted,
-                        diffRetained,
-                        creatorId,
-                        timestampISO,
-                        attr,
-                        derivedFromId: sub.derivedFromId || null,
-                        frontMeta: sub.frontMeta || {},
-                        backMeta: { createdAt: timestampISO }
-                    };
-                    await storage.saveAtom(newAtom);
-                    atomIds.push(atomId);
+                    timestampISO,
+                    currentHeads: {},
+                    frontMeta: {},
+                    backMeta: { createdAt: timestampISO }
+                };
+                conceptUpdated = true;
+            } else if (concept) {
+                // 检查 concept meta 更新. 后续公共的 meta 将加入审核, 或者绑定到 edition.
+                if (concept.name !== submission.conceptName) { concept.name = submission.conceptName; conceptUpdated = true; }
+                if (concept.topic !== submission.conceptTopic) { concept.topic = submission.conceptTopic; conceptUpdated = true; }
+                if (JSON.stringify(concept.disciplines) !== JSON.stringify(submission.conceptDisciplines)) {
+                    concept.disciplines = submission.conceptDisciplines;
+                    conceptUpdated = true;
                 }
             }
-            return atomIds;
-        };
 
-        const coreAtomIds = await processAtoms('core', submission.coreAtoms);
-        const docAtomIds = await processAtoms('doc', submission.docAtoms);
-        const tagsAtomIds = await processAtoms('tags', submission.tagsAtoms);
-        const refsAtomIds = await processAtoms('refs', submission.refsAtoms);
-        const relsAtomIds = await processAtoms('rels', submission.relsAtoms);
-
-        const editionId = await generateEditionHash(
-            conceptId,
-            submission.baseEditionId,
-            coreAtomIds,
-            docAtomIds,
-            tagsAtomIds,
-            refsAtomIds,
-            relsAtomIds,
-            creatorId,
-            timestampISO
-        );
-
-        // 检查内容重复, 避免提交的重复. 后续前端也要判断是否禁用按钮/提交.
-        const existingEdition = await storage.getEdition(editionId);
-        if (existingEdition) {
-            // 排除 autosave 更新 Heads, 相反 save 则需要确保是否先前为 autosave 情形的 head 更新.
-            if (submission.saveType !== 'autosave') {
-                if (concept && !concept.currentHeads[editionId]) {
-                    concept.currentHeads[editionId] = Date.now();
-                    
-                    if (!isFork && submission.baseEditionId && concept.currentHeads[submission.baseEditionId]) {
-                        delete concept.currentHeads[submission.baseEditionId];
+            // 获取 baseEdition 并计算 isFork
+            let isFork = false;
+            let baseEdition: IEdition | null = null;
+            if (submission.baseEditionId) {
+                baseEdition = await storage.getEdition(submission.baseEditionId);
+                if (baseEdition) {
+                    if (baseEdition.creator !== creatorId) {
+                        isFork = true;
+                    } else {
+                        // 相同用户，默认非fork，除非该节点已经有后续的分支（即baseEdition不在currentHeads中）
+                        isFork = !concept?.currentHeads[submission.baseEditionId];
                     }
-                    await storage.saveConcept(concept);
                 }
             }
-            return existingEdition;// 已存在完全相同的版本, 直接返回.
+
+            const atomsToSave: IContentAtom[] = [];
+
+            const processAtoms = async (field: ContentAtomField, atoms: AtomSubmission[]) => {
+                const atomIds: hash[] = [];
+                for (const sub of atoms) {
+                    let contentHash: string;
+                    if (sub.type === 'bin' && sub.blobs && sub.blobs.length > 0) {
+                        contentHash = await generateBinaryHash(sub.blobs);
+                    } else {
+                        contentHash = await generateContentHash(sub.contentPayload);
+                    }
+                    const contentSimHash = sub.type === 'bin' ? null : await simhash(sub.contentPayload);
+
+                    let prevAtom: IContentAtom | null = null;
+                    if (sub.derivedFromId) {
+                        prevAtom = await storage.getAtom(sub.derivedFromId);
+                    }
+
+                    // 检查内容更新.
+                    if (prevAtom && prevAtom.contentHash === contentHash) {
+                        atomIds.push(prevAtom.id);
+                        continue;
+                    }
+                    // 基于 diff 的变动记录
+                    let attr: ContentAtomAttr = { [creatorId]: 1 };
+                    let diffAdded: number | undefined;
+                    let diffDeleted: number | undefined;
+                    let diffRetained: number | undefined;
+
+                    if (prevAtom) {
+                        const diffStats = calculateDiffStats(prevAtom.content, sub.contentPayload);
+                        diffAdded = diffStats.added;
+                        diffDeleted = diffStats.deleted;
+                        diffRetained = diffStats.retained;
+
+                        const totalWeight = diffAdded + diffRetained;
+                        const retainedWeight = totalWeight > 0 ? diffRetained / totalWeight : 0;
+
+                        attr = this.calculateAttribution(prevAtom.attr, retainedWeight, creatorId);
+                    } else {
+                        diffAdded = sub.contentPayload.length;
+                        diffDeleted = 0;
+                        diffRetained = 0;
+                    }
+
+                    const atomId = await generateAtomHash(
+                        field,
+                        sub.type,
+                        contentHash,
+                        creatorId,
+                        sub.derivedFromId || null,
+                        attr
+                    );
+
+                    // 检查是否与历史 atom 完全一致.
+                    const existingAtom = await storage.getAtom(atomId);
+                    if (existingAtom) {
+                        atomIds.push(existingAtom.id);
+                    } else {
+                        const newAtom: IContentAtom = {
+                            id: atomId,
+                            field,
+                            type: sub.type,
+                            content: sub.contentPayload,
+                            blobs: sub.blobs,
+                            contentHash,
+                            contentSimHash,
+                            diffAdded,
+                            diffDeleted,
+                            diffRetained,
+                            creatorId,
+                            timestampISO,
+                            attr,
+                            derivedFromId: sub.derivedFromId || null,
+                            frontMeta: sub.frontMeta || {},
+                            backMeta: { createdAt: timestampISO }
+                        };
+                        atomsToSave.push(newAtom);
+                        atomIds.push(atomId);
+                    }
+                }
+                return atomIds;
+            };
+
+            const coreAtomIds = await processAtoms('core', submission.coreAtoms);
+            const docAtomIds = await processAtoms('doc', submission.docAtoms);
+            const tagsAtomIds = await processAtoms('tags', submission.tagsAtoms);
+            const refsAtomIds = await processAtoms('refs', submission.refsAtoms);
+            const relsAtomIds = await processAtoms('rels', submission.relsAtoms);
+
+            const editionId = await generateEditionHash(
+                conceptId,
+                submission.baseEditionId,
+                coreAtomIds,
+                docAtomIds,
+                tagsAtomIds,
+                refsAtomIds,
+                relsAtomIds,
+                creatorId,
+                timestampISO
+            );
+
+            // 检查内容重复, 避免提交的重复. 后续前端也要判断是否禁用按钮/提交.
+            const existingEdition = await storage.getEdition(editionId);
+            if (existingEdition) {
+                // 排除 autosave 更新 Heads, 相反 save 则需要确保是否先前为 autosave 情形的 head 更新.
+                if (submission.saveType !== 'autosave') {
+                    if (concept && !concept.currentHeads[editionId]) {
+                        concept.currentHeads[editionId] = Date.now();
+
+                        if (!isFork && submission.baseEditionId && concept.currentHeads[submission.baseEditionId]) {
+                            delete concept.currentHeads[submission.baseEditionId];
+                        }
+                        conceptUpdated = true;
+                    }
+                }
+
+                // If only concept was updated (e.g. metadata or heads), we should save it
+                if (conceptUpdated && concept) {
+                     await storage.submitEditionTransaction({ concept, edition: existingEdition, atoms: [] });
+                }
+
+                return { success: true, edition: existingEdition, message: "已存在完全相同的版本，无需重复提交。" };
+            }
+
+            const edition: IEdition = {
+                id: editionId,
+                conceptId,
+                saveType: submission.saveType,
+                coreAtomIds,
+                docAtomIds,
+                tagsAtomIds,
+                refsAtomIds,
+                relsAtomIds,
+                creator: creatorId,
+                timestampISO,
+                parentEditionId: submission.baseEditionId,
+                frontMeta: {},
+                backMeta: { createdAt: timestampISO }// 记录后端生成时间
+            };
+
+            // 更新 Concept Heads
+            if (submission.saveType !== 'autosave') {
+                if (concept) {
+                    const newHeads = { ...concept.currentHeads };
+                    if (!isFork && submission.baseEditionId && newHeads[submission.baseEditionId]) {
+                        delete newHeads[submission.baseEditionId];
+                    }
+                    newHeads[editionId] = Date.now();
+                    concept.currentHeads = newHeads;
+                    conceptUpdated = true;
+                }
+            }
+
+            // Write all changes atomically
+            await storage.submitEditionTransaction({
+                concept: conceptUpdated && concept ? concept : undefined,
+                edition,
+                atoms: atomsToSave
+            });
+
+            return { success: true, edition, message: "保存成功" };
+        } catch (error) {
+            console.error("Failed to submit edition:", error);
+            return { success: false, message: error instanceof Error ? error.message : "保存失败，发生未知错误" };
         }
-        
-        const edition: IEdition = {
-            id: editionId,
-            conceptId,
-            saveType: submission.saveType,
-            coreAtomIds,
-            docAtomIds,
-            tagsAtomIds,
-            refsAtomIds,
-            relsAtomIds,
-            creator: creatorId,
-            timestampISO,
-            parentEditionId: submission.baseEditionId,
-            frontMeta: {},
-            backMeta: { createdAt: timestampISO }// 记录后端生成时间
-        };
-
-        await storage.saveEdition(edition);
-
-        // 更新 Concept Heads
-        if (submission.saveType !== 'autosave') {
-             if (concept) {
-                 const newHeads = { ...concept.currentHeads };
-                 if (!isFork && submission.baseEditionId && newHeads[submission.baseEditionId]) {
-                     delete newHeads[submission.baseEditionId];
-                 }
-                 newHeads[editionId] = Date.now();
-                 concept.currentHeads = newHeads;
-                 await storage.saveConcept(concept);
-             }
-        }
-
-        return edition;
     }
 
     // 备用函数: 接受文件 api 和其他必要的 atom 元数据，将二进制流存入 atom，type 为 'bin'

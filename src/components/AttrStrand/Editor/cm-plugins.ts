@@ -479,6 +479,11 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
             widget: new AddButtonWidget(field, mappings.length - 1, 'bottom'),
             side: 1
         })});
+        if (!decorations.some(d => d.from === lastLine.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
+            decorations.push({ from: lastLine.from, to: lastLine.from, dec: Decoration.line({
+                class: 'group/cmline-gap'
+            })});
+        }
     } else {
         // 如果为空，在第一行显示
         decorations.push({ from: 0, to: 0, dec: Decoration.widget({

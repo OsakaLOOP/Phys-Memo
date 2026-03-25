@@ -156,7 +156,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                         paddingLeft: "4px"
                     },
                     ".cm-content > .cm-line:first-of-type": {
-                        paddingTop: "8px"}
+                        paddingTop: "16px"}
                 })
             ]
         });

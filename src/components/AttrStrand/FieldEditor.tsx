@@ -97,6 +97,7 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
 
         const blobs = files.map(f => f);
         const newId = genTempId();
+        console.log(`[DEV ImageGroup] File drop intercepted in FieldEditor. Target index: ${targetIndex}. Creating new atom ${newId} with ${blobs.length} file(s).`);
         addAtomId(field, newId, targetIndex);
 
         const state = useWorkspaceStore.getState();

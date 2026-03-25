@@ -199,6 +199,7 @@ export const dragDropImagePlugin = (field: ContentAtomField) => EditorView.domEv
 
         // Read files as blobs
         const blobs = files.map(f => f);
+        console.log(`[DEV ImageGroup] File drop intercepted in cm-plugins dragDropImagePlugin. Inserting new atom ${newId} with ${blobs.length} file(s) at index ${mappingIndex}.`);
 
         // Dispatch CM changes to make space for the new block in UI state tracking
         view.dispatch({
@@ -213,6 +214,7 @@ export const dragDropImagePlugin = (field: ContentAtomField) => EditorView.domEv
         // In cm-plugins we are dealing with parallel state directly for UI display.
         // Wait briefly for CM to sync to parallel state, then update blobs
         setTimeout(() => {
+            console.log(`[DEV ImageGroup] Updating blob and meta data for newly inserted atom ${newId} into parallel state.`);
             state.updateAtomBlobs(newId, blobs);
             state.updateAtomMeta(newId, {
                 images: blobs.map((_, i) => ({ id: `img_${i}`, widthRatio: 1, caption: '' }))

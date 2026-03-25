@@ -1,9 +1,9 @@
 import type {
     IConceptRoot, IEdition, IContentAtom, ContentAtomField, ContentAtomType, ContentAtomAttr,
-    EditionSubmission, AtomSubmission, hash, IPopulatedEdition
+    EditionSubmission, AtomSubmission, hash, IPopulatedEdition, Meta
 } from './types.ts';
 import { storage } from './storage.ts';
-import { simhash, generateConceptHash, generateAtomHash, generateEditionHash, generateContentHash, calculateDiffStats } from './utils.ts';
+import { simhash, generateConceptHash, generateAtomHash, generateEditionHash, generateContentHash, calculateDiffStats, generateBinaryHash } from './utils.ts';
 
 export class AttrStrandCore {
 
@@ -365,6 +365,55 @@ export class AttrStrandCore {
         }
 
         return edition;
+    }
+
+    // 备用函数: 接受文件 api 和其他必要的 atom 元数据，将二进制流存入 atom，type 为 'bin'
+    async saveBinaryAtom(
+        blob: Blob | ArrayBuffer,
+        fileName: string,
+        field: ContentAtomField,
+        creatorId: string,
+        timestampISO: string,
+        frontMeta: Meta = {}
+    ): Promise<IContentAtom> {
+        // 仅根据文件内容计算 hash
+        const contentHash = await generateBinaryHash(blob);
+        const contentPayload = fileName; // content 仅保存文件名
+        const contentSimHash = null;
+
+        const attr: ContentAtomAttr = { [creatorId]: 1 };
+
+        const atomId = await generateAtomHash(
+            field,
+            'bin',
+            contentHash,
+            creatorId,
+            null,
+            attr
+        );
+
+        const newAtom: IContentAtom = {
+            id: atomId,
+            field,
+            type: 'bin',
+            content: contentPayload,
+            blob: blob,
+            contentHash,
+            contentSimHash,
+            diffAdded: 0,
+            diffDeleted: 0,
+            diffRetained: 0,
+            creatorId,
+            timestampISO,
+            attr,
+            derivedFromId: null,
+            frontMeta,
+            backMeta: { createdAt: timestampISO }
+        };
+
+        await storage.saveAtom(newAtom);
+
+        return newAtom;
     }
 }
 

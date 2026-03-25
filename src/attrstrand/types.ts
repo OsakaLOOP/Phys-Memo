@@ -18,7 +18,7 @@ export interface IContentAtom {
 
     content: string; // 纯文本或 json
     blob?: Blob | ArrayBuffer; // 仅当 type 为 'bin' 时存在的二进制流
-    contentHash: hash; // 纯文本部分的 hash (或二进制流的 hash), 查重
+    contentHash: hash; // 纯文本部分或二进制流的 hash, 查重
     contentSimHash: hash | null; // 为基于相似度的计算预留
     
     diffAdded?: number;

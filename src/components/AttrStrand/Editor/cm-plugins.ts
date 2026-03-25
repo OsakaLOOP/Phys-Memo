@@ -457,11 +457,11 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
             if (line.from >= nextGapStart) {
                 if (isError) {
                      decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                         class: 'cm-atom-gap-error group/cmline'
+                         class: 'cm-atom-gap-error group/cmline-gap'
                      })});
                 } else {
                      decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                         class: 'group/cmline'
+                         class: 'group/cmline-gap'
                      })});
                 }
             }
@@ -479,11 +479,6 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
             widget: new AddButtonWidget(field, mappings.length - 1, 'bottom'),
             side: 1
         })});
-        if (!decorations.some(d => d.from === lastLine.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
-            decorations.push({ from: lastLine.from, to: lastLine.from, dec: Decoration.line({
-                class: 'group/cmline'
-            })});
-        }
     } else {
         // 如果为空，在第一行显示
         decorations.push({ from: 0, to: 0, dec: Decoration.widget({
@@ -493,7 +488,7 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
         const line = state.doc.lineAt(0);
         if (!decorations.some(d => d.from === line.from && d.dec.spec.class && d.dec.spec.class.includes('group/cmline'))) {
             decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                class: 'group/cmline'
+                class: 'group/cmline-gap'
             })});
         }
     }
@@ -533,8 +528,8 @@ export const blockDecorations = (field: ContentAtomField) => StateField.define<D
 class EmptyDragMarker extends GutterMarker {
     toDOM() {
         const span = document.createElement('span');
-        // 这里预留了一个 16px 的空间，未来可以塞进拖拽图标 (⋮⋮) 或是数字序号
-        span.className = 'cm-drag-handle opacity-0 hover:opacity-100 cursor-grab px-1 text-slate-400 select-none transition-opacity';
+        // 绝对定位，脱离文档流，不占据实际宽度
+        span.className = 'cm-drag-handle absolute -left-6 opacity-0 hover:opacity-100 cursor-grab px-1 text-slate-400 select-none transition-opacity';
         span.textContent = '⋮⋮';
         return span;
     }

@@ -33,6 +33,8 @@ interface WorkspaceState extends IWorkspaceDraft {
 
     // Atom 自身操作
     updateAtomContent: (id: DraftId, content: string) => void;
+    updateAtomBlobs: (id: DraftId, blobs: (Blob | ArrayBuffer)[]) => void;
+    updateAtomMeta: (id: DraftId, frontMeta: Record<string, any>) => void;
 
     // 批量更新 Atom 状态 (用于单实例编辑器)
     applyAtomTransactions: (field: ContentAtomField, transactions: {
@@ -260,6 +262,34 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 return {
                     draftAtomLists: { ...state.draftAtomLists, [field]: list },
                     draftAtomsData: newData,
+                    lastEdited: new Date().toISOString(),
+                    cmSessionId: null
+                };
+            });
+        },
+
+        updateAtomBlobs: (id: DraftId, blobs: (Blob | ArrayBuffer)[]) => {
+            set((state) => {
+                const atom = state.draftAtomsData[id];
+                if (!atom) return state;
+                const updatedAtom = { ...atom, blobs, isDirty: true, type: 'bin' };
+
+                return {
+                    draftAtomsData: { ...state.draftAtomsData, [id]: updatedAtom as any },
+                    lastEdited: new Date().toISOString(),
+                    cmSessionId: null
+                };
+            });
+        },
+
+        updateAtomMeta: (id: DraftId, frontMeta: Record<string, any>) => {
+            set((state) => {
+                const atom = state.draftAtomsData[id];
+                if (!atom) return state;
+                const updatedAtom = { ...atom, frontMeta, isDirty: true };
+
+                return {
+                    draftAtomsData: { ...state.draftAtomsData, [id]: updatedAtom },
                     lastEdited: new Date().toISOString(),
                     cmSessionId: null
                 };

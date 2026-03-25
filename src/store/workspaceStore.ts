@@ -425,6 +425,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             draftAtomsData: state.draftAtomsData,
             cmSessionId: state.cmSessionId,
         }),
+        // 必须配置 deep equality，否则 partialize 每次返回新对象会导致 zundo 哪怕无关状态改变也会记录相同历史
+        equality: (a, b) => JSON.stringify(a) === JSON.stringify(b),
         handleSet: (handleSet) => {
             // 后续副作用逻辑占位
             return (state) => {

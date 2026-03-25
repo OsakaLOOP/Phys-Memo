@@ -589,7 +589,7 @@ class AddButtonWidget extends WidgetType {
                     // 计算新的绝对映射
                     const newMappings = [...mappings];
 
-                    // 新的 currentMap (原本是 nextMap 的内容)
+                    // 新的 currentMap (原 nextMap 的内容)
                     const newCurrentTo = currentMap.from + textB.length;
                     newMappings[this.index] = {
                         id: nextMap.id,
@@ -597,7 +597,7 @@ class AddButtonWidget extends WidgetType {
                         to: newCurrentTo
                     };
 
-                    // 新的 nextMap (原本是 currentMap 的内容)
+                    // 新的 nextMap (原 currentMap 的内容)
                     const newNextFrom = newCurrentTo + gapText.length;
                     const newNextTo = newNextFrom + textA.length;
                     newMappings[this.index + 1] = {
@@ -606,12 +606,7 @@ class AddButtonWidget extends WidgetType {
                         to: newNextTo
                     };
 
-                    // 修改后续所有块的偏移量
-                    // 原本这两个块及中间间隙占据的长度: (nextMap.to - currentMap.from)
-                    // 互换后由于只是交换，总长度肯定是一样的，但是这仅仅是在本例中。
-                    // 实际上文本长度差异导致的 offset 变化：
-                    // 注意：因为只交换 A 和 B，A+B+gap 的总长必定等于 B+A+gap，
-                    // 所以后续 mapping 的位置不受影响！
+                    // 交换后续 mapping 的位置不受影响
 
                     const changes = [
                         { from: nextMap.from, to: nextMap.to, insert: textA },
@@ -632,7 +627,7 @@ class AddButtonWidget extends WidgetType {
             wrap.appendChild(btn);
             wrap.appendChild(swapBtn);
 
-            // 确保其父级也有这个 class，以支持之前的 group-hover 逻辑，虽然这里也加了 hover:opacity-100
+            // 支持 group-hover 逻辑
             wrap.classList.add('group-hover/cmline-gap:opacity-100');
 
         } else {

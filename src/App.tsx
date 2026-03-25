@@ -31,6 +31,8 @@ import { useStore } from 'zustand';
 import { useWorkspaceStore, useGlobalStore, workspaceActions } from './store/workspaceStore';
 import { useNetworkStore } from './store/networkStore';
 
+import {logZundoState} from './store/workspaceStore'
+
 // --- Type Definitions ---
 interface NodeData {
   id: string;
@@ -1700,6 +1702,7 @@ const PhysMemosApp: FC = () => {
                                             workspaceActions.jumpSessionUndo();
                                         } else {
                                             undo();
+                                            logZundoState('undo (main UI)');
                                         }
                                     }
                                 }}
@@ -1719,6 +1722,7 @@ const PhysMemosApp: FC = () => {
                                             workspaceActions.jumpSessionRedo();
                                         } else {
                                             redo();
+                                            logZundoState('redo (main UI)');
                                         }
                                     }
                                 }}

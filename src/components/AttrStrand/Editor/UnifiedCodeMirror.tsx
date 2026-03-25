@@ -146,7 +146,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                         paddingLeft: "8px"
                     },
                     ".cm-block-action-gutter": {
-                        width: '24px',
+                        width: '0px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -154,6 +154,9 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                     },
                     ".cm-line": {
                         paddingLeft: "4px"
+                    },
+                    ".cm-content > .cm-line:first-of-type": {
+                        paddingTop: "8px"
                     }
                 })
             ]

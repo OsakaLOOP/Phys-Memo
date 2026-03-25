@@ -5,7 +5,7 @@ export type uuid = string; // UUID v4 / Temp ID (can be hash length to be consis
 export type DraftId = string; // 草稿 ID, 可以是随机的 256 位 uuid, 也可以是继承的 hash, 由前端生成, 提交时后端验证并计算最终 Atom ID.
 
 export type ContentAtomField = 'doc' | 'core' | 'tags' | 'refs' | 'rels' // 所有概念页展示的字段内容均 json 格式化, 作为对应域的 Atom 存储.
-export type ContentAtomType = 'latex' | 'markdown' | 'inline' | 'sources' // inline -> tags/refs, sources -> uploaded md/pdf file links.
+export type ContentAtomType = 'latex' | 'markdown' | 'inline' | 'sources' | 'bin' // inline -> tags/refs, sources -> uploaded md/pdf file links, bin -> binary blob.
 export type ContentAtomAttr = Record<string, number> // {"author1": prop1, ...}, 用于计算版权分配
 export type Meta = Record<string, string | number | boolean | null> // 其他字段, 只用于编辑器渲染/ 后端 worker. 否则应当定义在顶层. 前后端 meta 必须分离, 后者api返回时剔除. 不参与hash计算
 // createdAt 现已移入backmeta.
@@ -17,7 +17,8 @@ export interface IContentAtom {
     type: ContentAtomType;
 
     content: string; // 纯文本或 json
-    contentHash: hash; // 纯文本部分的 hash, 查重
+    blob?: Blob | ArrayBuffer; // 仅当 type 为 'bin' 时存在的二进制流
+    contentHash: hash; // 纯文本部分的 hash (或二进制流的 hash), 查重
     contentSimHash: hash | null; // 为基于相似度的计算预留
     
     diffAdded?: number;

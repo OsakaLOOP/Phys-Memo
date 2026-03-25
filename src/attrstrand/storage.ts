@@ -1,3 +1,5 @@
+import { openDB } from 'idb';
+import type { DBSchema, IDBPDatabase } from 'idb';
 import type { IConceptRoot, IEdition, IContentAtom, DisciplineData, ContentAtomField, ContentAtomType } from './types.ts';
 
 export interface IStorage {
@@ -37,309 +39,125 @@ export interface IStorage {
     runCleanup(thresholdTimestamp: number): Promise<number>; // Returns number of deleted items
 }
 
-const STORAGE_KEYS = {
-    CONCEPTS: 'attr_concepts',
-    EDITIONS: 'attr_editions',
-    ATOMS: 'attr_atoms',
-    DISCIPLINES: 'attr_disciplines'
-};
+export interface AttrStrandDB extends DBSchema {
+    attr_concepts: {
+        key: string;
+        value: IConceptRoot;
+    };
+    attr_editions: {
+        key: string;
+        value: IEdition;
+        indexes: { 'conceptId': string };
+    };
+    attr_atoms: {
+        key: string;
+        value: IContentAtom;
+        indexes: { 'contentHash': string, 'field': string };
+    };
+    attr_disciplines: {
+        key: string;
+        value: DisciplineData;
+    };
+}
 
 export class IndexedDBStorage implements IStorage {
     private dbName = 'AttrStrandDB';
     private dbVersion = 1;
-    private dbPromise: Promise<IDBDatabase> | null = null;
+    private dbPromise: Promise<IDBPDatabase<AttrStrandDB>> | null = null;
 
-    private getDB(): Promise<IDBDatabase> {
+    private getDB(): Promise<IDBPDatabase<AttrStrandDB>> {
         if (this.dbPromise) return this.dbPromise;
 
-        this.dbPromise = new Promise((resolve, reject) => {
-            const request = indexedDB.open(this.dbName, this.dbVersion);
-
-            request.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result;
-
-                if (!db.objectStoreNames.contains(STORAGE_KEYS.CONCEPTS)) {
-                    db.createObjectStore(STORAGE_KEYS.CONCEPTS, { keyPath: 'id' });
+        this.dbPromise = openDB<AttrStrandDB>(this.dbName, this.dbVersion, {
+            upgrade(db) {
+                if (!db.objectStoreNames.contains('attr_concepts')) {
+                    db.createObjectStore('attr_concepts', { keyPath: 'id' });
                 }
-                if (!db.objectStoreNames.contains(STORAGE_KEYS.EDITIONS)) {
-                    const editionsStore = db.createObjectStore(STORAGE_KEYS.EDITIONS, { keyPath: 'id' });
-                    editionsStore.createIndex('conceptId', 'conceptId', { unique: false });
+                if (!db.objectStoreNames.contains('attr_editions')) {
+                    const editionsStore = db.createObjectStore('attr_editions', { keyPath: 'id' });
+                    editionsStore.createIndex('conceptId', 'conceptId');
                 }
-                if (!db.objectStoreNames.contains(STORAGE_KEYS.ATOMS)) {
-                    const atomsStore = db.createObjectStore(STORAGE_KEYS.ATOMS, { keyPath: 'id' });
-                    atomsStore.createIndex('contentHash', 'contentHash', { unique: false });
-                    atomsStore.createIndex('field', 'field', { unique: false });
+                if (!db.objectStoreNames.contains('attr_atoms')) {
+                    const atomsStore = db.createObjectStore('attr_atoms', { keyPath: 'id' });
+                    atomsStore.createIndex('contentHash', 'contentHash');
+                    atomsStore.createIndex('field', 'field');
                 }
-                if (!db.objectStoreNames.contains(STORAGE_KEYS.DISCIPLINES)) {
-                    db.createObjectStore(STORAGE_KEYS.DISCIPLINES, { keyPath: 'name' });
+                if (!db.objectStoreNames.contains('attr_disciplines')) {
+                    db.createObjectStore('attr_disciplines', { keyPath: 'name' });
                 }
-            };
-
-            request.onsuccess = async (event) => {
-                const db = (event.target as IDBOpenDBRequest).result;
-
-                try {
-                    // Migrate from LocalStorage if DB is newly created and empty
-                    await this.migrateFromLocalStorage(db);
-                    resolve(db);
-                } catch (e) {
-                    reject(e);
-                }
-            };
-
-            request.onerror = (event) => {
-                reject((event.target as IDBOpenDBRequest).error);
-            };
+            },
         });
 
         return this.dbPromise;
     }
 
-    private async migrateFromLocalStorage(db: IDBDatabase): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([
-                STORAGE_KEYS.CONCEPTS,
-                STORAGE_KEYS.EDITIONS,
-                STORAGE_KEYS.ATOMS,
-                STORAGE_KEYS.DISCIPLINES
-            ], 'readwrite');
-
-            transaction.oncomplete = () => resolve();
-            transaction.onerror = () => reject(transaction.error);
-
-            // Concepts
-            const conceptsStore = transaction.objectStore(STORAGE_KEYS.CONCEPTS);
-            const conceptsCountReq = conceptsStore.count();
-            conceptsCountReq.onsuccess = () => {
-                if (conceptsCountReq.result === 0) {
-                    const rawConcepts = localStorage.getItem(STORAGE_KEYS.CONCEPTS);
-                    if (rawConcepts) {
-                        try {
-                            const parsed: Record<string, IConceptRoot> = JSON.parse(rawConcepts);
-                            Object.values(parsed).forEach(concept => conceptsStore.put(concept));
-                        } catch (e) {
-                            console.error("Failed to parse local storage concepts", e);
-                        }
-                    }
-                }
-            };
-
-            // Editions
-            const editionsStore = transaction.objectStore(STORAGE_KEYS.EDITIONS);
-            const editionsCountReq = editionsStore.count();
-            editionsCountReq.onsuccess = () => {
-                if (editionsCountReq.result === 0) {
-                    const rawEditions = localStorage.getItem(STORAGE_KEYS.EDITIONS);
-                    if (rawEditions) {
-                        try {
-                            const parsed: Record<string, IEdition> = JSON.parse(rawEditions);
-                            Object.values(parsed).forEach(edition => editionsStore.put(edition));
-                        } catch (e) {
-                            console.error("Failed to parse local storage editions", e);
-                        }
-                    }
-                }
-            };
-
-            // Atoms
-            const atomsStore = transaction.objectStore(STORAGE_KEYS.ATOMS);
-            const atomsCountReq = atomsStore.count();
-            atomsCountReq.onsuccess = () => {
-                if (atomsCountReq.result === 0) {
-                    const rawAtoms = localStorage.getItem(STORAGE_KEYS.ATOMS);
-                    if (rawAtoms) {
-                        try {
-                            const parsed: Record<string, IContentAtom> = JSON.parse(rawAtoms);
-                            Object.values(parsed).forEach(atom => atomsStore.put(atom));
-                        } catch (e) {
-                            console.error("Failed to parse local storage atoms", e);
-                        }
-                    }
-                }
-            };
-
-            // Disciplines
-            const disciplinesStore = transaction.objectStore(STORAGE_KEYS.DISCIPLINES);
-            const disciplinesCountReq = disciplinesStore.count();
-            disciplinesCountReq.onsuccess = () => {
-                if (disciplinesCountReq.result === 0) {
-                    const rawDisciplines = localStorage.getItem(STORAGE_KEYS.DISCIPLINES);
-                    if (rawDisciplines) {
-                        try {
-                            const parsed: Record<string, DisciplineData> = JSON.parse(rawDisciplines);
-                            Object.values(parsed).forEach(discipline => disciplinesStore.put(discipline));
-                        } catch (e) {
-                            console.error("Failed to parse local storage disciplines", e);
-                        }
-                    }
-                }
-            };
-        });
-    }
-
-    private async dbGet<T>(storeName: string, key: string): Promise<T | null> {
-        const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(storeName, 'readonly');
-            const store = transaction.objectStore(storeName);
-            const request = store.get(key);
-
-            request.onsuccess = () => resolve(request.result || null);
-            request.onerror = () => reject(request.error);
-        });
-    }
-
-    private async dbGetAll<T>(storeName: string): Promise<T[]> {
-        const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(storeName, 'readonly');
-            const store = transaction.objectStore(storeName);
-            const request = store.getAll();
-
-            request.onsuccess = () => resolve(request.result || []);
-            request.onerror = () => reject(request.error);
-        });
-    }
-
-    private async dbPut<T>(storeName: string, item: T): Promise<void> {
-        const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(storeName, 'readwrite');
-            const store = transaction.objectStore(storeName);
-            const request = store.put(item);
-
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
-    }
-
-    private async dbDelete(storeName: string, key: string): Promise<void> {
-        const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(storeName, 'readwrite');
-            const store = transaction.objectStore(storeName);
-            const request = store.delete(key);
-
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
-    }
-
     // --- Concept Operations ---
     async saveConcept(concept: IConceptRoot): Promise<void> {
-        await this.dbPut(STORAGE_KEYS.CONCEPTS, concept);
+        const db = await this.getDB();
+        await db.put('attr_concepts', concept);
     }
 
     async getConcept(id: string): Promise<IConceptRoot | null> {
-        return this.dbGet<IConceptRoot>(STORAGE_KEYS.CONCEPTS, id);
+        const db = await this.getDB();
+        return (await db.get('attr_concepts', id)) || null;
     }
 
     async getAllConcepts(): Promise<IConceptRoot[]> {
-        return this.dbGetAll<IConceptRoot>(STORAGE_KEYS.CONCEPTS);
+        const db = await this.getDB();
+        return db.getAll('attr_concepts');
     }
 
     // --- Edition Operations ---
     async saveEdition(edition: IEdition): Promise<void> {
-        await this.dbPut(STORAGE_KEYS.EDITIONS, edition);
+        const db = await this.getDB();
+        await db.put('attr_editions', edition);
     }
 
     async getEdition(id: string): Promise<IEdition | null> {
-        return this.dbGet<IEdition>(STORAGE_KEYS.EDITIONS, id);
+        const db = await this.getDB();
+        return (await db.get('attr_editions', id)) || null;
     }
 
     async getEditionsByConcept(conceptId: string): Promise<IEdition[]> {
         const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORAGE_KEYS.EDITIONS, 'readonly');
-            const store = transaction.objectStore(STORAGE_KEYS.EDITIONS);
-            const index = store.index('conceptId');
-            const request = index.getAll(conceptId);
-
-            request.onsuccess = () => resolve(request.result || []);
-            request.onerror = () => reject(request.error);
-        });
+        return db.getAllFromIndex('attr_editions', 'conceptId', conceptId);
     }
 
     // --- Atom Operations ---
     async saveAtom(atom: IContentAtom): Promise<void> {
-        await this.dbPut(STORAGE_KEYS.ATOMS, atom);
+        const db = await this.getDB();
+        await db.put('attr_atoms', atom);
     }
 
     async getAtom(id: string): Promise<IContentAtom | null> {
-        return this.dbGet<IContentAtom>(STORAGE_KEYS.ATOMS, id);
+        const db = await this.getDB();
+        return (await db.get('attr_atoms', id)) || null;
     }
 
     async getAtoms(ids: string[]): Promise<IContentAtom[]> {
+        if (ids.length === 0) return [];
         const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORAGE_KEYS.ATOMS, 'readonly');
-            const store = transaction.objectStore(STORAGE_KEYS.ATOMS);
+        const tx = db.transaction('attr_atoms', 'readonly');
+        const store = tx.objectStore('attr_atoms');
 
-            const results: IContentAtom[] = [];
-            let completed = 0;
-            let errored = false;
-
-            if (ids.length === 0) {
-                resolve([]);
-                return;
-            }
-
-            ids.forEach((id) => {
-                const request = store.get(id);
-                request.onsuccess = () => {
-                    if (request.result) {
-                        results.push(request.result);
-                    }
-                    completed++;
-                    if (completed === ids.length && !errored) {
-                        resolve(results);
-                    }
-                };
-                request.onerror = () => {
-                    if (!errored) {
-                        errored = true;
-                        reject(request.error);
-                    }
-                };
-            });
-
-            transaction.onerror = () => {
-                if (!errored) {
-                    errored = true;
-                    reject(transaction.error);
-                }
-            };
-        });
+        const promises = ids.map(id => store.get(id));
+        const results = await Promise.all(promises);
+        return results.filter((atom): atom is IContentAtom => atom !== undefined);
     }
 
     async getAllAtoms(): Promise<IContentAtom[]> {
-        return this.dbGetAll<IContentAtom>(STORAGE_KEYS.ATOMS);
+        const db = await this.getDB();
+        return db.getAll('attr_atoms');
     }
 
     async findAtomsByContentHash(contentHash: string): Promise<IContentAtom[]> {
         const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORAGE_KEYS.ATOMS, 'readonly');
-            const store = transaction.objectStore(STORAGE_KEYS.ATOMS);
-            const index = store.index('contentHash');
-            const request = index.getAll(contentHash);
-
-            request.onsuccess = () => resolve(request.result || []);
-            request.onerror = () => reject(request.error);
-        });
+        return db.getAllFromIndex('attr_atoms', 'contentHash', contentHash);
     }
 
     async findAtomsByField(field: ContentAtomField): Promise<IContentAtom[]> {
         const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORAGE_KEYS.ATOMS, 'readonly');
-            const store = transaction.objectStore(STORAGE_KEYS.ATOMS);
-            const index = store.index('field');
-            const request = index.getAll(field);
-
-            request.onsuccess = () => resolve(request.result || []);
-            request.onerror = () => reject(request.error);
-        });
+        return db.getAllFromIndex('attr_atoms', 'field', field);
     }
 
     async queryAtoms(filter: {
@@ -364,26 +182,31 @@ export class IndexedDBStorage implements IStorage {
 
     // --- Discipline Operations ---
     async saveDiscipline(discipline: DisciplineData): Promise<void> {
-        await this.dbPut(STORAGE_KEYS.DISCIPLINES, discipline);
+        const db = await this.getDB();
+        await db.put('attr_disciplines', discipline);
     }
 
     async getDiscipline(name: string): Promise<DisciplineData | null> {
-        return this.dbGet<DisciplineData>(STORAGE_KEYS.DISCIPLINES, name);
+        const db = await this.getDB();
+        return (await db.get('attr_disciplines', name)) || null;
     }
 
     async getAllDisciplines(): Promise<DisciplineData[]> {
-        return this.dbGetAll<DisciplineData>(STORAGE_KEYS.DISCIPLINES);
+        const db = await this.getDB();
+        return db.getAll('attr_disciplines');
     }
 
     async deleteDiscipline(name: string): Promise<void> {
-        await this.dbDelete(STORAGE_KEYS.DISCIPLINES, name);
+        const db = await this.getDB();
+        await db.delete('attr_disciplines', name);
     }
 
     // --- Cleanup Operations ---
     async runCleanup(_thresholdTimestamp: number): Promise<number> {
+        const db = await this.getDB();
         const concepts = await this.getAllConcepts();
-        const editions = await this.dbGetAll<IEdition>(STORAGE_KEYS.EDITIONS);
-        const atoms = await this.dbGetAll<IContentAtom>(STORAGE_KEYS.ATOMS);
+        const editions = await db.getAll('attr_editions');
+        const atoms = await db.getAll('attr_atoms');
 
         let deletedCount = 0;
 
@@ -416,41 +239,39 @@ export class IndexedDBStorage implements IStorage {
             }
         }
 
-        const db = await this.getDB();
+        const tx = db.transaction(['attr_editions', 'attr_atoms'], 'readwrite');
+        const editionsStore = tx.objectStore('attr_editions');
+        const atomsStore = tx.objectStore('attr_atoms');
 
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORAGE_KEYS.EDITIONS, STORAGE_KEYS.ATOMS], 'readwrite');
-            const editionsStore = transaction.objectStore(STORAGE_KEYS.EDITIONS);
-            const atomsStore = transaction.objectStore(STORAGE_KEYS.ATOMS);
-
-            transaction.oncomplete = () => resolve(deletedCount);
-            transaction.onerror = () => reject(transaction.error);
-
-            Object.keys(editionsMap).forEach(id => {
-                if (!keptEditionIds.has(id)) {
-                    editionsStore.delete(id);
-                    deletedCount++;
-                }
-            });
-
-            const referencedAtomIds = new Set<string>();
-            Object.values(editionsMap).forEach(e => {
-                if (keptEditionIds.has(e.id)) {
-                    e.coreAtomIds.forEach(id => referencedAtomIds.add(id));
-                    e.docAtomIds.forEach(id => referencedAtomIds.add(id));
-                    e.tagsAtomIds.forEach(id => referencedAtomIds.add(id));
-                    e.refsAtomIds.forEach(id => referencedAtomIds.add(id));
-                    e.relsAtomIds.forEach(id => referencedAtomIds.add(id));
-                }
-            });
-
-            atoms.forEach(atom => {
-                if (!referencedAtomIds.has(atom.id)) {
-                    atomsStore.delete(atom.id);
-                    deletedCount++;
-                }
-            });
+        const editionsPromises: Promise<void>[] = [];
+        Object.keys(editionsMap).forEach(id => {
+            if (!keptEditionIds.has(id)) {
+                editionsPromises.push(editionsStore.delete(id));
+                deletedCount++;
+            }
         });
+
+        const referencedAtomIds = new Set<string>();
+        Object.values(editionsMap).forEach(e => {
+            if (keptEditionIds.has(e.id)) {
+                e.coreAtomIds.forEach(id => referencedAtomIds.add(id));
+                e.docAtomIds.forEach(id => referencedAtomIds.add(id));
+                e.tagsAtomIds.forEach(id => referencedAtomIds.add(id));
+                e.refsAtomIds.forEach(id => referencedAtomIds.add(id));
+                e.relsAtomIds.forEach(id => referencedAtomIds.add(id));
+            }
+        });
+
+        const atomsPromises: Promise<void>[] = [];
+        atoms.forEach(atom => {
+            if (!referencedAtomIds.has(atom.id)) {
+                atomsPromises.push(atomsStore.delete(atom.id));
+                deletedCount++;
+            }
+        });
+
+        await Promise.all([...editionsPromises, ...atomsPromises, tx.done]);
+        return deletedCount;
     }
 }
 

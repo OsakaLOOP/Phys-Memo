@@ -146,6 +146,13 @@ export async function generateContentHash(content: string): Promise<string> {
         return await sha256(content);
 }
 
+export async function generateBinaryHash(blob: Blob | ArrayBuffer): Promise<string> {
+    const buffer = blob instanceof Blob ? await blob.arrayBuffer() : blob;
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export function calculateDiffStats(oldText: string, newText: string): { added: number, deleted: number, retained: number } {
     const changes = diff(oldText, newText);
     let added = 0;

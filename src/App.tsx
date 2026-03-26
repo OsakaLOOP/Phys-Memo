@@ -929,8 +929,11 @@ const PhysMemosApp: FC = () => {
   const loadData = async () => {
     try {
       // 1. Load Data
-      let allDisciplines = await storage.getAllDisciplines();
-      let allConcepts = await storage.getAllConcepts();
+      // ⚡ Bolt: Optimize sequential data loading by fetching disciplines and concepts concurrently
+      let [allDisciplines, allConcepts] = await Promise.all([
+        storage.getAllDisciplines(),
+        storage.getAllConcepts()
+      ]);
 
       // If storage is empty, fetch and migrate from V2 JSON
       if (allDisciplines.length === 0 && allConcepts.length === 0) {
@@ -940,8 +943,10 @@ const PhysMemosApp: FC = () => {
           const { migrateData } = await import('./attrstrand/migration');
           await migrateData();
 
-          allDisciplines = await storage.getAllDisciplines();
-          allConcepts = await storage.getAllConcepts();
+          [allDisciplines, allConcepts] = await Promise.all([
+            storage.getAllDisciplines(),
+            storage.getAllConcepts()
+          ]);
       }
 
       setDisciplines(allDisciplines);
@@ -1108,18 +1113,25 @@ const PhysMemosApp: FC = () => {
            const topicConcepts = allConcepts.filter(c => c.topic === activeNode.title);
 
            const aggregatedRefs = new Set<string>();
-           for (const concept of topicConcepts) {
+
+           // ⚡ Bolt: Optimize sequential data loading by converting O(N) sequential queries to concurrent batch fetching
+           const headPromises = topicConcepts.map(concept => {
                const heads = Object.entries(concept.currentHeads).sort((a, b) => b[1] - a[1]);
                if (heads.length > 0) {
                    const headId = heads[0][0];
-                   const populated = await core.getPopulatedEdition(headId);
-                   if (populated) {
-                       populated.refsAtoms.forEach(atom => {
-                           if (atom.content.trim()) {
-                               aggregatedRefs.add(atom.content.trim());
-                           }
-                       });
-                   }
+                   return core.getPopulatedEdition(headId);
+               }
+               return Promise.resolve(null);
+           });
+
+           const populatedEditions = await Promise.all(headPromises);
+           for (const populated of populatedEditions) {
+               if (populated) {
+                   populated.refsAtoms.forEach(atom => {
+                       if (atom.content.trim()) {
+                           aggregatedRefs.add(atom.content.trim());
+                       }
+                   });
                }
            }
            setTopicRefs(Array.from(aggregatedRefs));

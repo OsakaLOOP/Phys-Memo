@@ -111,11 +111,14 @@ export class AttrStrandCore {
             });
         };
 
-        const coreAtoms = await populate(edition.coreAtomIds);
-        const docAtoms = await populate(edition.docAtomIds);
-        const tagsAtoms = await populate(edition.tagsAtomIds);
-        const refsAtoms = await populate(edition.refsAtomIds);
-        const relsAtoms = await populate(edition.relsAtomIds);
+        // ⚡ Bolt: Optimize sequential data fetching by using Promise.all to fetch all atom types concurrently
+        const [coreAtoms, docAtoms, tagsAtoms, refsAtoms, relsAtoms] = await Promise.all([
+            populate(edition.coreAtomIds),
+            populate(edition.docAtomIds),
+            populate(edition.tagsAtomIds),
+            populate(edition.refsAtomIds),
+            populate(edition.relsAtomIds)
+        ]);
 
         const allAtoms = [...coreAtoms, ...docAtoms, ...tagsAtoms, ...refsAtoms, ...relsAtoms];
 

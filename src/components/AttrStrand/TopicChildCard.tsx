@@ -37,11 +37,14 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
                         const e = await storage.getEdition(headId);
                         if (e) {
                             // Populate atoms
-                            const coreAtoms = await storage.getAtoms(e.coreAtomIds);
-                            const docAtoms = await storage.getAtoms(e.docAtomIds);
-                            const tagsAtoms = await storage.getAtoms(e.tagsAtomIds);
-                            const refsAtoms = await storage.getAtoms(e.refsAtomIds);
-                            const relsAtoms = await storage.getAtoms(e.relsAtomIds);
+                            // ⚡ Bolt: Optimize sequential data fetching by fetching all atoms concurrently using Promise.all
+                            const [coreAtoms, docAtoms, tagsAtoms, refsAtoms, relsAtoms] = await Promise.all([
+                                storage.getAtoms(e.coreAtomIds),
+                                storage.getAtoms(e.docAtomIds),
+                                storage.getAtoms(e.tagsAtomIds),
+                                storage.getAtoms(e.refsAtomIds),
+                                storage.getAtoms(e.relsAtomIds)
+                            ]);
 
                             setEdition({
                                 ...e,

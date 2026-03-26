@@ -1,4 +1,4 @@
-import { type FC } from 'react';
+import { memo, type FC } from 'react';
 import EditableBlock, { type EditableBlockProps } from './EditableBlock';
 
 const SmartFormulaBlock: FC<EditableBlockProps> = (props) => {
@@ -10,4 +10,4 @@ const SmartFormulaBlock: FC<EditableBlockProps> = (props) => {
   );
 };
 
-export default SmartFormulaBlock;
+export default memo(SmartFormulaBlock);

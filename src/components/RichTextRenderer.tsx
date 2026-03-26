@@ -1,4 +1,4 @@
-import { useEffect, useRef, type FC } from 'react';
+import { useEffect, useRef, memo, type FC } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { marked } from 'marked';
 import katex from 'katex';
@@ -156,4 +156,4 @@ const RichTextRenderer: FC<RichTextRendererProps> = ({ content, className = "", 
   return <div ref={containerRef} className={`markdown-body ${className}`} />;
 };
 
-export default RichTextRenderer;
+export default memo(RichTextRenderer);

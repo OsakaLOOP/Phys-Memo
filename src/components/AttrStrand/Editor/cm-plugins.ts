@@ -3,7 +3,7 @@ import { EditorView, Decoration, ViewPlugin, ViewUpdate, gutter, GutterMarker, W
 import { undoDepth, redoDepth } from '@codemirror/commands';
 import type { DecorationSet } from '@codemirror/view';
 import type { DraftId, ContentAtomField } from '../../../attrstrand/types';
-import { useWorkspaceStore } from '../../../store/workspaceStore';
+import { useWorkspaceStore, genTempId } from '../../../store/workspaceStore';
 import type { AtomDraft } from '../../../attrstrand/types';
 import { BinaryAtomWidget } from './cm-react-widgets';
 
@@ -198,11 +198,20 @@ export const dragDropImagePlugin = (field: ContentAtomField) => EditorView.domEv
         const atomFrom = insertText === '\n\n' ? insertPos + 1 : insertPos;
 
         // Read files as blobs
-        const blobs = files.map(f => f);
+        const blobs: Record<string, Blob | ArrayBuffer> = {};
+        const imagesMeta = [];
+        for (let i = 0; i < files.length; i++) {
+            const uuid = genTempId();
+            blobs[uuid] = files[i];
+            imagesMeta.push({ id: uuid, widthRatio: 1, caption: '' });
+        }
+
+        const contentJson = JSON.stringify({ images: imagesMeta });
+        const insertTextModified = `\n\n${contentJson}\n\n`;
 
         // Dispatch CM changes to make space for the new block in UI state tracking
         view.dispatch({
-            changes: { from: insertPos, to: insertPos, insert: insertText },
+            changes: { from: insertPos, to: insertPos, insert: insertTextModified },
             effects: addAtomEffect.of({ id: newId, index: mappingIndex, insertPos: atomFrom }),
             annotations: Transaction.userEvent.of('add_atom')
         });
@@ -214,9 +223,8 @@ export const dragDropImagePlugin = (field: ContentAtomField) => EditorView.domEv
         // Wait briefly for CM to sync to parallel state, then update blobs
         setTimeout(() => {
             state.updateAtomBlobs(newId, blobs);
-            state.updateAtomMeta(newId, {
-                images: blobs.map((_, i) => ({ id: `img_${i}`, widthRatio: 1, caption: '' }))
-            });
+            state.updateAtomContent(newId, contentJson);
+            state.updateAtomMeta(newId, { images: imagesMeta });
             state.setActiveEditor({ field, id: newId });
         }, 50);
 

@@ -46,18 +46,6 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     if (!atom) return null; // Defensive check
 
     const handleSave = (valToSave?: string, exit: boolean = true) => {
-        if (atom.type === 'bin') {
-            if (exit) {
-                if (isMultilineEditor) {
-                    if (useWorkspaceStore.getState().activeEditor?.id === atomId) {
-                        setActiveEditor(null);
-                    }
-                } else {
-                    setIsEditingLocal(false);
-                }
-            }
-            return;
-        }
         const finalVal = valToSave !== undefined ? valToSave : editValue;
         if (finalVal !== atom.content) {
             updateAtomContent(atomId, finalVal);
@@ -178,7 +166,13 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     const renderContent = () => {
         if (atom.type === 'bin') {
-            return <ImageGroupViewer blobs={atom.blobs || []} meta={atom.frontMeta as any} />;
+            let meta = {};
+            try {
+                meta = JSON.parse(atom.content || '{}');
+            } catch (e) {
+                // Ignore
+            }
+            return <ImageGroupViewer blobs={atom.blobs || {}} meta={meta} />;
         }
 
         if (!atom.content) return <span className="text-slate-300 italic text-sm">点击编辑内容...</span>;
@@ -207,18 +201,10 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     const renderEditor = () => {
         if (atom.type === 'bin') {
-            return (
-                <ImageGroupEditor
-                    blobs={atom.blobs || []}
-                    meta={atom.frontMeta as any}
-                    onUpdateMeta={(newMeta) => {
-                        useWorkspaceStore.getState().updateAtomMeta(atomId, newMeta);
-                    }}
-                    onUpdateBlobs={(newBlobs) => {
-                        useWorkspaceStore.getState().updateAtomBlobs(atomId, newBlobs);
-                    }}
-                />
-            );
+            // For editing bin atoms, we just open CodeMirror, but since isMultilineEditor handles bin atoms, we don't need this.
+            // Wait, bin atoms ARE multiline editors (core, doc) in this app.
+            // The isMultilineEditor check will handle it.
+            // So we can remove this block.
         }
 
         if (isTags) {

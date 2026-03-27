@@ -1,32 +1,54 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GripHorizontal } from 'lucide-react';
 import type { BinAtomMeta } from '../../../attrstrand/types';
+import { genTempId } from '../../../store/workspaceStore';
 
 interface ImageGroupEditorProps {
-    blobs: (Blob | ArrayBuffer)[];
+    blobs: Record<string, Blob | ArrayBuffer>;
     meta: BinAtomMeta;
     onUpdateMeta: (newMeta: BinAtomMeta) => void;
-    onUpdateBlobs: (newBlobs: (Blob | ArrayBuffer)[]) => void;
+    onUpdateBlobs: (newBlobs: Record<string, Blob | ArrayBuffer>) => void;
 }
 
 export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta, onUpdateMeta, onUpdateBlobs }) => {
-    const [urls, setUrls] = useState<string[]>([]);
+    const [urls, setUrls] = useState<Record<string, string>>({});
+    const captionInputRef = useRef<HTMLInputElement>(null);
 
     // Convert array buffers/blobs to object URLs for preview
     useEffect(() => {
-        const objectUrls = blobs.map(blob => {
-            if (blob instanceof Blob) {
-                return URL.createObjectURL(blob);
-            } else {
-                return URL.createObjectURL(new Blob([blob]));
+        const objectUrls: Record<string, string> = {};
+        if (Array.isArray(blobs)) {
+            // Backward compatibility for old atoms where blobs is an array
+            blobs.forEach((blob, index) => {
+                const id = meta.images?.[index]?.id || `img_${index}`;
+                if (blob instanceof Blob) {
+                    objectUrls[id] = URL.createObjectURL(blob);
+                } else {
+                    objectUrls[id] = URL.createObjectURL(new Blob([blob]));
+                }
+            });
+        } else {
+            for (const [id, blob] of Object.entries(blobs)) {
+                if (blob instanceof Blob) {
+                    objectUrls[id] = URL.createObjectURL(blob);
+                } else {
+                    objectUrls[id] = URL.createObjectURL(new Blob([blob]));
+                }
             }
-        });
+        }
         setUrls(objectUrls);
 
         return () => {
-            objectUrls.forEach(url => URL.revokeObjectURL(url));
+            Object.values(objectUrls).forEach(url => URL.revokeObjectURL(url));
         };
-    }, [blobs]);
+    }, [blobs, meta]);
+
+    // Auto-focus the group caption input when this component mounts/is edited
+    useEffect(() => {
+        if (captionInputRef.current) {
+            captionInputRef.current.focus();
+        }
+    }, []);
 
     const handleGroupCaptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         onUpdateMeta({ ...meta, groupCaption: e.target.value });
@@ -34,9 +56,7 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
 
     const handleImageCaptionChange = (index: number, newCaption: string) => {
         const newImages = [...(meta.images || [])];
-        if (!newImages[index]) {
-            newImages[index] = { id: `img_${index}`, widthRatio: 1, caption: '' };
-        }
+        if (!newImages[index]) return;
         newImages[index].caption = newCaption;
         onUpdateMeta({ ...meta, images: newImages });
     };
@@ -45,9 +65,7 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
         // Clamp between 0.1 and 1.0, precision 0.1
         const clampedRatio = Math.max(0.1, Math.min(1.0, Math.round(newRatio * 10) / 10));
         const newImages = [...(meta.images || [])];
-        if (!newImages[index]) {
-            newImages[index] = { id: `img_${index}`, widthRatio: 1, caption: '' };
-        }
+        if (!newImages[index]) return;
         newImages[index].widthRatio = clampedRatio;
         onUpdateMeta({ ...meta, images: newImages });
     };
@@ -104,31 +122,33 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
         e.preventDefault();
         if (draggedIndex === null || draggedIndex === dropIndex) return;
 
-        // Reorder blobs and meta.images
-        const newBlobs = [...blobs];
-        const [draggedBlob] = newBlobs.splice(draggedIndex, 1);
-        newBlobs.splice(dropIndex, 0, draggedBlob);
-
+        // Reorder meta.images
         const newImages = [...(meta.images || [])];
         const [draggedMeta] = newImages.splice(draggedIndex, 1);
         newImages.splice(dropIndex, 0, draggedMeta);
 
-        onUpdateBlobs(newBlobs);
         onUpdateMeta({ ...meta, images: newImages });
         setDraggedIndex(null);
     };
 
     return (
-        <div className="w-full border border-indigo-200 rounded-lg bg-indigo-50/30 p-4 flex flex-col gap-4">
+        <div className="w-full bg-white flex flex-col gap-4 outline-none" tabIndex={-1}>
             {/* Header: Group Caption */}
             <div className="flex flex-col">
                 <label className="text-xs font-semibold text-slate-500 mb-1">图片组标题 (Group Caption)</label>
                 <input
+                    ref={captionInputRef}
                     type="text"
                     value={meta.groupCaption || ''}
                     onChange={handleGroupCaptionChange}
                     placeholder="输入图组总标题..."
                     className="w-full p-2 border border-slate-300 rounded text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 transition-shadow"
+                    onKeyDown={(e) => {
+                        // Let CM handle Enter/Esc if needed, or stop propagation if we want to handle locally
+                        if (e.key === 'Enter' || e.key === 'Escape') {
+                            e.stopPropagation();
+                        }
+                    }}
                 />
             </div>
 
@@ -138,9 +158,9 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
                 className="flex flex-row overflow-x-auto gap-4 pb-4 items-end whitespace-nowrap scrollbar-thin scrollbar-thumb-indigo-200 scrollbar-track-transparent"
                 style={{ minHeight: '200px' }}
             >
-                {urls.map((url, index) => {
-                    const imgMeta = meta.images?.[index] || { widthRatio: 1, caption: '' };
-                    const widthRatio = imgMeta.widthRatio;
+                {(meta.images || []).map((imgMeta, index) => {
+                    const url = urls[imgMeta.id] || '';
+                    const widthRatio = imgMeta.widthRatio || 1;
                     // base width 300px = ratio 1.0
                     const pxWidth = Math.max(80, widthRatio * 300);
 
@@ -181,10 +201,12 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        const newBlobs = [...blobs];
-                                        newBlobs.splice(index, 1);
+                                        const imageId = imgMeta.id;
                                         const newImages = [...(meta.images || [])];
                                         newImages.splice(index, 1);
+                                        const newBlobs = { ...blobs };
+                                        delete newBlobs[imageId];
+
                                         onUpdateBlobs(newBlobs);
                                         onUpdateMeta({ ...meta, images: newImages });
                                     }}
@@ -223,10 +245,12 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
                         const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
                         if (files.length === 0) return;
 
-                        const newBlobs = [...blobs, ...files.map(f => f)];
+                        const newBlobs = { ...blobs };
                         const newImages = [...(meta.images || [])];
                         for (let i = 0; i < files.length; i++) {
-                            newImages.push({ id: `img_${newImages.length + i}`, widthRatio: 1, caption: '' });
+                            const uuid = genTempId();
+                            newBlobs[uuid] = files[i];
+                            newImages.push({ id: uuid, widthRatio: 1, caption: '' });
                         }
                         onUpdateBlobs(newBlobs);
                         onUpdateMeta({ ...meta, images: newImages });

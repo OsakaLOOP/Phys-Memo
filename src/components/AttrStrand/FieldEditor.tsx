@@ -95,14 +95,21 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
         e.preventDefault();
         e.stopPropagation();
 
-        const blobs = files.map(f => f);
+        const blobs: Record<string, Blob | ArrayBuffer> = {};
+        const imagesMeta = [];
+        for (let i = 0; i < files.length; i++) {
+            const uuid = genTempId();
+            blobs[uuid] = files[i];
+            imagesMeta.push({ id: uuid, widthRatio: 1, caption: '' });
+        }
+
         const newId = genTempId();
         addAtomId(field, newId, targetIndex);
 
         const state = useWorkspaceStore.getState();
         state.updateAtomBlobs(newId, blobs);
         state.updateAtomMeta(newId, {
-            images: blobs.map((_, i) => ({ id: `img_${i}`, widthRatio: 1, caption: '' }))
+            images: imagesMeta
         });
 
         // Let it stay in read-only or open editor, here we open editor

@@ -33,7 +33,7 @@ interface WorkspaceState extends IWorkspaceDraft {
 
     // Atom 自身操作
     updateAtomContent: (id: DraftId, content: string) => void;
-    updateAtomBlobs: (id: DraftId, blobs: (Blob | ArrayBuffer)[]) => void;
+    updateAtomBlobs: (id: DraftId, blobs: Record<string, Blob | ArrayBuffer>) => void;
     updateAtomMeta: (id: DraftId, frontMeta: Record<string, any>) => void;
 
     // 批量更新 Atom 状态 (用于单实例编辑器)
@@ -268,7 +268,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             });
         },
 
-        updateAtomBlobs: (id: DraftId, blobs: (Blob | ArrayBuffer)[]) => {
+        updateAtomBlobs: (id: DraftId, blobs: Record<string, Blob | ArrayBuffer>) => {
             set((state) => {
                 const atom = state.draftAtomsData[id];
                 if (!atom) return state;

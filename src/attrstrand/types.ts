@@ -26,7 +26,7 @@ export interface IContentAtom {
     type: ContentAtomType;
 
     content: string; // 纯文本或 json
-    blobs?: (Blob | ArrayBuffer)[]; // 仅当 type 为 'bin' 时存在的二进制流
+    blobs?: Record<string, Blob | ArrayBuffer>; // 仅当 type 为 'bin' 时存在的二进制流
     contentHash: hash; // 纯文本部分或二进制流的 hash, 查重
     contentSimHash: hash | null; // 为基于相似度的计算预留
     
@@ -150,7 +150,7 @@ export interface AtomSubmission {
     type: ContentAtomType;
     derivedFromId: hash | null; // 一定要是真实的 hash 或者 null
     frontMeta: Meta;
-    blobs?: (Blob | ArrayBuffer)[];
+    blobs?: Record<string, Blob | ArrayBuffer>;
 }
 
 export interface EditionSubmission {

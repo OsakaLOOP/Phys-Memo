@@ -3,18 +3,21 @@ import { GripHorizontal } from 'lucide-react';
 import type { BinAtomMeta } from '../../../attrstrand/types';
 
 interface ImageGroupEditorProps {
-    blobs: (Blob | ArrayBuffer)[];
+    blobs: Record<string, Blob | ArrayBuffer>;
     meta: BinAtomMeta;
     onUpdateMeta: (newMeta: BinAtomMeta) => void;
-    onUpdateBlobs: (newBlobs: (Blob | ArrayBuffer)[]) => void;
+    onUpdateBlobs: (newBlobs: Record<string, Blob | ArrayBuffer>) => void;
+    inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
-export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta, onUpdateMeta, onUpdateBlobs }) => {
+export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta, onUpdateMeta, onUpdateBlobs, inputRef }) => {
     const [urls, setUrls] = useState<string[]>([]);
 
-    // Convert array buffers/blobs to object URLs for preview
+    // Convert array buffers/blobs to object URLs for preview based on meta.images
     useEffect(() => {
-        const objectUrls = blobs.map(blob => {
+        const objectUrls = (meta.images || []).map(img => {
+            const blob = blobs && blobs[img.id];
+            if (!blob) return '';
             if (blob instanceof Blob) {
                 return URL.createObjectURL(blob);
             } else {
@@ -24,9 +27,11 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
         setUrls(objectUrls);
 
         return () => {
-            objectUrls.forEach(url => URL.revokeObjectURL(url));
+            objectUrls.forEach(url => {
+                if (url) URL.revokeObjectURL(url);
+            });
         };
-    }, [blobs]);
+    }, [blobs, meta.images]);
 
     const handleGroupCaptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         onUpdateMeta({ ...meta, groupCaption: e.target.value });
@@ -35,9 +40,10 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
     const handleImageCaptionChange = (index: number, newCaption: string) => {
         const newImages = [...(meta.images || [])];
         if (!newImages[index]) {
-            newImages[index] = { id: `img_${index}`, widthRatio: 1, caption: '' };
+            newImages[index] = { id: crypto.randomUUID().replace(/-/g, ''), widthRatio: 1, caption: '' };
+        } else {
+            newImages[index] = { ...newImages[index], caption: newCaption };
         }
-        newImages[index].caption = newCaption;
         onUpdateMeta({ ...meta, images: newImages });
     };
 
@@ -104,26 +110,21 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
         e.preventDefault();
         if (draggedIndex === null || draggedIndex === dropIndex) return;
 
-        // Reorder blobs and meta.images
-        const newBlobs = [...blobs];
-        const [draggedBlob] = newBlobs.splice(draggedIndex, 1);
-        newBlobs.splice(dropIndex, 0, draggedBlob);
-
+        // Reorder meta.images (blobs map doesn't change)
         const newImages = [...(meta.images || [])];
         const [draggedMeta] = newImages.splice(draggedIndex, 1);
         newImages.splice(dropIndex, 0, draggedMeta);
-
-        onUpdateBlobs(newBlobs);
         onUpdateMeta({ ...meta, images: newImages });
         setDraggedIndex(null);
     };
 
     return (
-        <div className="w-full border border-indigo-200 rounded-lg bg-indigo-50/30 p-4 flex flex-col gap-4">
+        <div className="w-full flex flex-col gap-4">
             {/* Header: Group Caption */}
             <div className="flex flex-col">
                 <label className="text-xs font-semibold text-slate-500 mb-1">图片组标题 (Group Caption)</label>
                 <input
+                    ref={inputRef}
                     type="text"
                     value={meta.groupCaption || ''}
                     onChange={handleGroupCaptionChange}
@@ -181,10 +182,14 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        const newBlobs = [...blobs];
-                                        newBlobs.splice(index, 1);
                                         const newImages = [...(meta.images || [])];
+                                        const imgToRemove = newImages[index];
                                         newImages.splice(index, 1);
+                                        // We don't necessarily need to delete from blobs, but we could
+                                        const newBlobs = { ...blobs };
+                                        if (imgToRemove && newBlobs[imgToRemove.id]) {
+                                            delete newBlobs[imgToRemove.id];
+                                        }
                                         onUpdateBlobs(newBlobs);
                                         onUpdateMeta({ ...meta, images: newImages });
                                     }}
@@ -223,10 +228,12 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
                         const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
                         if (files.length === 0) return;
 
-                        const newBlobs = [...blobs, ...files.map(f => f)];
+                        const newBlobs = { ...blobs };
                         const newImages = [...(meta.images || [])];
                         for (let i = 0; i < files.length; i++) {
-                            newImages.push({ id: `img_${newImages.length + i}`, widthRatio: 1, caption: '' });
+                            const newId = crypto.randomUUID().replace(/-/g, '');
+                            newBlobs[newId] = files[i];
+                            newImages.push({ id: newId, widthRatio: 1, caption: '' });
                         }
                         onUpdateBlobs(newBlobs);
                         onUpdateMeta({ ...meta, images: newImages });

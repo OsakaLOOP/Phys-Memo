@@ -195,15 +195,28 @@ export const dragDropImagePlugin = (field: ContentAtomField) => EditorView.domEv
             insertText = '\n\n';
         }
 
-        const atomFrom = insertText === '\n\n' ? insertPos + 1 : insertPos;
 
-        // Read files as blobs
-        const blobs = files.map(f => f);
+
+        const newBlobs: Record<string, Blob | ArrayBuffer> = {};
+        const newImages = files.map(f => {
+            const uuid = crypto.randomUUID().replace(/-/g, '');
+            newBlobs[uuid] = f;
+            return { id: uuid, widthRatio: 1, caption: '' };
+        });
+
+        // For bin atoms, the initial insertText should contain the JSON payload.
+        // However, the `insertText` calculated earlier is just newlines.
+        // If we want to insert the initial JSON, we should modify `insertText`.
+        // Wait, addAtomEffect will just add an empty atom unless we specify content.
+        // Actually, since we want to create a bin atom, the text we insert should be the JSON string.
+        const jsonContent = JSON.stringify({ images: newImages });
+        const modifiedInsertText = insertText === '\n\n' ? '\n' + jsonContent + '\n' : insertText === '\n' ? jsonContent + '\n' : jsonContent;
+        const modifiedAtomFrom = insertText === '\n\n' ? insertPos + 1 : insertPos;
 
         // Dispatch CM changes to make space for the new block in UI state tracking
         view.dispatch({
-            changes: { from: insertPos, to: insertPos, insert: insertText },
-            effects: addAtomEffect.of({ id: newId, index: mappingIndex, insertPos: atomFrom }),
+            changes: { from: insertPos, to: insertPos, insert: modifiedInsertText },
+            effects: addAtomEffect.of({ id: newId, index: mappingIndex, insertPos: modifiedAtomFrom }),
             annotations: Transaction.userEvent.of('add_atom')
         });
 
@@ -213,10 +226,8 @@ export const dragDropImagePlugin = (field: ContentAtomField) => EditorView.domEv
         // In cm-plugins we are dealing with parallel state directly for UI display.
         // Wait briefly for CM to sync to parallel state, then update blobs
         setTimeout(() => {
-            state.updateAtomBlobs(newId, blobs);
-            state.updateAtomMeta(newId, {
-                images: blobs.map((_, i) => ({ id: `img_${i}`, widthRatio: 1, caption: '' }))
-            });
+            state.updateAtomBlobs(newId, newBlobs);
+            // We set the parallel type to 'bin' via updateAtomBlobs, no need for frontMeta
             state.setActiveEditor({ field, id: newId });
         }, 50);
 
@@ -545,16 +556,9 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
         if (m.from < m.to) {
             const atom = atomsData[m.id] || fallbackData[m.id];
             if (atom && atom.type === 'bin') {
-                // If it's a binary atom, we replace its entire content range with a widget
-                decorations.push({
-                    from: m.from,
-                    to: m.to,
-                    dec: Decoration.replace({
-                        widget: new BinaryAtomWidget(m.id),
-                        block: true, // replace as a block widget
-                        inclusive: true
-                    })
-                });
+                // Wait, if it's already done by widgetReplacementsPlugin, we don't need to do it here in blockDecorations.
+                // Or if we do it here, we shouldn't have widgetReplacementsPlugin.
+                // But buildDecorations doesn't have 'view'.
             }
         }
     }
@@ -807,6 +811,40 @@ class AddButtonWidget extends WidgetType {
     }
 }
 
+
+
+export const widgetReplacementsPlugin = (_field: ContentAtomField) => ViewPlugin.fromClass(class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+        this.decorations = this.build(view);
+    }
+    update(update: ViewUpdate) {
+        if (update.docChanged || update.selectionSet) {
+            this.decorations = this.build(update.view);
+        }
+    }
+    build(view: EditorView) {
+        const builder = new RangeSetBuilder<Decoration>();
+        const mappings = view.state.field(atomMapField);
+        const state = useWorkspaceStore.getState();
+        const data = state.cmDraftAtomsData;
+
+        // mappings are sorted
+        for (const m of mappings) {
+            const atom = data[m.id];
+            if (atom && atom.type === 'bin') {
+                const text = view.state.sliceDoc(m.from, m.to);
+                builder.add(m.from, m.to, Decoration.replace({
+                    widget: new BinaryAtomWidget(m.id, text, () => m.from, view),
+                    block: true
+                }));
+            }
+        }
+        return builder.finish();
+    }
+}, {
+    decorations: v => v.decorations
+});
 
 export const blockActionGutter = gutter({
     class: 'cm-block-action-gutter bg-transparent border-r-0 w-6',

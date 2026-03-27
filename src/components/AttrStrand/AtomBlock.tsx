@@ -6,7 +6,6 @@ import { Edit3, Check, X } from 'lucide-react';
 import { calculateDiffStats } from '../../attrstrand/utils';
 import { CopyrightTooltip } from './CopyrightTooltip';
 import { ImageGroupViewer } from './Editor/ImageGroupViewer';
-import { ImageGroupEditor } from './Editor/ImageGroupEditor';
 
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
@@ -178,7 +177,7 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     const renderContent = () => {
         if (atom.type === 'bin') {
-            return <ImageGroupViewer blobs={atom.blobs || []} meta={atom.frontMeta as any} />;
+            return <ImageGroupViewer blobs={atom.blobs || {}} meta={atom.content ? (() => { try { return JSON.parse(atom.content); } catch { return { images: [] }; } })() : { images: [] }} />;
         }
 
         if (!atom.content) return <span className="text-slate-300 italic text-sm">点击编辑内容...</span>;
@@ -206,20 +205,8 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
     };
 
     const renderEditor = () => {
-        if (atom.type === 'bin') {
-            return (
-                <ImageGroupEditor
-                    blobs={atom.blobs || []}
-                    meta={atom.frontMeta as any}
-                    onUpdateMeta={(newMeta) => {
-                        useWorkspaceStore.getState().updateAtomMeta(atomId, newMeta);
-                    }}
-                    onUpdateBlobs={(newBlobs) => {
-                        useWorkspaceStore.getState().updateAtomBlobs(atomId, newBlobs);
-                    }}
-                />
-            );
-        }
+        // ImageGroupEditor has been moved to UnifiedCodeMirror as per requirements.
+        // It should not be rendered here.
 
         if (isTags) {
              return (

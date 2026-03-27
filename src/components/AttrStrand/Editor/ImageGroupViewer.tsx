@@ -8,21 +8,6 @@ interface ImageGroupViewerProps {
 
 export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta }) => {
     const [urls, setUrls] = useState<Record<string, string>>({});
-    const [containerWidth, setContainerWidth] = useState<number>(800);
-    const containerRef = React.useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!containerRef.current) return;
-        const observer = new ResizeObserver(entries => {
-            for (let entry of entries) {
-                if (entry.contentRect.width > 0) {
-                    setContainerWidth(entry.contentRect.width);
-                }
-            }
-        });
-        observer.observe(containerRef.current);
-        return () => observer.disconnect();
-    }, []);
 
     useEffect(() => {
         const objectUrls: Record<string, string> = {};
@@ -63,30 +48,17 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
     let currentRowWidth = 0;
 
     imagesMeta.forEach(img => {
-        // Calculate effective width ratio based on height limits to avoid horizontal whitespace
-        // Max container height is bounded to 800px. Container width is measured dynamically.
-        // If image natural height requires scaling it down, we shrink the effective horizontal width ratio to tightly match bounds.
-        let effectiveWidthRatio = img.widthRatio || 1;
-        if (img.naturalWidth && img.naturalHeight) {
-            // maxRatio = 800(max height) / (containerWidth * (naturalHeight / naturalWidth))
-            const maxRatio = (800 / containerWidth) * (img.naturalWidth / img.naturalHeight);
-            if (maxRatio < effectiveWidthRatio) {
-                effectiveWidthRatio = maxRatio;
-            }
-        }
+        const widthRatio = img.widthRatio || 1;
 
-        // Save the computed effective ratio for rendering
-        const processedImg = { ...img, effectiveWidthRatio };
-
-        if (currentRowWidth + effectiveWidthRatio > 1.01) { // 1.01 to allow minor floating point errors
+        if (currentRowWidth + widthRatio > 1.01) { // 1.01 to allow minor floating point errors
             if (currentRow.length > 0) {
                 rows.push(currentRow);
             }
-            currentRow = [processedImg];
-            currentRowWidth = effectiveWidthRatio;
+            currentRow = [img];
+            currentRowWidth = widthRatio;
         } else {
-            currentRow.push(processedImg);
-            currentRowWidth += effectiveWidthRatio;
+            currentRow.push(img);
+            currentRowWidth += widthRatio;
         }
     });
     if (currentRow.length > 0) {
@@ -97,7 +69,7 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
 
     // LaTeX subfigure style rendering
     return (
-        <div ref={containerRef} className="w-full my-4 flex flex-col items-center justify-center font-serif text-slate-800 bg-white">
+        <div className="w-full my-4 flex flex-col items-center justify-center font-serif text-slate-800 bg-white">
             <div className="w-full flex flex-col gap-y-6">
                 {rows.map((row, rowIndex) => {
                     // Pre-calculate indices for this row
@@ -110,52 +82,37 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                     // The upper images vertically centered, lower captions top-aligned.
                     return (
                         <div key={rowIndex} className="w-full flex flex-col items-center">
-                            {/* Images Row: Vertically Centered */}
-                            <div className="w-full flex flex-row justify-center items-center">
+                            {/* Combined Row: Images and Captions in columns */}
+                            <div className="w-full flex flex-row justify-center items-end">
                                 {rowItems.map(({ imgMeta, index }) => {
                                     const url = urls[imgMeta.id] || '';
                                     const widthRatio = imgMeta.widthRatio || 1;
                                     const caption = imgMeta.caption || '';
-                                    const effectiveWidthRatio = (imgMeta as any).effectiveWidthRatio || widthRatio;
                                     return (
                                         <div
-                                            key={`img-${index}`}
-                                            style={{ width: `${effectiveWidthRatio * 100}%` }}
-                                            className="flex flex-col items-center justify-center box-border"
+                                            key={`col-${index}`}
+                                            style={{ maxWidth: `${widthRatio * 100}%` }}
+                                            className="flex flex-col items-center justify-start box-border"
                                         >
-                                            <img
-                                                src={url}
-                                                alt={caption || `Figure sub ${index + 1}`}
-                                                className="max-w-full max-h-[800px] object-contain"
-                                            />
+                                            <div className="flex flex-col items-center justify-center w-fit">
+                                                <img
+                                                    src={url}
+                                                    alt={caption || `Figure sub ${index + 1}`}
+                                                    className="max-w-full max-h-[800px] object-contain"
+                                                />
+                                                {caption && (
+                                                    <div className="mt-2 text-sm text-center w-full">
+                                                        <span>
+                                                            {imagesMeta.length > 1 && `(${String.fromCharCode(97 + index)}) `}
+                                                            {caption}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}
                             </div>
-                            {/* Captions Row: Top Aligned */}
-                            {rowItems.some(({ imgMeta }) => imgMeta.caption) && (
-                                <div className="w-full flex flex-row justify-center items-start mt-2">
-                                    {rowItems.map(({ imgMeta, index }) => {
-                                        const widthRatio = imgMeta.widthRatio || 1;
-                                        const caption = imgMeta.caption || '';
-                                        const effectiveWidthRatio = (imgMeta as any).effectiveWidthRatio || widthRatio;
-                                        return (
-                                            <div
-                                                key={`cap-${index}`}
-                                                style={{ width: `${effectiveWidthRatio * 100}%` }}
-                                                className="flex flex-col items-center justify-start box-border text-sm text-center"
-                                            >
-                                                {caption && (
-                                                    <span>
-                                                        {imagesMeta.length > 1 && `(${String.fromCharCode(97 + index)}) `}
-                                                        {caption}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
                         </div>
                     );
                 })}

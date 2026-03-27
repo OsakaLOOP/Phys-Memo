@@ -197,42 +197,72 @@ export const dragDropImagePlugin = (field: ContentAtomField) => EditorView.domEv
 
         const atomFrom = insertText === '\n\n' ? insertPos + 1 : insertPos;
 
-        // Read files as blobs
-        const blobs: Record<string, Blob | ArrayBuffer> = {};
-        const imagesMeta = [];
-        for (let i = 0; i < files.length; i++) {
-            const uuid = genTempId();
-            blobs[uuid] = files[i];
-            imagesMeta.push({ id: uuid, widthRatio: 1, caption: '' });
-        }
+        // Read files as blobs asynchronously to get natural dimensions
+        const processFiles = async () => {
+            const blobs: Record<string, Blob | ArrayBuffer> = {};
+            const imagesMeta: any[] = [];
 
-        const contentJson = JSON.stringify({ images: imagesMeta });
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const uuid = genTempId();
+                blobs[uuid] = file;
 
-        // Insert newlines appropriately around the atom content
-        const beforeStr = insertPos > 0 && view.state.doc.sliceString(insertPos - 1, insertPos) !== '\n' ? '\n\n' : (insertPos > 0 && view.state.doc.sliceString(insertPos - 2, insertPos) !== '\n\n' ? '\n' : '');
-        const afterStr = insertPos < view.state.doc.length && view.state.doc.sliceString(insertPos, insertPos + 1) !== '\n' ? '\n\n' : (insertPos < view.state.doc.length && view.state.doc.sliceString(insertPos, insertPos + 2) !== '\n\n' ? '\n' : '');
+                // Read image dimensions
+                const img = new Image();
+                const objectUrl = URL.createObjectURL(file);
 
-        const insertTextModified = `${beforeStr}${contentJson}${afterStr}`;
-        const newAtomFrom = insertPos + beforeStr.length;
+                await new Promise<void>((resolve) => {
+                    img.onload = () => {
+                        imagesMeta.push({
+                            id: uuid,
+                            widthRatio: 1,
+                            caption: '',
+                            naturalWidth: img.naturalWidth,
+                            naturalHeight: img.naturalHeight
+                        });
+                        URL.revokeObjectURL(objectUrl);
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        // Fallback if image fails to load
+                        imagesMeta.push({ id: uuid, widthRatio: 1, caption: '' });
+                        URL.revokeObjectURL(objectUrl);
+                        resolve();
+                    };
+                    img.src = objectUrl;
+                });
+            }
 
-        // Use workspace actions to save blobs FIRST, before dispatching to CM,
-        // to avoid race conditions with the parallel state snapshot
-        const state = useWorkspaceStore.getState();
-        state.updateAtomBlobs(newId, blobs);
-        state.updateAtomContent(newId, contentJson);
-        state.updateAtomMeta(newId, { images: imagesMeta });
+            const contentJson = JSON.stringify({ images: imagesMeta });
 
-        // Dispatch CM changes to make space for the new block in UI state tracking
-        view.dispatch({
-            changes: { from: insertPos, to: insertPos, insert: insertTextModified },
-            effects: addAtomEffect.of({ id: newId, index: mappingIndex, insertPos: newAtomFrom, length: contentJson.length }),
-            annotations: Transaction.userEvent.of('add_atom')
-        });
+            // Insert newlines appropriately around the atom content
+            const beforeStr = insertPos > 0 && view.state.doc.sliceString(insertPos - 1, insertPos) !== '\n' ? '\n\n' : (insertPos > 0 && view.state.doc.sliceString(insertPos - 2, insertPos) !== '\n\n' ? '\n' : '');
+            const afterStr = insertPos < view.state.doc.length && view.state.doc.sliceString(insertPos, insertPos + 1) !== '\n' ? '\n\n' : (insertPos < view.state.doc.length && view.state.doc.sliceString(insertPos, insertPos + 2) !== '\n\n' ? '\n' : '');
 
-        setTimeout(() => {
-            state.setActiveEditor({ field, id: newId });
-        }, 50);
+            const insertTextModified = `${beforeStr}${contentJson}${afterStr}`;
+            const newAtomFrom = insertPos + beforeStr.length;
 
+            // Use workspace actions to save blobs FIRST, before dispatching to CM,
+            // to avoid race conditions with the parallel state snapshot
+            const state = useWorkspaceStore.getState();
+            state.updateAtomBlobs(newId, blobs);
+            state.updateAtomContent(newId, contentJson);
+            state.updateAtomMeta(newId, { images: imagesMeta });
+
+            // Dispatch CM changes to make space for the new block in UI state tracking
+            const { Transaction } = await import('@codemirror/state');
+            view.dispatch({
+                changes: { from: insertPos, to: insertPos, insert: insertTextModified },
+                effects: addAtomEffect.of({ id: newId, index: mappingIndex, insertPos: newAtomFrom, length: contentJson.length }),
+                annotations: Transaction.userEvent.of('add_atom')
+            });
+
+            setTimeout(() => {
+                useWorkspaceStore.getState().setActiveEditor({ field, id: newId });
+            }, 50);
+        };
+
+        processFiles();
         return true;
     }
 });

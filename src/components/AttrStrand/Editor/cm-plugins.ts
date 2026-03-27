@@ -638,8 +638,8 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
         const sideB = (b.dec as any).startSide ?? 0;
         return sideA - sideB;
     }).map(d => {
-        return d.dec.range(d.from); // for widget and line, to is the same as from, range(pos) is sufficient
-    }), true); // pass true to allow Decoration.set to sort them or handle existing sorted order, but our own sort handles the strict side rules.
+        return d.dec.range(d.from, d.to);
+    }), true);
 }
 
 export const blockDecorations = (field: ContentAtomField) => StateField.define<DecorationSet>({

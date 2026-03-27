@@ -12,6 +12,7 @@ interface ImageGroupEditorProps {
 
 export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta, onUpdateMeta, onUpdateBlobs }) => {
     const [urls, setUrls] = useState<Record<string, string>>({});
+    const [dimensions, setDimensions] = useState<Record<string, { w: number, h: number }>>({});
     const captionInputRef = useRef<HTMLInputElement>(null);
 
     // Convert array buffers/blobs to object URLs for preview
@@ -37,6 +38,23 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
             }
         }
         setUrls(objectUrls);
+
+        const dimMap: Record<string, { w: number, h: number }> = {};
+        let loaded = 0;
+        const total = Object.keys(objectUrls).length;
+        if (total === 0) return;
+
+        Object.entries(objectUrls).forEach(([id, url]) => {
+            const img = new Image();
+            img.onload = () => {
+                dimMap[id] = { w: img.naturalWidth, h: img.naturalHeight };
+                loaded++;
+                if (loaded === total) {
+                    setDimensions(prev => ({ ...prev, ...dimMap }));
+                }
+            };
+            img.src = url;
+        });
 
         return () => {
             Object.values(objectUrls).forEach(url => URL.revokeObjectURL(url));
@@ -161,8 +179,20 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
                 {(meta.images || []).map((imgMeta, index) => {
                     const url = urls[imgMeta.id] || '';
                     const widthRatio = imgMeta.widthRatio || 1;
-                    // base width 300px = ratio 1.0
-                    const pxWidth = Math.max(80, widthRatio * 300);
+
+                    const natW = imgMeta.naturalWidth || dimensions[imgMeta.id]?.w;
+                    const natH = imgMeta.naturalHeight || dimensions[imgMeta.id]?.h;
+
+                    let theoreticalPxWidth = widthRatio * 300;
+                    if (natW && natH) {
+                        // Max height in editor is 150px
+                        const maxPxWidth = 150 * (natW / natH);
+                        if (theoreticalPxWidth > maxPxWidth) {
+                            theoreticalPxWidth = maxPxWidth;
+                        }
+                    }
+
+                    const pxWidth = Math.max(80, theoreticalPxWidth);
 
                     return (
                         <div

@@ -8,6 +8,7 @@ interface ImageGroupViewerProps {
 
 export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta }) => {
     const [urls, setUrls] = useState<Record<string, string>>({});
+    const [dimensions, setDimensions] = useState<Record<string, { w: number, h: number }>>({});
     const [containerWidth, setContainerWidth] = useState<number>(800);
     const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -47,6 +48,24 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
         }
         setUrls(objectUrls);
 
+        // Calculate dimensions for legacy atoms that lack naturalWidth/Height
+        const dimMap: Record<string, { w: number, h: number }> = {};
+        let loaded = 0;
+        const total = Object.keys(objectUrls).length;
+        if (total === 0) return;
+
+        Object.entries(objectUrls).forEach(([id, url]) => {
+            const img = new Image();
+            img.onload = () => {
+                dimMap[id] = { w: img.naturalWidth, h: img.naturalHeight };
+                loaded++;
+                if (loaded === total) {
+                    setDimensions(prev => ({ ...prev, ...dimMap }));
+                }
+            };
+            img.src = url;
+        });
+
         return () => {
             Object.values(objectUrls).forEach(url => URL.revokeObjectURL(url));
         };
@@ -67,9 +86,12 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
         // Max container height is bounded to 800px. Container width is measured dynamically.
         // If image natural height requires scaling it down, we shrink the effective horizontal width ratio to tightly match bounds.
         let effectiveWidthRatio = img.widthRatio || 1;
-        if (img.naturalWidth && img.naturalHeight) {
+        const natW = img.naturalWidth || dimensions[img.id]?.w;
+        const natH = img.naturalHeight || dimensions[img.id]?.h;
+
+        if (natW && natH) {
             // maxRatio = 800(max height) / (containerWidth * (naturalHeight / naturalWidth))
-            const maxRatio = (800 / containerWidth) * (img.naturalWidth / img.naturalHeight);
+            const maxRatio = (800 / containerWidth) * (natW / natH);
             if (maxRatio < effectiveWidthRatio) {
                 effectiveWidthRatio = maxRatio;
             }

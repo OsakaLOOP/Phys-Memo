@@ -8,6 +8,21 @@ interface ImageGroupViewerProps {
 
 export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta }) => {
     const [urls, setUrls] = useState<Record<string, string>>({});
+    const [containerWidth, setContainerWidth] = useState<number>(800);
+    const containerRef = React.useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                if (entry.contentRect.width > 0) {
+                    setContainerWidth(entry.contentRect.width);
+                }
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
         const objectUrls: Record<string, string> = {};
@@ -49,13 +64,12 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
 
     imagesMeta.forEach(img => {
         // Calculate effective width ratio based on height limits to avoid horizontal whitespace
-        // Max container height is bounded to 800px. Standard container width is assumed ~800px.
+        // Max container height is bounded to 800px. Container width is measured dynamically.
         // If image natural height requires scaling it down, we shrink the effective horizontal width ratio to tightly match bounds.
         let effectiveWidthRatio = img.widthRatio || 1;
         if (img.naturalWidth && img.naturalHeight) {
-            // maxRatio = 800(max height) / (800(assumed width) * (naturalHeight / naturalWidth))
-            // Which simplifies to naturalWidth / naturalHeight
-            const maxRatio = img.naturalWidth / img.naturalHeight;
+            // maxRatio = 800(max height) / (containerWidth * (naturalHeight / naturalWidth))
+            const maxRatio = (800 / containerWidth) * (img.naturalWidth / img.naturalHeight);
             if (maxRatio < effectiveWidthRatio) {
                 effectiveWidthRatio = maxRatio;
             }
@@ -83,7 +97,7 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
 
     // LaTeX subfigure style rendering
     return (
-        <div className="w-full my-4 flex flex-col items-center justify-center font-serif text-slate-800 bg-white">
+        <div ref={containerRef} className="w-full my-4 flex flex-col items-center justify-center font-serif text-slate-800 bg-white">
             <div className="w-full flex flex-col gap-y-6">
                 {rows.map((row, rowIndex) => {
                     // Pre-calculate indices for this row

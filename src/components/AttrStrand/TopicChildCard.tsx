@@ -102,14 +102,23 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
                 </div>
 
                 {/* Core Atoms (Latex) */}
-                {edition.coreAtoms.length > 0 && (
-                  <div className="bg-slate-50 rounded border border-slate-100 px-3 py-2 overflow-x-auto pointer-events-none">
-                     {/* For read-only topic preview, directly render the first content to avoid store dependency */}
-                     <div className="text-xs">
-                        <RichTextRenderer content={edition.coreAtoms[0].content} />
-                     </div>
-                  </div>
-                )}
+                {(() => {
+                   const nonBinContents = edition.coreAtoms
+                      .filter(a => a.type !== 'bin')
+                      .map(a => a.content)
+                      .filter(Boolean);
+
+                   if (nonBinContents.length === 0) return null;
+
+                   return (
+                      <div className="bg-slate-50 rounded border border-slate-100 px-3 py-2 overflow-x-auto pointer-events-none">
+                         {/* For read-only topic preview, join all non-bin core atoms */}
+                         <div className="text-xs">
+                            <RichTextRenderer content={nonBinContents.join('\n\n')} />
+                         </div>
+                      </div>
+                   );
+                })()}
 
                 {/* Doc Atoms (Description) */}
                 {edition.docAtoms.length > 0 && (

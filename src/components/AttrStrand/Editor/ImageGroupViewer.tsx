@@ -48,16 +48,30 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
     let currentRowWidth = 0;
 
     imagesMeta.forEach(img => {
-        const width = img.widthRatio || 1;
-        if (currentRowWidth + width > 1.01) { // 1.01 to allow minor floating point errors
+        // Calculate effective width ratio based on height limits to avoid horizontal whitespace
+        // Max container height is bounded to 600px. Standard container width is assumed ~800px.
+        // If image natural height requires scaling it down, we shrink the effective horizontal width ratio to tightly match bounds.
+        let effectiveWidthRatio = img.widthRatio || 1;
+        if (img.naturalWidth && img.naturalHeight) {
+            // maxRatio = 600 / (800 * (naturalHeight / naturalWidth))
+            const maxRatio = (600 / 800) * (img.naturalWidth / img.naturalHeight);
+            if (maxRatio < effectiveWidthRatio) {
+                effectiveWidthRatio = maxRatio;
+            }
+        }
+
+        // Save the computed effective ratio for rendering
+        const processedImg = { ...img, effectiveWidthRatio };
+
+        if (currentRowWidth + effectiveWidthRatio > 1.01) { // 1.01 to allow minor floating point errors
             if (currentRow.length > 0) {
                 rows.push(currentRow);
             }
-            currentRow = [img];
-            currentRowWidth = width;
+            currentRow = [processedImg];
+            currentRowWidth = effectiveWidthRatio;
         } else {
-            currentRow.push(img);
-            currentRowWidth += width;
+            currentRow.push(processedImg);
+            currentRowWidth += effectiveWidthRatio;
         }
     });
     if (currentRow.length > 0) {
@@ -87,10 +101,11 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                                     const url = urls[imgMeta.id] || '';
                                     const widthRatio = imgMeta.widthRatio || 1;
                                     const caption = imgMeta.caption || '';
+                                    const effectiveWidthRatio = (imgMeta as any).effectiveWidthRatio || widthRatio;
                                     return (
                                         <div
                                             key={`img-${index}`}
-                                            style={{ width: `${widthRatio * 100}%` }}
+                                            style={{ width: `${effectiveWidthRatio * 100}%` }}
                                             className="flex flex-col items-center justify-center box-border"
                                         >
                                             <img
@@ -108,10 +123,11 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                                     {rowItems.map(({ imgMeta, index }) => {
                                         const widthRatio = imgMeta.widthRatio || 1;
                                         const caption = imgMeta.caption || '';
+                                        const effectiveWidthRatio = (imgMeta as any).effectiveWidthRatio || widthRatio;
                                         return (
                                             <div
                                                 key={`cap-${index}`}
-                                                style={{ width: `${widthRatio * 100}%` }}
+                                                style={{ width: `${effectiveWidthRatio * 100}%` }}
                                                 className="flex flex-col items-center justify-start box-border text-sm text-center"
                                             >
                                                 {caption && (

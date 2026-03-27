@@ -17,6 +17,8 @@ export interface BinAtomMeta {
         id: string;
         caption?: string;
         widthRatio: number;
+        naturalWidth?: number;
+        naturalHeight?: number;
     }>;
 }
 

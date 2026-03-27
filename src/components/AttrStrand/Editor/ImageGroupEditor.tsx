@@ -245,15 +245,44 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
                         const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
                         if (files.length === 0) return;
 
-                        const newBlobs = { ...blobs };
-                        const newImages = [...(meta.images || [])];
-                        for (let i = 0; i < files.length; i++) {
-                            const uuid = genTempId();
-                            newBlobs[uuid] = files[i];
-                            newImages.push({ id: uuid, widthRatio: 1, caption: '' });
-                        }
-                        onUpdateBlobs(newBlobs);
-                        onUpdateMeta({ ...meta, images: newImages });
+                        const processDroppedFiles = async () => {
+                            const newBlobs = { ...blobs };
+                            const newImages = [...(meta.images || [])];
+
+                            for (let i = 0; i < files.length; i++) {
+                                const file = files[i];
+                                const uuid = genTempId();
+                                newBlobs[uuid] = file;
+
+                                const img = new Image();
+                                const objectUrl = URL.createObjectURL(file);
+
+                                await new Promise<void>((resolve) => {
+                                    img.onload = () => {
+                                        newImages.push({
+                                            id: uuid,
+                                            widthRatio: 1,
+                                            caption: '',
+                                            naturalWidth: img.naturalWidth,
+                                            naturalHeight: img.naturalHeight
+                                        });
+                                        URL.revokeObjectURL(objectUrl);
+                                        resolve();
+                                    };
+                                    img.onerror = () => {
+                                        newImages.push({ id: uuid, widthRatio: 1, caption: '' });
+                                        URL.revokeObjectURL(objectUrl);
+                                        resolve();
+                                    };
+                                    img.src = objectUrl;
+                                });
+                            }
+
+                            onUpdateBlobs(newBlobs);
+                            onUpdateMeta({ ...meta, images: newImages });
+                        };
+
+                        processDroppedFiles();
                     }}
                 >
                     <div className="flex flex-col items-center">

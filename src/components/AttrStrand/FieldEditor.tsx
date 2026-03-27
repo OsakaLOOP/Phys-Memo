@@ -246,7 +246,7 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                                 {/* 块内容与左侧边框 */}
                                 <div className="py-2">
                                     {atom?.type === 'bin' ? (
-                                        <div className="pl-0 group-hover/block:bg-slate-50/50 transition-colors max-h-[800px] overflow-hidden relative">
+                                        <div className="pl-0 group-hover/block:bg-slate-50/50 transition-colors relative rounded-lg">
                                             {(() => {
                                                 let meta = {};
                                                 try {
@@ -259,8 +259,6 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                                                     meta={meta}
                                                 />;
                                             })()}
-                                            {/* Add a fade to indicate it can be expanded/edited if it's very tall */}
-                                            <div className="absolute inset-0 hover:bg-black/5 transition-colors pointer-events-none rounded-lg" />
                                         </div>
                                     ) : (
                                         <div className="pl-3 border-l-[3px] border-slate-200 group-hover/block:border-indigo-300 transition-colors">

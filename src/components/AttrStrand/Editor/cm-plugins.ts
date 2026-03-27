@@ -22,7 +22,7 @@ export interface AtomMapping {
 
 // 状态机和 Effect
 export const setAtomMapEffect = StateEffect.define<AtomMapping[]>();
-export const addAtomEffect = StateEffect.define<{ id: string, index: number, insertPos: number }>();
+export const addAtomEffect = StateEffect.define<{ id: string, index: number, insertPos: number, length?: number }>();
 export const removeAtomEffect = StateEffect.define<{ id: string }>();
 export const swapAtomEffect = StateEffect.define<{ indexA: number, indexB: number }>();
 
@@ -225,7 +225,7 @@ export const dragDropImagePlugin = (field: ContentAtomField) => EditorView.domEv
         // Dispatch CM changes to make space for the new block in UI state tracking
         view.dispatch({
             changes: { from: insertPos, to: insertPos, insert: insertTextModified },
-            effects: addAtomEffect.of({ id: newId, index: mappingIndex, insertPos: newAtomFrom }),
+            effects: addAtomEffect.of({ id: newId, index: mappingIndex, insertPos: newAtomFrom, length: contentJson.length }),
             annotations: Transaction.userEvent.of('add_atom')
         });
 
@@ -293,8 +293,8 @@ export const atomMapField = StateField.define<AtomMapping[]>({
             }
             else if (e.is(addAtomEffect)) 
             {
-                const { id, index, insertPos } = e.value;
-                const newMapping: AtomMapping = { id, from: insertPos, to: insertPos };
+                const { id, index, insertPos, length = 0 } = e.value;
+                const newMapping: AtomMapping = { id, from: insertPos, to: insertPos + length };
                 if (index === -1) {
                     nextMappings.unshift(newMapping);
                 } else if (index >= 0) {
@@ -557,14 +557,17 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
     for (const m of mappings) {
         const atom = atomsData[m.id] || fallbackData[m.id];
         if (atom && atom.type === 'bin') {
-            // If it's a binary atom, we replace its entire content range with a widget
+            // Expand the replacement range slightly to hide leading/trailing blank lines associated purely with this bin atom
+            // We want the block widget to sit exactly where the atom's text is, replacing the entire chunk including the `\n` if possible,
+            // but we must not overlap with adjacent atoms. Using `m.from` to `m.to` is technically correct, but if there's text,
+            // we must replace strictly that. `inclusive: true` helps, but we don't need to overcomplicate.
             decorations.push({
                 from: m.from,
                 to: m.to,
                 dec: Decoration.replace({
                     widget: new BinaryAtomWidget(m.id),
                     block: true, // replace as a block widget
-                    inclusive: true
+                    inclusive: false // Use false so adjacent insertions don't get swallowed into the widget
                 })
             });
         }

@@ -49,12 +49,13 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
 
     imagesMeta.forEach(img => {
         // Calculate effective width ratio based on height limits to avoid horizontal whitespace
-        // Max container height is bounded to 600px. Standard container width is assumed ~800px.
+        // Max container height is bounded to 800px. Standard container width is assumed ~800px.
         // If image natural height requires scaling it down, we shrink the effective horizontal width ratio to tightly match bounds.
         let effectiveWidthRatio = img.widthRatio || 1;
         if (img.naturalWidth && img.naturalHeight) {
-            // maxRatio = 600 / (800 * (naturalHeight / naturalWidth))
-            const maxRatio = (600 / 800) * (img.naturalWidth / img.naturalHeight);
+            // maxRatio = 800(max height) / (800(assumed width) * (naturalHeight / naturalWidth))
+            // Which simplifies to naturalWidth / naturalHeight
+            const maxRatio = img.naturalWidth / img.naturalHeight;
             if (maxRatio < effectiveWidthRatio) {
                 effectiveWidthRatio = maxRatio;
             }
@@ -111,7 +112,7 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                                             <img
                                                 src={url}
                                                 alt={caption || `Figure sub ${index + 1}`}
-                                                className="max-w-full max-h-[600px] object-contain"
+                                                className="max-w-full max-h-[800px] object-contain"
                                             />
                                         </div>
                                     );

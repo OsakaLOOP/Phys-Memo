@@ -95,15 +95,20 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
         e.preventDefault();
         e.stopPropagation();
 
-        const blobs = files.map(f => f);
+        const newBlobs: Record<string, Blob | ArrayBuffer> = {};
+        const newImages = files.map(f => {
+            const uuid = crypto.randomUUID().replace(/-/g, '');
+            newBlobs[uuid] = f;
+            return { id: uuid, widthRatio: 1, caption: '' };
+        });
+
         const newId = genTempId();
         addAtomId(field, newId, targetIndex);
 
         const state = useWorkspaceStore.getState();
-        state.updateAtomBlobs(newId, blobs);
-        state.updateAtomMeta(newId, {
-            images: blobs.map((_, i) => ({ id: `img_${i}`, widthRatio: 1, caption: '' }))
-        });
+        state.updateAtomBlobs(newId, newBlobs);
+        state.updateAtomContent(newId, JSON.stringify({ images: newImages }));
+        // Note: we can still call updateAtomMeta if needed, but the actual data is now in content.
 
         // Let it stay in read-only or open editor, here we open editor
         setActiveEditor({ field, id: newId });
@@ -240,10 +245,15 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                                 <div className="py-2">
                                     <div className="pl-3 border-l-[3px] border-slate-200 group-hover/block:border-indigo-300 transition-colors">
                                         {atom?.type === 'bin' ? (
-                                            <ImageGroupViewer
-                                                blobs={atom.blobs || []}
-                                                meta={atom.frontMeta as any}
-                                            />
+                                            <div onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveEditor({ field, id });
+                                            }} className="cursor-pointer">
+                                                <ImageGroupViewer
+                                                    blobs={atom.blobs || {}}
+                                                    meta={content ? (() => { try { return JSON.parse(content); } catch { return { images: [] }; } })() : { images: [] }}
+                                                />
+                                            </div>
                                         ) : (
                                             <RichTextRenderer content={content} enableAnalysis={true} />
                                         )}

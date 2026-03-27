@@ -8,7 +8,7 @@ import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@cod
 
 import type { ContentAtomField, DraftId } from '../../../attrstrand/types';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
-import { atomMapField, blockDecorations, setAtomMapEffect, addAtomEffect, removeAtomEffect, swapAtomEffect, syncAndSnapshotPlugin, blockActionGutter, strictMappingEditFilter, copyFormatterPlugin, dragDropImagePlugin, crossMappingSelectionPlugin } from './cm-plugins';
+import { widgetReplacementsPlugin, atomMapField, blockDecorations, setAtomMapEffect, addAtomEffect, removeAtomEffect, swapAtomEffect, syncAndSnapshotPlugin, blockActionGutter, strictMappingEditFilter, copyFormatterPlugin, dragDropImagePlugin, crossMappingSelectionPlugin } from './cm-plugins';
 import type { AtomMapping, EditorSnapshot } from './cm-plugins';
 import { lintGutter } from '@codemirror/lint';
 import { atomBoundaryLinter } from './cm-lint';
@@ -115,6 +115,7 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                     return inverted;
                 }),
                 blockDecorations(field),
+                widgetReplacementsPlugin(field),
                 blockActionGutter, // 预留的左侧操作区和拖拽手柄
                 // Linting 插件
                 lintGutter(),

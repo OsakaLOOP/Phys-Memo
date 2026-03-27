@@ -225,12 +225,44 @@ export class AttrStrandCore {
                 const atomIds: hash[] = [];
                 for (const sub of atoms) {
                     let contentHash: string;
-                    if (sub.type === 'bin' && sub.blobs && sub.blobs.length > 0) {
-                        contentHash = await generateBinaryHash(sub.blobs);
-                    } else {
-                        contentHash = await generateContentHash(sub.contentPayload);
+                    let processedContentPayload = sub.contentPayload;
+                    let processedBlobs = sub.blobs;
+
+                    if (sub.type === 'bin') {
+                        let parsedMeta: any = { images: [] };
+                        if (sub.contentPayload) {
+                            try {
+                                parsedMeta = JSON.parse(sub.contentPayload);
+                            } catch (e) {
+                                // ignore
+                            }
+                        }
+
+                        const newBlobs: Record<string, Blob | ArrayBuffer> = {};
+
+                        if (sub.blobs) {
+                            for (const [id, blob] of Object.entries(sub.blobs)) {
+                                const hash = await generateBinaryHash(blob);
+                                newBlobs[hash] = blob;
+
+                                // Replace uuid with hash in meta
+                                if (parsedMeta.images) {
+                                    for (const img of parsedMeta.images) {
+                                        if (img.id === id) {
+                                            img.id = hash;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Deterministically stringify JSON
+                        processedContentPayload = JSON.stringify(parsedMeta);
+                        processedBlobs = newBlobs;
                     }
-                    const contentSimHash = sub.type === 'bin' ? null : await simhash(sub.contentPayload);
+
+                    contentHash = await generateContentHash(processedContentPayload);
+                    const contentSimHash = sub.type === 'bin' ? null : await simhash(processedContentPayload);
 
                     let prevAtom: IContentAtom | null = null;
                     if (sub.derivedFromId) {
@@ -249,7 +281,7 @@ export class AttrStrandCore {
                     let diffRetained: number | undefined;
 
                     if (prevAtom) {
-                        const diffStats = calculateDiffStats(prevAtom.content, sub.contentPayload);
+                        const diffStats = calculateDiffStats(prevAtom.content, processedContentPayload);
                         diffAdded = diffStats.added;
                         diffDeleted = diffStats.deleted;
                         diffRetained = diffStats.retained;
@@ -259,7 +291,7 @@ export class AttrStrandCore {
 
                         attr = this.calculateAttribution(prevAtom.attr, retainedWeight, creatorId);
                     } else {
-                        diffAdded = sub.contentPayload.length;
+                        diffAdded = processedContentPayload.length;
                         diffDeleted = 0;
                         diffRetained = 0;
                     }
@@ -282,8 +314,8 @@ export class AttrStrandCore {
                             id: atomId,
                             field,
                             type: sub.type,
-                            content: sub.contentPayload,
-                            blobs: sub.blobs,
+                            content: processedContentPayload,
+                            blobs: processedBlobs,
                             contentHash,
                             contentSimHash,
                             diffAdded,
@@ -389,7 +421,7 @@ export class AttrStrandCore {
 
     // 备用函数: 接受文件 api 和其他必要的 atom 元数据，将二进制流存入 atom，type 为 'bin'
     async saveBinaryAtom(
-        blobs: (Blob | ArrayBuffer)[],
+        blob: Blob | ArrayBuffer,
         fileName: string,
         field: ContentAtomField,
         creatorId: string,
@@ -397,9 +429,11 @@ export class AttrStrandCore {
         frontMeta: Meta = {}
     ): Promise<IContentAtom> {
         // 仅根据文件内容计算 hash
-        const contentHash = await generateBinaryHash(blobs);
+        const contentHash = await generateBinaryHash(blob);
         const contentPayload = fileName; // content 仅保存文件名
         const contentSimHash = null;
+
+        const blobs: Record<string, Blob | ArrayBuffer> = { [contentHash]: blob };
 
         const attr: ContentAtomAttr = { [creatorId]: 1 };
 

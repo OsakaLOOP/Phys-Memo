@@ -2,15 +2,19 @@ import React, { useEffect, useState } from 'react';
 import type { BinAtomMeta } from '../../../attrstrand/types';
 
 interface ImageGroupViewerProps {
-    blobs: (Blob | ArrayBuffer)[];
+    blobs: Record<string, Blob | ArrayBuffer>;
     meta: BinAtomMeta;
 }
 
 export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta }) => {
     const [urls, setUrls] = useState<string[]>([]);
 
+    const imagesMeta = meta.images || [];
+
     useEffect(() => {
-        const objectUrls = blobs.map(blob => {
+        const objectUrls = imagesMeta.map(img => {
+            const blob = blobs && blobs[img.id];
+            if (!blob) return '';
             if (blob instanceof Blob) {
                 return URL.createObjectURL(blob);
             } else {
@@ -20,19 +24,20 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
         setUrls(objectUrls);
 
         return () => {
-            objectUrls.forEach(url => URL.revokeObjectURL(url));
+            objectUrls.forEach(url => {
+                if (url) URL.revokeObjectURL(url);
+            });
         };
-    }, [blobs]);
+    }, [blobs, imagesMeta]);
 
-    if (!blobs || blobs.length === 0) return null;
-
-    const imagesMeta = meta.images || [];
+    if (!blobs || Object.keys(blobs).length === 0 || imagesMeta.length === 0) return null;
 
     // LaTeX subfigure style rendering
     return (
-        <div className="w-full my-4 flex flex-col items-center justify-center font-serif text-slate-800">
+        <div className="w-full flex flex-col items-center justify-center font-serif text-slate-800">
             <div className="w-full flex flex-row flex-wrap justify-center items-end gap-y-6">
                 {urls.map((url, index) => {
+                    if (!url) return null;
                     // Fallback to 1 if not specified
                     const widthRatio = imagesMeta[index]?.widthRatio || 1;
                     const caption = imagesMeta[index]?.caption || '';

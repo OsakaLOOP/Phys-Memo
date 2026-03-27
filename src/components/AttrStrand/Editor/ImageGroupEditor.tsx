@@ -155,7 +155,7 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
             {/* Scrollable Horizontal Images Container */}
             <div
                 ref={containerRef}
-                className="flex flex-row overflow-x-auto gap-4 pb-4 items-end whitespace-nowrap scrollbar-thin scrollbar-thumb-indigo-200 scrollbar-track-transparent"
+                className="flex flex-row overflow-x-auto gap-4 pb-4 items-end whitespace-nowrap scrollbar-thin scrollbar-thumb-indigo-200 scrollbar-track-transparent max-w-full"
                 style={{ minHeight: '200px' }}
             >
                 {(meta.images || []).map((imgMeta, index) => {
@@ -175,12 +175,12 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
                             style={{ width: pxWidth, minWidth: '80px' }}
                         >
                             {/* Drag Handle Top */}
-                            <div className="absolute top-0 left-0 right-0 h-6 bg-slate-100 flex items-center justify-center cursor-grab active:cursor-grabbing rounded-t opacity-0 hover:opacity-100 transition-opacity">
+                            <div className="absolute top-0 left-0 right-0 h-6 bg-slate-100 flex items-center justify-center cursor-grab active:cursor-grabbing rounded-t opacity-0 hover:opacity-100 transition-opacity z-10">
                                 <GripHorizontal size={14} className="text-slate-400" />
                             </div>
 
                             {/* Image Preview */}
-                            <div className="w-full flex-1 flex items-center justify-center p-2 mt-4 pointer-events-none">
+                            <div className="w-full flex-1 flex items-center justify-center pointer-events-none">
                                 <img src={url} alt={`Preview ${index}`} className="max-w-full max-h-[150px] object-contain select-none" />
                             </div>
 
@@ -223,7 +223,7 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
                                 value={imgMeta.caption || ''}
                                 onChange={(e) => handleImageCaptionChange(index, e.target.value)}
                                 placeholder="子图注..."
-                                className="w-full text-xs text-center border-t border-slate-100 p-1 outline-none focus:bg-indigo-50"
+                                className="w-full text-xs text-center border-t border-slate-100 p-1 outline-none focus:bg-indigo-50 box-border"
                                 onMouseDown={(e) => e.stopPropagation()} // prevent drag on text select
                             />
                         </div>

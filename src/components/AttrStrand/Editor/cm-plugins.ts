@@ -287,9 +287,11 @@ export const atomMapField = StateField.define<AtomMapping[]>({
 
         // 处理结构性操作 Effects
         for (const e of tr.effects) {
+            
             if (e.is(setAtomMapEffect)) {
                 nextMappings = e.value; // 全量覆盖
                 skipMapPos = true;
+                console.log(nextMappings)
             }
             else if (e.is(addAtomEffect)) 
             {
@@ -302,7 +304,6 @@ export const atomMapField = StateField.define<AtomMapping[]>({
                 } else {
                     nextMappings.push(newMapping);
                 }
-                console.log(newMapping)
                 newAddedIds.add(id);
             }
             else if (e.is(removeAtomEffect))
@@ -350,9 +351,8 @@ export const atomMapField = StateField.define<AtomMapping[]>({
 
                 return { ...m, from: newFrom, to: newTo };
             });
-            console.log(nextMappings)
         }
-
+        console.log(nextMappings)
         return nextMappings;
     }
 });
@@ -553,10 +553,12 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
     const store = useWorkspaceStore.getState();
     const atomsData = store.cmDraftAtomsData;
     const fallbackData = store.draftAtomsData;
-
+    
     for (const m of mappings) {
+        console.log(m,(atomsData[m.id] || fallbackData[m.id]).type)
         const atom = atomsData[m.id] || fallbackData[m.id];
         if (atom && atom.type === 'bin') {
+            console.log(`trying bin ${m.from} ${m.to}`)
             // Expand the replacement range slightly to hide leading/trailing blank lines associated purely with this bin atom
             // We want the block widget to sit exactly where the atom's text is, replacing the entire chunk including the `\n` if possible,
             // but we must not overlap with adjacent atoms. Using `m.from` to `m.to` is technically correct, but if there's text,

@@ -245,16 +245,28 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
 
                                 {/* 块内容与左侧边框 */}
                                 <div className="py-2">
-                                    <div className="pl-3 border-l-[3px] border-slate-200 group-hover/block:border-indigo-300 transition-colors">
-                                        {atom?.type === 'bin' ? (
-                                            <ImageGroupViewer
-                                                blobs={atom.blobs || []}
-                                                meta={atom.frontMeta as any}
-                                            />
-                                        ) : (
+                                    {atom?.type === 'bin' ? (
+                                        <div className="pl-0 group-hover/block:bg-slate-50/50 transition-colors max-h-[800px] overflow-hidden relative">
+                                            {(() => {
+                                                let meta = {};
+                                                try {
+                                                    meta = JSON.parse(atom.content || '{}');
+                                                } catch (e) {
+                                                    // Fallback
+                                                }
+                                                return <ImageGroupViewer
+                                                    blobs={atom.blobs || {}}
+                                                    meta={meta}
+                                                />;
+                                            })()}
+                                            {/* Add a fade to indicate it can be expanded/edited if it's very tall */}
+                                            <div className="absolute inset-0 hover:bg-black/5 transition-colors pointer-events-none rounded-lg" />
+                                        </div>
+                                    ) : (
+                                        <div className="pl-3 border-l-[3px] border-slate-200 group-hover/block:border-indigo-300 transition-colors">
                                             <RichTextRenderer content={content} enableAnalysis={true} />
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* 块版权信息浮窗 (非编辑状态悬浮) */}

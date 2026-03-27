@@ -176,7 +176,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         id: a.id,
                         field: a.field,
                         type: a.type,
-                        content: rawContent.trim(),
+                        content: a.type === 'bin' ? rawContent : rawContent.trim(),
+                        blobs: a.blobs, // 包含 blobs 以便 bin 类型 Atom 显示图像
                         creatorId: a.creatorId,
                         derivedFromId: a.id, // 加载原有 Atom 的继承.
                         frontMeta: a.frontMeta || {},

@@ -4,37 +4,87 @@ import type { Root } from 'react-dom/client';
 import { WidgetType } from '@codemirror/view';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
 import { ImageGroupEditor } from './ImageGroupEditor';
+import { ImageGroupViewer } from './ImageGroupViewer';
+import { EditorView } from '@codemirror/view';
 
 const BinaryAtomEditorWrapper: React.FC<{ atomId: string }> = ({ atomId }) => {
     // We subscribe to the PARALLEL state since we are inside CM.
     const atom = useWorkspaceStore(state => state.cmDraftAtomsData[atomId] || state.draftAtomsData[atomId]);
+    const [isFocused, setIsFocused] = React.useState(false);
+
+    // We can't cleanly get EditorView from the widget without architectural changes.
+    // Instead of intercepting CM selections, we'll let this be an interactive block that just stays focused while we click in it.
+    // We handle blur to exit edit mode if we click outside.
+    const containerRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        const handleDocClick = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsFocused(false);
+            }
+        };
+        document.addEventListener('mousedown', handleDocClick);
+        return () => {
+            document.removeEventListener('mousedown', handleDocClick);
+        };
+    }, []);
 
     if (!atom || atom.type !== 'bin') return null;
 
+    // Parse meta from content JSON
+    let meta = {};
+    try {
+        meta = JSON.parse(atom.content || '{}');
+    } catch (e) {
+        // Fallback
+    }
+
     return (
-        <div className="my-2 ml-4 mr-2 cm-binary-atom-container pointer-events-auto select-auto" onMouseDown={(e) => e.stopPropagation()}>
-            <ImageGroupEditor
-                blobs={atom.blobs || []}
-                meta={atom.frontMeta as any}
-                onUpdateMeta={(newMeta) => {
-                    useWorkspaceStore.getState().updateAtomMeta(atomId, newMeta);
-                    const currentParallel = useWorkspaceStore.getState().cmDraftAtomsData;
-                    const fieldList = useWorkspaceStore.getState().cmDraftAtomLists[atom.field];
-                    useWorkspaceStore.getState().syncCMToParallelState(atom.field, fieldList, {
-                        ...currentParallel,
-                        [atomId]: { ...currentParallel[atomId], frontMeta: newMeta as any }
-                    });
-                }}
-                onUpdateBlobs={(newBlobs) => {
-                    useWorkspaceStore.getState().updateAtomBlobs(atomId, newBlobs);
-                    const currentParallel = useWorkspaceStore.getState().cmDraftAtomsData;
-                    const fieldList = useWorkspaceStore.getState().cmDraftAtomLists[atom.field];
-                    useWorkspaceStore.getState().syncCMToParallelState(atom.field, fieldList, {
-                        ...currentParallel,
-                        [atomId]: { ...currentParallel[atomId], blobs: newBlobs } as any
-                    });
-                }}
-            />
+        <div
+            ref={containerRef}
+            className="my-2 ml-4 mr-2 cm-binary-atom-container pointer-events-auto select-auto border-2 border-transparent transition-all hover:border-indigo-100 rounded-lg"
+            onMouseDown={(e) => {
+                e.stopPropagation();
+                if (!isFocused) {
+                    setIsFocused(true);
+                }
+            }}
+        >
+            {isFocused ? (
+                <ImageGroupEditor
+                    blobs={atom.blobs || {}}
+                    meta={meta}
+                    onUpdateMeta={(newMeta) => {
+                        const newContent = JSON.stringify(newMeta);
+
+                        useWorkspaceStore.getState().updateAtomMeta(atomId, newMeta);
+                        const currentParallel = useWorkspaceStore.getState().cmDraftAtomsData;
+                        const fieldList = useWorkspaceStore.getState().cmDraftAtomLists[atom.field];
+                        useWorkspaceStore.getState().syncCMToParallelState(atom.field, fieldList, {
+                            ...currentParallel,
+                            [atomId]: { ...currentParallel[atomId], content: newContent }
+                        });
+
+                        // We do not directly mutate CM from here anymore as that was causing crashes.
+                        // The parallel state update ensures the UI is correct. CM's syncAndSnapshotPlugin
+                        // handles sync when necessary, or we ignore the native undo/redo for this bin atom's JSON text
+                        // and just rely on workspace state if it doesn't hook into CM history smoothly.
+                    }}
+                    onUpdateBlobs={(newBlobs) => {
+                        useWorkspaceStore.getState().updateAtomBlobs(atomId, newBlobs);
+                        const currentParallel = useWorkspaceStore.getState().cmDraftAtomsData;
+                        const fieldList = useWorkspaceStore.getState().cmDraftAtomLists[atom.field];
+                        useWorkspaceStore.getState().syncCMToParallelState(atom.field, fieldList, {
+                            ...currentParallel,
+                            [atomId]: { ...currentParallel[atomId], blobs: newBlobs } as any
+                        });
+                    }}
+                />
+            ) : (
+                <div className="p-4 bg-slate-50/50 rounded-lg cursor-pointer">
+                    <ImageGroupViewer blobs={atom.blobs || {}} meta={meta} />
+                </div>
+            )}
         </div>
     );
 };

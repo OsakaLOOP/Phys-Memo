@@ -2,40 +2,53 @@ import React, { useEffect, useState } from 'react';
 import type { BinAtomMeta } from '../../../attrstrand/types';
 
 interface ImageGroupViewerProps {
-    blobs: (Blob | ArrayBuffer)[];
+    blobs: Record<string, Blob | ArrayBuffer>;
     meta: BinAtomMeta;
 }
 
 export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta }) => {
-    const [urls, setUrls] = useState<string[]>([]);
+    const [urls, setUrls] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        const objectUrls = blobs.map(blob => {
-            if (blob instanceof Blob) {
-                return URL.createObjectURL(blob);
-            } else {
-                return URL.createObjectURL(new Blob([blob]));
+        const objectUrls: Record<string, string> = {};
+        if (Array.isArray(blobs)) {
+            // Backward compatibility for old atoms where blobs is an array
+            blobs.forEach((blob, index) => {
+                const id = meta.images?.[index]?.id || `img_${index}`;
+                if (blob instanceof Blob) {
+                    objectUrls[id] = URL.createObjectURL(blob);
+                } else {
+                    objectUrls[id] = URL.createObjectURL(new Blob([blob]));
+                }
+            });
+        } else {
+            for (const [id, blob] of Object.entries(blobs)) {
+                if (blob instanceof Blob) {
+                    objectUrls[id] = URL.createObjectURL(blob);
+                } else {
+                    objectUrls[id] = URL.createObjectURL(new Blob([blob]));
+                }
             }
-        });
+        }
         setUrls(objectUrls);
 
         return () => {
-            objectUrls.forEach(url => URL.revokeObjectURL(url));
+            Object.values(objectUrls).forEach(url => URL.revokeObjectURL(url));
         };
-    }, [blobs]);
+    }, [blobs, meta]);
 
-    if (!blobs || blobs.length === 0) return null;
+    if (!blobs || Object.keys(blobs).length === 0) return null;
 
     const imagesMeta = meta.images || [];
 
     // LaTeX subfigure style rendering
     return (
-        <div className="w-full my-4 flex flex-col items-center justify-center font-serif text-slate-800">
+        <div className="w-full my-4 flex flex-col items-center justify-center font-serif text-slate-800 bg-white">
             <div className="w-full flex flex-row flex-wrap justify-center items-end gap-y-6">
-                {urls.map((url, index) => {
-                    // Fallback to 1 if not specified
-                    const widthRatio = imagesMeta[index]?.widthRatio || 1;
-                    const caption = imagesMeta[index]?.caption || '';
+                {imagesMeta.map((imgMeta, index) => {
+                    const url = urls[imgMeta.id] || '';
+                    const widthRatio = imgMeta?.widthRatio || 1;
+                    const caption = imgMeta?.caption || '';
 
                     return (
                         <div

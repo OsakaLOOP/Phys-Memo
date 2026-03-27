@@ -146,20 +146,27 @@ export async function generateContentHash(content: string): Promise<string> {
         return await sha256(content);
 }
 
-export async function generateBinaryHash(blobs: (Blob | ArrayBuffer)[]): Promise<string> {
-    const buffers = await Promise.all(
-        blobs.map(blob => blob instanceof Blob ? blob.arrayBuffer() : Promise.resolve(blob))
-    );
-    const totalLength = buffers.reduce((acc, buf) => acc + buf.byteLength, 0);
-    const combinedBuffer = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const buf of buffers) {
-        combinedBuffer.set(new Uint8Array(buf), offset);
-        offset += buf.byteLength;
-    }
-    const hashBuffer = await crypto.subtle.digest('SHA-256', combinedBuffer);
+export async function generateBinaryBlobHash(blob: Blob | ArrayBuffer): Promise<string> {
+    const buffer = blob instanceof Blob ? await blob.arrayBuffer() : blob;
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function generateBinaryHash(contentJson: string, blobs: Record<string, Blob | ArrayBuffer>): Promise<string> {
+    const blobHashes: Record<string, string> = {};
+    for (const [key, blob] of Object.entries(blobs)) {
+        blobHashes[key] = await generateBinaryBlobHash(blob);
+    }
+
+    let parsedContent = {};
+    try {
+        parsedContent = JSON.parse(contentJson);
+    } catch (e) {
+        // Fallback
+    }
+    const payload = deterministicStringify({ content: parsedContent, blobHashes });
+    return await sha256(payload);
 }
 
 export function calculateDiffStats(oldText: string, newText: string): { added: number, deleted: number, retained: number } {

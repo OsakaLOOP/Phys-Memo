@@ -225,8 +225,8 @@ export class AttrStrandCore {
                 const atomIds: hash[] = [];
                 for (const sub of atoms) {
                     let contentHash: string;
-                    if (sub.type === 'bin' && sub.blobs && sub.blobs.length > 0) {
-                        contentHash = await generateBinaryHash(sub.blobs);
+                    if (sub.type === 'bin' && sub.blobs) {
+                        contentHash = await generateBinaryHash(sub.contentPayload, sub.blobs);
                     } else {
                         contentHash = await generateContentHash(sub.contentPayload);
                     }
@@ -389,7 +389,7 @@ export class AttrStrandCore {
 
     // 备用函数: 接受文件 api 和其他必要的 atom 元数据，将二进制流存入 atom，type 为 'bin'
     async saveBinaryAtom(
-        blobs: (Blob | ArrayBuffer)[],
+        blobs: Record<string, Blob | ArrayBuffer>,
         fileName: string,
         field: ContentAtomField,
         creatorId: string,
@@ -397,8 +397,8 @@ export class AttrStrandCore {
         frontMeta: Meta = {}
     ): Promise<IContentAtom> {
         // 仅根据文件内容计算 hash
-        const contentHash = await generateBinaryHash(blobs);
         const contentPayload = fileName; // content 仅保存文件名
+        const contentHash = await generateBinaryHash(contentPayload, blobs);
         const contentSimHash = null;
 
         const attr: ContentAtomAttr = { [creatorId]: 1 };

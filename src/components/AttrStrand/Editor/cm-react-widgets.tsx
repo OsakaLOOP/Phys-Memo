@@ -44,20 +44,42 @@ const BinaryAtomEditorWrapper: React.FC<{ atomId: string }> = ({ atomId }) => {
             ref={containerRef}
             className={`my-2 ml-4 mr-2 cm-binary-atom-container pointer-events-auto select-auto border-2 border-transparent transition-all ${isFocused ? 'hover:border-indigo-100' : ''} rounded-lg`}
             onMouseDown={(e) => {
+                // When clicking inside the widget, prevent CodeMirror from moving its native cursor into the JSON string
+                // This ensures the JSON is not accidentally editable
                 e.stopPropagation();
+                e.preventDefault();
                 if (!isFocused) {
                     setIsFocused(true);
                 }
             }}
         >
             {isFocused ? (
-                <div className="max-h-[800px] overflow-y-auto">
+                <div className="cursor-auto" onMouseDown={(e) => e.stopPropagation()}>
                     <ImageGroupEditor
                         blobs={atom.blobs || {}}
                         meta={meta}
                         onUpdateMeta={(newMeta) => {
                             const newContent = JSON.stringify(newMeta);
 
+                            // 1. Dispatch Codemirror transaction to update text document and keep undo history
+                            if (containerRef.current) {
+                                const view = EditorView.findFromDOM(containerRef.current);
+                                if (view) {
+                                    // Need to find the mapped atom to get the exact `from` / `to` position
+                                    const { atomMapField } = require('./cm-plugins');
+                                    const { Transaction } = require('@codemirror/state');
+                                    const mappings = view.state.field(atomMapField);
+                                    const m = mappings.find((mapping: any) => mapping.id === atomId);
+                                    if (m) {
+                                        view.dispatch({
+                                            changes: { from: m.from, to: m.to, insert: newContent },
+                                            annotations: Transaction.userEvent.of('input') // Ensure sync And Snapshot catches it.
+                                        });
+                                    }
+                                }
+                            }
+
+                            // 2. Also manually update state just in case, though the text change above will trigger syncAndSnapshotPlugin
                             useWorkspaceStore.getState().updateAtomMeta(atomId, newMeta);
                             const currentParallel = useWorkspaceStore.getState().cmDraftAtomsData;
                             const fieldList = useWorkspaceStore.getState().cmDraftAtomLists[atom.field];
@@ -78,7 +100,7 @@ const BinaryAtomEditorWrapper: React.FC<{ atomId: string }> = ({ atomId }) => {
                     />
                 </div>
             ) : (
-                <div className="cursor-pointer max-h-[800px] overflow-hidden relative">
+                <div className="cursor-pointer relative">
                     <ImageGroupViewer blobs={atom.blobs || {}} meta={meta} />
                     {/* Add a fade to indicate it can be expanded/edited if it's very tall */}
                     <div className="absolute inset-0 hover:bg-black/5 transition-colors pointer-events-none rounded-lg" />

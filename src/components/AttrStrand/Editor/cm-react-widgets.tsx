@@ -42,7 +42,7 @@ const BinaryAtomEditorWrapper: React.FC<{ atomId: string }> = ({ atomId }) => {
     return (
         <div
             ref={containerRef}
-            className="my-2 ml-4 mr-2 cm-binary-atom-container pointer-events-auto select-auto border-2 border-transparent transition-all hover:border-indigo-100 rounded-lg"
+            className={`my-2 ml-4 mr-2 cm-binary-atom-container pointer-events-auto select-auto border-2 border-transparent transition-all ${isFocused ? 'hover:border-indigo-100' : ''} rounded-lg`}
             onMouseDown={(e) => {
                 e.stopPropagation();
                 if (!isFocused) {
@@ -51,38 +51,37 @@ const BinaryAtomEditorWrapper: React.FC<{ atomId: string }> = ({ atomId }) => {
             }}
         >
             {isFocused ? (
-                <ImageGroupEditor
-                    blobs={atom.blobs || {}}
-                    meta={meta}
-                    onUpdateMeta={(newMeta) => {
-                        const newContent = JSON.stringify(newMeta);
+                <div className="max-h-[800px] overflow-y-auto">
+                    <ImageGroupEditor
+                        blobs={atom.blobs || {}}
+                        meta={meta}
+                        onUpdateMeta={(newMeta) => {
+                            const newContent = JSON.stringify(newMeta);
 
-                        useWorkspaceStore.getState().updateAtomMeta(atomId, newMeta);
-                        const currentParallel = useWorkspaceStore.getState().cmDraftAtomsData;
-                        const fieldList = useWorkspaceStore.getState().cmDraftAtomLists[atom.field];
-                        useWorkspaceStore.getState().syncCMToParallelState(atom.field, fieldList, {
-                            ...currentParallel,
-                            [atomId]: { ...currentParallel[atomId], content: newContent }
-                        });
-
-                        // We do not directly mutate CM from here anymore as that was causing crashes.
-                        // The parallel state update ensures the UI is correct. CM's syncAndSnapshotPlugin
-                        // handles sync when necessary, or we ignore the native undo/redo for this bin atom's JSON text
-                        // and just rely on workspace state if it doesn't hook into CM history smoothly.
-                    }}
-                    onUpdateBlobs={(newBlobs) => {
-                        useWorkspaceStore.getState().updateAtomBlobs(atomId, newBlobs);
-                        const currentParallel = useWorkspaceStore.getState().cmDraftAtomsData;
-                        const fieldList = useWorkspaceStore.getState().cmDraftAtomLists[atom.field];
-                        useWorkspaceStore.getState().syncCMToParallelState(atom.field, fieldList, {
-                            ...currentParallel,
-                            [atomId]: { ...currentParallel[atomId], blobs: newBlobs } as any
-                        });
-                    }}
-                />
+                            useWorkspaceStore.getState().updateAtomMeta(atomId, newMeta);
+                            const currentParallel = useWorkspaceStore.getState().cmDraftAtomsData;
+                            const fieldList = useWorkspaceStore.getState().cmDraftAtomLists[atom.field];
+                            useWorkspaceStore.getState().syncCMToParallelState(atom.field, fieldList, {
+                                ...currentParallel,
+                                [atomId]: { ...currentParallel[atomId], content: newContent }
+                            });
+                        }}
+                        onUpdateBlobs={(newBlobs) => {
+                            useWorkspaceStore.getState().updateAtomBlobs(atomId, newBlobs);
+                            const currentParallel = useWorkspaceStore.getState().cmDraftAtomsData;
+                            const fieldList = useWorkspaceStore.getState().cmDraftAtomLists[atom.field];
+                            useWorkspaceStore.getState().syncCMToParallelState(atom.field, fieldList, {
+                                ...currentParallel,
+                                [atomId]: { ...currentParallel[atomId], blobs: newBlobs } as any
+                            });
+                        }}
+                    />
+                </div>
             ) : (
-                <div className="p-4 bg-slate-50/50 rounded-lg cursor-pointer">
+                <div className="cursor-pointer max-h-[800px] overflow-hidden relative">
                     <ImageGroupViewer blobs={atom.blobs || {}} meta={meta} />
+                    {/* Add a fade to indicate it can be expanded/edited if it's very tall */}
+                    <div className="absolute inset-0 hover:bg-black/5 transition-colors pointer-events-none rounded-lg" />
                 </div>
             )}
         </div>

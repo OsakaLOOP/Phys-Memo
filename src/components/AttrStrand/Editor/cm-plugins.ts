@@ -207,24 +207,29 @@ export const dragDropImagePlugin = (field: ContentAtomField) => EditorView.domEv
         }
 
         const contentJson = JSON.stringify({ images: imagesMeta });
-        const insertTextModified = `\n\n${contentJson}\n\n`;
+
+        // Insert newlines appropriately around the atom content
+        const beforeStr = insertPos > 0 && view.state.doc.sliceString(insertPos - 1, insertPos) !== '\n' ? '\n\n' : (insertPos > 0 && view.state.doc.sliceString(insertPos - 2, insertPos) !== '\n\n' ? '\n' : '');
+        const afterStr = insertPos < view.state.doc.length && view.state.doc.sliceString(insertPos, insertPos + 1) !== '\n' ? '\n\n' : (insertPos < view.state.doc.length && view.state.doc.sliceString(insertPos, insertPos + 2) !== '\n\n' ? '\n' : '');
+
+        const insertTextModified = `${beforeStr}${contentJson}${afterStr}`;
+        const newAtomFrom = insertPos + beforeStr.length;
+
+        // Use workspace actions to save blobs FIRST, before dispatching to CM,
+        // to avoid race conditions with the parallel state snapshot
+        const state = useWorkspaceStore.getState();
+        state.updateAtomBlobs(newId, blobs);
+        state.updateAtomContent(newId, contentJson);
+        state.updateAtomMeta(newId, { images: imagesMeta });
 
         // Dispatch CM changes to make space for the new block in UI state tracking
         view.dispatch({
             changes: { from: insertPos, to: insertPos, insert: insertTextModified },
-            effects: addAtomEffect.of({ id: newId, index: mappingIndex, insertPos: atomFrom }),
+            effects: addAtomEffect.of({ id: newId, index: mappingIndex, insertPos: newAtomFrom }),
             annotations: Transaction.userEvent.of('add_atom')
         });
 
-        // Use workspace actions to save blobs
-        const state = useWorkspaceStore.getState();
-
-        // In cm-plugins we are dealing with parallel state directly for UI display.
-        // Wait briefly for CM to sync to parallel state, then update blobs
         setTimeout(() => {
-            state.updateAtomBlobs(newId, blobs);
-            state.updateAtomContent(newId, contentJson);
-            state.updateAtomMeta(newId, { images: imagesMeta });
             state.setActiveEditor({ field, id: newId });
         }, 50);
 
@@ -550,20 +555,18 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
     const fallbackData = store.draftAtomsData;
 
     for (const m of mappings) {
-        if (m.from < m.to) {
-            const atom = atomsData[m.id] || fallbackData[m.id];
-            if (atom && atom.type === 'bin') {
-                // If it's a binary atom, we replace its entire content range with a widget
-                decorations.push({
-                    from: m.from,
-                    to: m.to,
-                    dec: Decoration.replace({
-                        widget: new BinaryAtomWidget(m.id),
-                        block: true, // replace as a block widget
-                        inclusive: true
-                    })
-                });
-            }
+        const atom = atomsData[m.id] || fallbackData[m.id];
+        if (atom && atom.type === 'bin') {
+            // If it's a binary atom, we replace its entire content range with a widget
+            decorations.push({
+                from: m.from,
+                to: m.to,
+                dec: Decoration.replace({
+                    widget: new BinaryAtomWidget(m.id),
+                    block: true, // replace as a block widget
+                    inclusive: true
+                })
+            });
         }
     }
 

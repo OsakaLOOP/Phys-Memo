@@ -172,6 +172,8 @@ export function useNetworkLayout(
 
         // 为每个轨道分配一个 X 位置
         const trackXIndex = new Map<number, number>();
+        // ⚡ Bolt: Optimize layout calculation by using a Set for O(1) X index lookups instead of O(N) Array.from(trackXIndex.values()).includes(...) inside a loop
+        const usedXIndices = new Set<number>();
 
         // 防线重叠算法：记录每个父节点已被使用的出射斜率（dx / dy）
         // 因为每个节点Y坐标固定为 virtualRow * layerHeight
@@ -194,6 +196,7 @@ export function useNetworkLayout(
             // 第一个轨道（深度最浅/主干）固定在中间
             if (i === 0 && trackXIndex.size === 0) {
                 trackXIndex.set(i, 0);
+                usedXIndices.add(0);
                 continue;
             }
 
@@ -225,7 +228,7 @@ export function useNetworkLayout(
                     // 尝试右边
                     const dxRight = parentXIndex + offset - parentXIndex;
                     const slopeRight = dxRight / dy;
-                    if (!slopes.has(slopeRight) && !Array.from(trackXIndex.values()).includes(parentXIndex + offset)) {
+                    if (!slopes.has(slopeRight) && !usedXIndices.has(parentXIndex + offset)) {
                         candidateX = parentXIndex + offset;
                         slopes.add(slopeRight);
                         found = true;
@@ -235,7 +238,7 @@ export function useNetworkLayout(
                     // 尝试左边
                     const dxLeft = parentXIndex - offset - parentXIndex;
                     const slopeLeft = dxLeft / dy;
-                    if (!slopes.has(slopeLeft) && !Array.from(trackXIndex.values()).includes(parentXIndex - offset)) {
+                    if (!slopes.has(slopeLeft) && !usedXIndices.has(parentXIndex - offset)) {
                         candidateX = parentXIndex - offset;
                         slopes.add(slopeLeft);
                         found = true;
@@ -247,10 +250,10 @@ export function useNetworkLayout(
                 // 如果没有父节点（或者父节点不在列表内），退化为寻找全局未使用的空位
                 let offset = 0;
                 while (!found) {
-                    if (!Array.from(trackXIndex.values()).includes(offset)) {
+                    if (!usedXIndices.has(offset)) {
                         candidateX = offset;
                         found = true;
-                    } else if (offset > 0 && !Array.from(trackXIndex.values()).includes(-offset)) {
+                    } else if (offset > 0 && !usedXIndices.has(-offset)) {
                         candidateX = -offset;
                         found = true;
                     }
@@ -259,6 +262,7 @@ export function useNetworkLayout(
             }
 
             trackXIndex.set(i, candidateX);
+            usedXIndices.add(candidateX);
         }
 
         const center_X = width / 4; // 将图表偏左绘制，给右侧留出文本空间

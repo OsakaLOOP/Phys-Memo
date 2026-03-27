@@ -91,7 +91,7 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                                         <div
                                             key={`img-${index}`}
                                             style={{ width: `${widthRatio * 100}%` }}
-                                            className="flex flex-col items-center justify-center px-2 box-border"
+                                            className="flex flex-col items-center justify-center box-border"
                                         >
                                             <img
                                                 src={url}
@@ -112,7 +112,7 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                                             <div
                                                 key={`cap-${index}`}
                                                 style={{ width: `${widthRatio * 100}%` }}
-                                                className="flex flex-col items-center justify-start px-2 box-border text-sm text-center"
+                                                className="flex flex-col items-center justify-start box-border text-sm text-center"
                                             >
                                                 {caption && (
                                                     <span>

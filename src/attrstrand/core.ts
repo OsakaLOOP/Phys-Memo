@@ -303,11 +303,14 @@ export class AttrStrandCore {
                 return atomIds;
             };
 
-            const coreAtomIds = await processAtoms('core', submission.coreAtoms);
-            const docAtomIds = await processAtoms('doc', submission.docAtoms);
-            const tagsAtomIds = await processAtoms('tags', submission.tagsAtoms);
-            const refsAtomIds = await processAtoms('refs', submission.refsAtoms);
-            const relsAtomIds = await processAtoms('rels', submission.relsAtoms);
+            // ⚡ Bolt: Optimize sequential data fetching by using Promise.all to fetch all atom types concurrently
+            const [coreAtomIds, docAtomIds, tagsAtomIds, refsAtomIds, relsAtomIds] = await Promise.all([
+                processAtoms('core', submission.coreAtoms),
+                processAtoms('doc', submission.docAtoms),
+                processAtoms('tags', submission.tagsAtoms),
+                processAtoms('refs', submission.refsAtoms),
+                processAtoms('rels', submission.relsAtoms)
+            ]);
 
             const editionId = await generateEditionHash(
                 conceptId,

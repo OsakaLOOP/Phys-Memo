@@ -63,16 +63,14 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
     let currentRowWidth = 0;
 
     imagesMeta.forEach(img => {
-        // Calculate effective width ratio based on height limits to avoid horizontal whitespace
-        // Max container height is bounded to 800px. Container width is measured dynamically.
-        // If image natural height requires scaling it down, we shrink the effective horizontal width ratio to tightly match bounds.
         let effectiveWidthRatio = img.widthRatio || 1;
         if (img.naturalWidth && img.naturalHeight) {
-            // maxRatio = 800(max height) / (containerWidth * (naturalHeight / naturalWidth))
-            const maxRatio = (800 / containerWidth) * (img.naturalWidth / img.naturalHeight);
-            if (maxRatio < effectiveWidthRatio) {
-                effectiveWidthRatio = maxRatio;
-            }
+            // 预测基于当前容器宽度的渲染高度
+            const expectedHeight = containerWidth * effectiveWidthRatio * (img.naturalHeight / img.naturalWidth);
+            // Viewer 的最大高度限制是 800
+            const factor = expectedHeight > 800 ? 800 / expectedHeight : 1;
+            // 额外乘上修复系数消除白边
+            effectiveWidthRatio = effectiveWidthRatio * factor;
         }
 
         // Save the computed effective ratio for rendering

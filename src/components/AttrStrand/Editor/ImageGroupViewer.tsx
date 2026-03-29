@@ -8,21 +8,8 @@ interface ImageGroupViewerProps {
 
 export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta }) => {
     const [urls, setUrls] = useState<Record<string, string>>({});
-    const [containerWidth, setContainerWidth] = useState<number>(800);
     const containerRef = React.useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (!containerRef.current) return;
-        const observer = new ResizeObserver(entries => {
-            for (let entry of entries) {
-                if (entry.contentRect.width > 0) {
-                    setContainerWidth(entry.contentRect.width);
-                }
-            }
-        });
-        observer.observe(containerRef.current);
-        return () => observer.disconnect();
-    }, []);
 
     useEffect(() => {
         const objectUrls: Record<string, string> = {};
@@ -57,34 +44,24 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
     const imagesMeta = meta.images || [];
 
     // Group images into rows based on widthRatio
-    // A row breaks when the sum of widthRatios exceeds 1
+    // A row breaks when the sum of effective width ratios exceeds 1
     const rows: Array<typeof imagesMeta> = [];
     let currentRow: typeof imagesMeta = [];
     let currentRowWidth = 0;
 
     imagesMeta.forEach(img => {
-        let effectiveWidthRatio = img.widthRatio || 1;
-        if (img.naturalWidth && img.naturalHeight) {
-            // 预测基于当前容器宽度的渲染高度
-            const expectedHeight = containerWidth * effectiveWidthRatio * (img.naturalHeight / img.naturalWidth);
-            // Viewer 的最大高度限制是 800
-            const factor = expectedHeight > 800 ? 800 / expectedHeight : 1;
-            // 额外乘上修复系数消除白边
-            effectiveWidthRatio = effectiveWidthRatio * factor;
-        }
+        // Base ratio calculation: 1 -> 50%
+        const effectiveRatio = (img.widthRatio || 1) * 0.5;
 
-        // Save the computed effective ratio for rendering
-        const processedImg = { ...img, effectiveWidthRatio };
-
-        if (currentRowWidth + effectiveWidthRatio > 1.01) { // 1.01 to allow minor floating point errors
+        if (currentRowWidth + effectiveRatio > 1.01) { // 1.01 to allow minor floating point errors
             if (currentRow.length > 0) {
                 rows.push(currentRow);
             }
-            currentRow = [processedImg];
-            currentRowWidth = effectiveWidthRatio;
+            currentRow = [{ ...img, widthRatio: effectiveRatio }];
+            currentRowWidth = effectiveRatio;
         } else {
-            currentRow.push(processedImg);
-            currentRowWidth += effectiveWidthRatio;
+            currentRow.push({ ...img, widthRatio: effectiveRatio });
+            currentRowWidth += effectiveRatio;
         }
     });
     if (currentRow.length > 0) {
@@ -108,24 +85,35 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                     // The upper images vertically centered, lower captions top-aligned.
                     return (
                         <div key={rowIndex} className="w-full flex flex-col items-center">
-                            {/* Images Row: Vertically Centered */}
-                            <div className="w-full flex flex-row justify-center items-center">
+                            {/* Combined Row: Images and Captions in columns */}
+                            {/* NEW CSS: justify-evenly (or justify-around/center) for distribution */}
+                            <div className="w-full flex flex-row justify-evenly items-end">
                                 {rowItems.map(({ imgMeta, index }) => {
                                     const url = urls[imgMeta.id] || '';
-                                    const widthRatio = imgMeta.widthRatio || 1;
+                                    const effectiveRatio = imgMeta.widthRatio || 1; // already calculated in the loop above
                                     const caption = imgMeta.caption || '';
-                                    const effectiveWidthRatio = (imgMeta as any).effectiveWidthRatio || widthRatio;
                                     return (
                                         <div
-                                            key={`img-${index}`}
-                                            style={{ width: `${effectiveWidthRatio * 100}%` }}
-                                            className="flex flex-col items-center justify-center box-border"
+                                            key={`col-${index}`}
+                                            // Ensure width fits content.
+                                            style={{ maxWidth: `${effectiveRatio * 100}%` }}
+                                            className="flex flex-col items-center justify-start box-border shrink"
                                         >
-                                            <img
-                                                src={url}
-                                                alt={caption || `Figure sub ${index + 1}`}
-                                                className="max-w-full max-h-[800px] object-contain"
-                                            />
+                                            <div className="flex flex-col items-center justify-center w-fit max-h-[800px]">
+                                                <img
+                                                    src={url}
+                                                    alt={caption || `Figure sub ${index + 1}`}
+                                                    className="max-w-full max-h-[800px] object-contain"
+                                                />
+                                                {caption && (
+                                                    <div className="mt-2 text-sm text-center w-full">
+                                                        <span>
+                                                            {imagesMeta.length > 1 && `(${String.fromCharCode(97 + index)}) `}
+                                                            {caption}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}

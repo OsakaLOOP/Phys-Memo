@@ -42,23 +42,24 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
     const imagesMeta = meta.images || [];
 
     // Group images into rows based on widthRatio
-    // A row breaks when the sum of widthRatios exceeds 1
+    // A row breaks when the sum of effective width ratios exceeds 1
     const rows: Array<typeof imagesMeta> = [];
     let currentRow: typeof imagesMeta = [];
     let currentRowWidth = 0;
 
     imagesMeta.forEach(img => {
-        const widthRatio = img.widthRatio || 1;
+        // Base ratio calculation: 1 -> 50%
+        const effectiveRatio = (img.widthRatio || 1) * 0.5;
 
-        if (currentRowWidth + widthRatio > 1.01) { // 1.01 to allow minor floating point errors
+        if (currentRowWidth + effectiveRatio > 1.01) { // 1.01 to allow minor floating point errors
             if (currentRow.length > 0) {
                 rows.push(currentRow);
             }
-            currentRow = [img];
-            currentRowWidth = widthRatio;
+            currentRow = [{ ...img, widthRatio: effectiveRatio }];
+            currentRowWidth = effectiveRatio;
         } else {
-            currentRow.push(img);
-            currentRowWidth += widthRatio;
+            currentRow.push({ ...img, widthRatio: effectiveRatio });
+            currentRowWidth += effectiveRatio;
         }
     });
     if (currentRow.length > 0) {
@@ -83,18 +84,20 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                     return (
                         <div key={rowIndex} className="w-full flex flex-col items-center">
                             {/* Combined Row: Images and Captions in columns */}
-                            <div className="w-full flex flex-row justify-center items-end">
+                            {/* NEW CSS: justify-evenly (or justify-around/center) for distribution */}
+                            <div className="w-full flex flex-row justify-evenly items-end">
                                 {rowItems.map(({ imgMeta, index }) => {
                                     const url = urls[imgMeta.id] || '';
-                                    const widthRatio = imgMeta.widthRatio || 1;
+                                    const effectiveRatio = imgMeta.widthRatio || 1; // already calculated in the loop above
                                     const caption = imgMeta.caption || '';
                                     return (
                                         <div
                                             key={`col-${index}`}
-                                            style={{ maxWidth: `${widthRatio * 100}%` }}
-                                            className="flex flex-col items-center justify-start box-border"
+                                            // Ensure width fits content.
+                                            style={{ maxWidth: `${effectiveRatio * 100}%` }}
+                                            className="flex flex-col items-center justify-start box-border shrink"
                                         >
-                                            <div className="flex flex-col items-center justify-center w-fit">
+                                            <div className="flex flex-col items-center justify-center w-fit max-h-[800px]">
                                                 <img
                                                     src={url}
                                                     alt={caption || `Figure sub ${index + 1}`}

@@ -72,22 +72,54 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
 
         const zoomLayer = svg.append("g");
 
-        // 特殊处理跨轨道的连线：让它平滑弯曲
-        const customLinkGenerator = (d: ProcessedLink) => {
-            if (d.source.trackIdx === d.target.trackIdx) {
-                return `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`;
-            } else {
-                // 绘制贝塞尔曲线，在分支点平滑过渡
-                return `M${d.source.x},${d.source.y} C${d.source.x},${d.source.y - layerHeight/2} ${d.target.x},${d.target.y + layerHeight/2} ${d.target.x},${d.target.y}`;
+        // 生成平滑且发散的分支连线
+        const generateLinkPath = (d: ProcessedLink) => {
+            const { source, target } = d;
+
+            // 1. 同垂直轨道，直接画直线
+            if (source.x === target.x) {
+                return `M${source.x},${source.y} L${target.x},${target.y}`;
             }
+
+            // 2. 对于多子节点的分支，计算动态的起点控制点（使其带有发散角度，防止重叠）
+            const childrenCount = source.childrenIds.length;
+            const childIndex = source.childrenIds.indexOf(target.edition.id);
+
+            // 控制点 Y 的拉伸距离（使得曲线有足够的向上空间）
+            const controlYOffset = layerHeight * 0.5;
+
+            // 如果源节点只有一个子节点（单线跨轨道转移），控制点可以直接保持垂直出射，或者用现有的简单 S 型
+            if (childrenCount <= 1) {
+                return `M${source.x},${source.y} C${source.x},${source.y - controlYOffset} ${target.x},${target.y + controlYOffset} ${target.x},${target.y}`;
+            }
+
+            // 多子节点：赋予 source 端的控制点一定的水平偏移 (X 偏移)
+            // 找出这个节点向左和向右分布的极限
+            // 这里给出一个基础的水平发散常数
+            const spreadFactor = 15;
+
+            // 为了让中间的子节点尽量直，两侧的节点向两边弯，将 childIndex 映射到以0为中心
+            // 比如有 3 个子节点, index: 0, 1, 2 -> offset: -1, 0, 1
+            const normalizedIndex = childIndex - (childrenCount - 1) / 2;
+            const cp1x = source.x + normalizedIndex * spreadFactor;
+
+            // 但是如果 target.x 的方向与计算出的 cp1x 的偏移方向相反，稍微修正一下，防止过度绕弯
+            // 通常因为 childrenIds 已经按 x 排序，normalizedIndex 的正负应该与 (target.x - source.x) 一致
+
+            const cp1y = source.y - controlYOffset;
+
+            // target 端的控制点通常可以保持垂直进入，以保证在目标处平滑接入轨道
+            const cp2x = target.x;
+            const cp2y = target.y + controlYOffset;
+
+            return `M${source.x},${source.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${target.x},${target.y}`;
         };
-        // 待修改.
 
         zoomLayer.selectAll("path.link")
             .data(links)
             .join("path")
             .attr("class", "link")
-            .attr("d", d => customLinkGenerator(d))
+            .attr("d", d => generateLinkPath(d))
             .attr("fill", "none")
             .attr("stroke", d => d.color)
             .attr("stroke-width", 2.5)

@@ -11,6 +11,7 @@ export interface ProcessedNode {
     x: number;
     y: number;
     trackIdx: number;
+    childrenIds: string[]; // 子节点 ID 列表
 }
 
 export interface ProcessedLink {
@@ -293,10 +294,22 @@ export function useNetworkLayout(
                  color,
                  x,
                  y,
-                 trackIdx
+                 trackIdx,
+                 childrenIds: childrenMap.get(e.id) || []
              };
              nodes.set(e.id, node);
         });
+
+        // 对 childrenIds 根据子节点的 X 坐标进行排序，方便渲染时计算发散的角度/偏移
+        for (const node of nodes.values()) {
+            if (node.childrenIds.length > 1) {
+                node.childrenIds.sort((a, b) => {
+                    const childA = nodes.get(a);
+                    const childB = nodes.get(b);
+                    return (childA?.x || 0) - (childB?.x || 0);
+                });
+            }
+        }
 
         // 4. 生成连线
         const links: ProcessedLink[] = [];

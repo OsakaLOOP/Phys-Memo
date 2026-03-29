@@ -167,6 +167,8 @@ export function useNetworkLayout(
             trackColors.set(i, color);
         }
 
+
+
         // 3. 树状向上螺旋生长的布局
         const nodes: Map<string, ProcessedNode> = new Map();
         const baseWidth = 30; // 轨道之间的水平步长
@@ -174,84 +176,145 @@ export function useNetworkLayout(
         // 为每个轨道分配一个 X 位置
         const trackXIndex = new Map<number, number>();
 
-        // 防线重叠算法：记录每个父节点已被使用的出射斜率（dx / dy）
-        // 因为每个节点Y坐标固定为 virtualRow * layerHeight
-        // dx = (childXIndex - parentXIndex)
-        // dy = (childRow - parentRow)
-        // 斜率 slope = dx / dy
-        const usedSlopesByParent = new Map<string, Set<number>>();
+        // 记录每个轨道活跃的行区间 [startRow, endRow]
+        const trackRanges = new Map<number, { startRow: number; endRow: number }>();
+        tracks.forEach((track, i) => {
+            const rows = track.map(id => idToVirtualRow.get(id) || 0);
+            let startRow = Math.min(...rows);
+            const endRow = Math.max(...rows);
 
-        // 为了让子节点计算斜率时，父节点的 X 已经被分配，需要按照轨道的起始节点的深度/行号来排序处理
+            // 轨道的起点其实是从父节点分支出来的那一刻，所以区间的起点要包含父节点的行号
+            const firstId = track[0];
+            const parentId = idToEdition.get(firstId)?.parentEditionId;
+            if (parentId && idToVirtualRow.has(parentId)) {
+                startRow = Math.min(startRow, idToVirtualRow.get(parentId)!);
+            }
+            trackRanges.set(i, { startRow, endRow });
+        });
+
+        // 按起点行号从小到大（从旧到新）的顺序分配轨道，这样新分支总是在父分支分配后处理
         const trackProcessingOrder = Array.from({ length: tracks.length }, (_, i) => i)
             .sort((a, b) => {
-                const trackA = tracks[a];
-                const trackB = tracks[b];
-                const rowA = idToVirtualRow.get(trackA[0]) || 0;
-                const rowB = idToVirtualRow.get(trackB[0]) || 0;
-                return rowA - rowB;
+                const rangeA = trackRanges.get(a)!;
+                const rangeB = trackRanges.get(b)!;
+                if (rangeA.startRow !== rangeB.startRow) return rangeA.startRow - rangeB.startRow;
+                return rangeA.endRow - rangeB.endRow;
             });
 
+        // activeIntervals 记录每个 X 坐标上已经被占据的行区间列表
+        const activeIntervals = new Map<number, Array<{ start: number; end: number }>>();
+
+        const isOverlap = (s1: number, e1: number, s2: number, e2: number) => {
+            // 如果两个区间有重叠，则发生碰撞
+            // 注意：父节点分支出子节点的那一行（startRow）是允许"接触"的，但为了严格防止连线重叠，
+            // 如果一个线段在 startRow 到 endRow 活动，另一个在同一 X 的相同区间活动，就是交叉。
+            // 只要区间的交集长度 >= 0 就算重叠（即 max(s1, s2) <= min(e1, e2)）
+            return Math.max(s1, s2) <= Math.min(e1, e2);
+        };
+
+        const isLaneFree = (x: number, start: number, end: number) => {
+            const intervals = activeIntervals.get(x);
+            if (!intervals) return true;
+            for (const interval of intervals) {
+                if (isOverlap(start, end, interval.start, interval.end)) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        const addInterval = (x: number, start: number, end: number) => {
+            if (!activeIntervals.has(x)) activeIntervals.set(x, []);
+            activeIntervals.get(x)!.push({ start, end });
+        };
+
+        // 动态移开占据空间的外部轨道，为新的子轨道腾出空间
+        const shiftOuterLanes = (fromX: number, direction: 1 | -1, startRow: number, endRow: number) => {
+            // 需要找到一个连续占用的区间，直到遇到一个空车道为止，把它们整体向外推一格
+            // 为了简单处理并保持拓扑相对顺序，当检测到目标X被占用且可能导致交叉时，
+            // 我们将所有在目标X以外（同侧）的轨道强行向外推一格
+
+            // 找出需要移动的 track
+            const tracksToShift: number[] = [];
+            for (const [trackIdx, trackX] of trackXIndex.entries()) {
+                if (direction === 1 && trackX >= fromX) {
+                    tracksToShift.push(trackIdx);
+                } else if (direction === -1 && trackX <= fromX) {
+                    tracksToShift.push(trackIdx);
+                }
+            }
+
+            if (tracksToShift.length > 0) {
+                // 清理旧的区间
+                for (const trackIdx of tracksToShift) {
+                    const oldX = trackXIndex.get(trackIdx)!;
+                    const r = trackRanges.get(trackIdx)!;
+                    const intervals = activeIntervals.get(oldX);
+                    if (intervals) {
+                        const index = intervals.findIndex(int => int.start === r.startRow && int.end === r.endRow);
+                        if (index !== -1) intervals.splice(index, 1);
+                    }
+                }
+                // 应用新的位置并重新写入区间
+                for (const trackIdx of tracksToShift) {
+                    const oldX = trackXIndex.get(trackIdx)!;
+                    const newX = oldX + direction;
+                    trackXIndex.set(trackIdx, newX);
+                    const r = trackRanges.get(trackIdx)!;
+                    addInterval(newX, r.startRow, r.endRow);
+                }
+            }
+        };
+
         for (const i of trackProcessingOrder) {
-            // 第一个轨道（深度最浅/主干）固定在中间
-            if (i === 0 && trackXIndex.size === 0) {
+            const range = trackRanges.get(i)!;
+
+            if (i === 0) {
+                // 主轨道固定在 X = 0
                 trackXIndex.set(i, 0);
+                addInterval(0, range.startRow, range.endRow);
                 continue;
             }
 
-            const trackStrand = tracks[i];
-            const startId = trackStrand[0];
-            const startEdition = idToEdition.get(startId)!;
-            const parentId = startEdition.parentEditionId;
+            const startId = tracks[i][0];
+            const parentId = idToEdition.get(startId)?.parentEditionId;
 
             let candidateX = 0;
-            let found = false;
 
-            // 如果有父节点，我们需要找一个不产生共线重叠的 X 偏移
             if (parentId && idToTrackIndex.has(parentId)) {
                 const parentTrackIdx = idToTrackIndex.get(parentId)!;
-                // 如果因为某种原因父节点还没有分配，默认0（排序后一般不会出现）
-                const parentXIndex = trackXIndex.has(parentTrackIdx) ? trackXIndex.get(parentTrackIdx)! : 0;
-                const parentRow = idToVirtualRow.get(parentId) || 0;
-                const childRow = idToVirtualRow.get(startId) || 0;
-                const dy = childRow - parentRow; // y 的距离差（以行数为单位）
+                const parentXIndex = trackXIndex.get(parentTrackIdx) || 0;
 
-                if (!usedSlopesByParent.has(parentId)) {
-                    usedSlopesByParent.set(parentId, new Set());
-                }
-                const slopes = usedSlopesByParent.get(parentId)!;
+                // 优先尝试靠近父节点的位置
+                let candLeft = parentXIndex - 1;
+                let candRight = parentXIndex + 1;
 
-                // 先尝试竖直, 然后左右交替.
-                let offset = 0;
-                while (!found) {
-                    // 尝试右边
-                    const dxRight = parentXIndex + offset - parentXIndex;
-                    const slopeRight = dxRight / dy;
-                    if (!slopes.has(slopeRight) && !Array.from(trackXIndex.values()).includes(parentXIndex + offset)) {
-                        candidateX = parentXIndex + offset;
-                        slopes.add(slopeRight);
-                        found = true;
-                        break;
-                    }
+                // 检查左边和右边是否空闲
+                const isLeftFree = isLaneFree(candLeft, range.startRow, range.endRow);
+                const isRightFree = isLaneFree(candRight, range.startRow, range.endRow);
 
-                    // 尝试左边
-                    const dxLeft = parentXIndex - offset - parentXIndex;
-                    const slopeLeft = dxLeft / dy;
-                    if (!slopes.has(slopeLeft) && !Array.from(trackXIndex.values()).includes(parentXIndex - offset)) {
-                        candidateX = parentXIndex - offset;
-                        slopes.add(slopeLeft);
-                        found = true;
-                        break;
-                    }
-                    offset++;
+                if (isRightFree && isLaneFree(candRight, range.startRow, range.startRow)) {
+                    // 右侧完全空闲，且不存在跨越
+                    candidateX = candRight;
+                } else if (isLeftFree && isLaneFree(candLeft, range.startRow, range.startRow)) {
+                    // 左侧完全空闲
+                    candidateX = candLeft;
+                } else {
+                    // 如果两侧都被占用了（或者在 startRow 存在障碍物导致了交叉）
+                    // 我们强行扒开空间（Shift），把外侧的现有轨道往外挤。
+                    // 默认向右边挤（Git 图常见策略，子分支在右侧）
+                    shiftOuterLanes(candRight, 1, range.startRow, range.endRow);
+                    candidateX = candRight;
                 }
             } else {
-                // 如果没有父节点（或者父节点不在列表内），退化为寻找全局未使用的空位
+                // 如果没有父节点（游离分支），找一个绝对空闲的位置
                 let offset = 0;
+                let found = false;
                 while (!found) {
-                    if (!Array.from(trackXIndex.values()).includes(offset)) {
+                    if (isLaneFree(offset, range.startRow, range.endRow)) {
                         candidateX = offset;
                         found = true;
-                    } else if (offset > 0 && !Array.from(trackXIndex.values()).includes(-offset)) {
+                    } else if (offset > 0 && isLaneFree(-offset, range.startRow, range.endRow)) {
                         candidateX = -offset;
                         found = true;
                     }
@@ -260,6 +323,7 @@ export function useNetworkLayout(
             }
 
             trackXIndex.set(i, candidateX);
+            addInterval(candidateX, range.startRow, range.endRow);
         }
 
         const center_X = width / 4; // 将图表偏左绘制，给右侧留出文本空间

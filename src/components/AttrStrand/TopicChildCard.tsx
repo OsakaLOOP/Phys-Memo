@@ -67,7 +67,27 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
     }, [conceptId]);
 
     if (loading) {
-        return <div className="p-4 bg-white rounded-lg border border-slate-200 animate-pulse h-32"></div>;
+        return (
+            <div className="bg-white border border-slate-100 rounded-lg p-4 flex gap-4 animate-pulse h-36">
+                <div className="flex flex-col items-center gap-2 pt-1">
+                    <div className="w-8 h-8 rounded-full bg-slate-200"></div>
+                </div>
+                <div className="flex-1 space-y-4 py-1">
+                    <div className="flex justify-between">
+                        <div className="h-5 bg-slate-200 rounded w-1/3"></div>
+                        <div className="h-4 bg-slate-200 rounded w-16"></div>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="h-4 bg-slate-100 rounded w-full"></div>
+                        <div className="h-4 bg-slate-100 rounded w-5/6"></div>
+                    </div>
+                    <div className="flex gap-4 pt-3 mt-2 border-t border-slate-50">
+                        <div className="h-3 bg-slate-100 rounded w-16"></div>
+                        <div className="h-3 bg-slate-100 rounded w-16"></div>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     // Fallback to minimal view if no attrstrand data (shouldn't happen with correct migration)
@@ -83,11 +103,11 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
     return (
         <div
             onClick={onClick}
-            className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group flex gap-4"
+            className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-lg hover:-translate-y-1 hover:border-indigo-300 transition-all duration-300 cursor-pointer group flex gap-4"
         >
              {/* Icon / Type */}
              <div className="flex flex-col items-center gap-2 pt-1">
-                <div className={`w-8 h-8 rounded-full flex-center text-white shadow-sm ${legacyTypeConfig?.color.split(' ')[0].replace('bg-', 'bg-indigo-500')}`} style={{ backgroundColor: legacyTypeConfig?.nodeColor }}>
+                <div className={`w-8 h-8 rounded-full flex-center text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md ${legacyTypeConfig?.color.split(' ')[0].replace('bg-', 'bg-indigo-500')}`} style={{ backgroundColor: legacyTypeConfig?.nodeColor }}>
                    <span className="font-bold text-xs">{legacyType[0]}</span>
                 </div>
              </div>

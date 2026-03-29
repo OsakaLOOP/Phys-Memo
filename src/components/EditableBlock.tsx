@@ -88,9 +88,9 @@ const EditableBlock: FC<EditableBlockProps> = ({
           : `$$${strValue}$$`;
 
         return (
-          <div className="group relative min-h-[3rem] bg-slate-50/50 rounded border border-slate-100 hover:border-indigo-300 transition-colors cursor-pointer py-6 px-2 text-lg">
+          <div className="group relative min-h-[3rem] bg-slate-50/50 rounded border border-slate-100 hover:border-indigo-300 transition-all duration-300 cursor-pointer py-6 px-2 text-lg">
             <RichTextRenderer content={content} className="text-slate-800 [&_.katex-display]:my-0" enableAnalysis={enableAnalysis} />
-            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-2 right-2 opacity-0 translate-x-1 -translate-y-1 group-hover:translate-x-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
               <Edit3 className="w-4 h-4 text-indigo-400" />
             </div>
           </div>
@@ -100,7 +100,7 @@ const EditableBlock: FC<EditableBlockProps> = ({
         return (
           <div className="flex flex-wrap gap-2">
             {Array.isArray(value) && value.map((tag, i) => (
-              <span key={i} className="inline-flex-center badge-base bg-yellow-50 text-yellow-700 border-yellow-200">
+              <span key={i} className="inline-flex-center badge-base bg-yellow-50 text-yellow-700 border-yellow-200 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm hover:scale-105">
                 <RichTextRenderer content={tag} className="inline-block [&>p]:inline [&>p]:m-0" />
               </span>
             ))}

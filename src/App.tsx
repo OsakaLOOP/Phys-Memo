@@ -30,6 +30,9 @@ import { FieldEditor } from './components/AttrStrand/FieldEditor';
 import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
 import { TopicChildCard } from './components/AttrStrand/TopicChildCard';
 import { useStore } from 'zustand';
+import Modal from 'react-modal';
+
+Modal.setAppElement('#root');
 import { useWorkspaceStore, useGlobalStore, workspaceActions } from './store/workspaceStore';
 import { useNetworkStore } from './store/networkStore';
 
@@ -1587,6 +1590,9 @@ const PhysMemosApp: FC = () => {
                   <button onClick={() => setViewMode('editor')} className="btn-primary flex justify-center items-center text-xs py-1.5 px-3 mr-auto" style={{ width: '144px', flex: 'none' }}>
                     <FileText className="w-4 h-4 mr-1"/> 返回编辑
                   </button>
+                  {/* Right side space - Add EditionFlagBar here */}
+                  <div className="flex-1"></div>
+                  <EditionFlagBar editionId={activeEdition?.id || null} currentUserId="default-user" />
                 </div>
               </div>
               <div className="flex-1 p-8 pt-0 overflow-hidden flex flex-col">

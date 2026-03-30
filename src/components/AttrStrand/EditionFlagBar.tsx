@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
-import { Star, ThumbsUp, ThumbsDown, GitMerge, Trash2, MoreHorizontal } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Star, ArrowBigUp, ArrowBigDown, GitMerge, Trash2, MoreHorizontal } from 'lucide-react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { core } from '../../attrstrand/core';
 import type { EditionFlagType } from '../../attrstrand/types';
 import toast from 'react-hot-toast';
+import Modal from 'react-modal';
 
 export const EditionFlagBar: React.FC<{
     editionId: string | null;
     currentUserId: string;
 }> = ({ editionId, currentUserId }) => {
     const [showDropdown, setShowDropdown] = useState(false);
+    const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+    const buttonRef = useRef<HTMLButtonElement>(null);
     const flags = useWorkspaceStore(state => state.baseEditionFlags);
     const setFlags = useWorkspaceStore(state => state.setEditionFlags);
 
@@ -37,7 +40,7 @@ export const EditionFlagBar: React.FC<{
         return (
             <button
                 onClick={() => handleToggle(type)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors text-sm font-medium ${
+                className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors text-sm font-medium ${
                     isChecked
                     ? 'text-indigo-600 bg-indigo-50'
                     : 'text-slate-500 hover:bg-slate-50'
@@ -45,7 +48,7 @@ export const EditionFlagBar: React.FC<{
                 title={title}
             >
                 <Icon className={`w-4 h-4 ${isChecked ? 'fill-current' : ''}`} />
-                <span>{count > 0 ? count : ''}</span>
+                {count > 0 && <span className="text-xs">{count}</span>}
             </button>
         );
     };
@@ -67,33 +70,91 @@ export const EditionFlagBar: React.FC<{
         );
     };
 
+    const timeoutRef = useRef<number | null>(null);
+
+    const updateDropdownPos = () => {
+        if (buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            // Position modal relative to viewport, bottom right aligned to button
+            setDropdownPos({
+                top: rect.bottom + 4,
+                left: rect.right, // We will use right edge mapping inside modal inline style
+            });
+        }
+    };
+
+    const handleMouseEnter = () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        if (!showDropdown) {
+            updateDropdownPos();
+            setShowDropdown(true);
+        }
+    };
+
+    const handleMouseLeave = () => {
+        timeoutRef.current = window.setTimeout(() => {
+            setShowDropdown(false);
+        }, 200); // 0.2s delay
+    };
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        };
+    }, []);
+
+    // Also update position on resize or scroll if modal is open
+    useEffect(() => {
+        if (!showDropdown) return;
+        const handler = () => updateDropdownPos();
+        window.addEventListener('resize', handler);
+        window.addEventListener('scroll', handler, true);
+        return () => {
+            window.removeEventListener('resize', handler);
+            window.removeEventListener('scroll', handler, true);
+        };
+    }, [showDropdown]);
+
     return (
-        <div className="flex items-center bg-white rounded-full shadow-sm border border-slate-200 px-1 h-10 relative">
-            <div className="flex items-center gap-1">
+        <div className="flex items-center bg-white rounded-full shadow-sm border border-slate-200 px-1 h-8 relative">
+            <div className="flex items-center gap-0.5">
                 {renderPublicBtn('star', Star, 'Star / 收藏')}
-                <div className="w-px h-4 bg-slate-200" />
-                {renderPublicBtn('upvote', ThumbsUp, 'Upvote / 赞同')}
-                {renderPublicBtn('downvote', ThumbsDown, 'Downvote / 反对')}
+                {renderPublicBtn('upvote', ArrowBigUp, 'Vote Up / 赞同')}
+                {renderPublicBtn('downvote', ArrowBigDown, 'Vote Down / 反反对')}
             </div>
 
-            <div className="w-px h-4 bg-slate-200 mx-1" />
-
             <button
-                onClick={() => setShowDropdown(!showDropdown)}
-                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+                ref={buttonRef}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors outline-none"
             >
                 <MoreHorizontal className="w-4 h-4" />
             </button>
 
-            {showDropdown && (
-                <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
-                        {renderPrivateBtn('to-be-merged', GitMerge, '标记待合并 (To be merged)')}
-                        {renderPrivateBtn('to-be-cleaned', Trash2, '标记待清理 (To be cleaned)')}
-                    </div>
-                </>
-            )}
+            <Modal
+                isOpen={showDropdown}
+                onRequestClose={() => setShowDropdown(false)}
+                className="absolute outline-none bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50 overflow-hidden w-48"
+                overlayClassName="fixed inset-0 z-40 bg-transparent"
+                style={{
+                    content: {
+                        top: `${dropdownPos.top}px`,
+                        left: `${dropdownPos.left}px`,
+                        transform: 'translateX(-100%)', // Align right edge with button right edge
+                    }
+                }}
+            >
+                <div
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                    className="flex flex-col w-full h-full"
+                >
+                    {renderPrivateBtn('to-be-merged', GitMerge, '标记待合并 (To be merged)')}
+                    {renderPrivateBtn('to-be-cleaned', Trash2, '标记待清理 (To be cleaned)')}
+                </div>
+            </Modal>
         </div>
     );
 };

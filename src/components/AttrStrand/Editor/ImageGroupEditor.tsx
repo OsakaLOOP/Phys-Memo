@@ -132,7 +132,7 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
     };
 
     return (
-        <div className="w-full bg-white flex flex-col gap-4 outline-none" tabIndex={-1}>
+        <div className="w-full bg-white flex flex-col gap-4 outline-none overflow-hidden" tabIndex={-1}>
             {/* Header: Group Caption */}
             <div className="flex flex-col">
                 <label className="text-xs font-semibold text-slate-500 mb-1">图片组标题 (Group Caption)</label>
@@ -155,7 +155,7 @@ export const ImageGroupEditor: React.FC<ImageGroupEditorProps> = ({ blobs, meta,
             {/* Scrollable Horizontal Images Container */}
             <div
                 ref={containerRef}
-                className="flex flex-row overflow-x-auto gap-4 pb-4 items-end whitespace-nowrap scrollbar-thin scrollbar-thumb-indigo-200 scrollbar-track-transparent max-w-full"
+                className="flex flex-row overflow-x-auto gap-4 pb-4 items-end whitespace-nowrap scrollbar-thin scrollbar-thumb-indigo-200 scrollbar-track-transparent max-w-full min-w-0 w-full"
                 style={{ minHeight: '200px' }}
             >
                 {(meta.images || []).map((imgMeta, index) => {

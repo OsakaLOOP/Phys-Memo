@@ -1231,6 +1231,18 @@ const PhysMemosApp: FC = () => {
     return { relevantTopics, topicNodesMap, childrenMap };
   }, [nodes, searchQuery, disciplinesMap]);
 
+  // ⚡ Bolt: Memoize the active topic children and disciplines to prevent 5x O(N) array filtrations during render
+  // This avoids redundant iterations over the potentially large `nodes` array when rendering the TOPIC OVERVIEW page.
+  const activeTopicChildren = useMemo(() => {
+    if (!activeNode || activeNode.type !== 'TOPIC') return [];
+    return nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC');
+  }, [nodes, activeNode]);
+
+  const activeTopicDisciplines = useMemo(() => {
+    if (!activeTopicChildren.length) return [];
+    return Array.from(new Set(activeTopicChildren.flatMap(n => n.disciplines)));
+  }, [activeTopicChildren]);
+
   return (
     <div className="flex h-screen w-full bg-slate-50 text-slate-800 font-sans overflow-hidden">
       <Toaster position="top-center" />
@@ -1639,7 +1651,7 @@ const PhysMemosApp: FC = () => {
                             <div className="p-4 bg-indigo-50/50 rounded-lg border border-indigo-100 flex flex-row">
                                <div className='pr-8'>
                                <div className="text-2xl font-bold text-indigo-600 mb-1 ">
-                                 {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').length}
+                                 {activeTopicChildren.length}
                                </div>
                                <div className="text-xs text-indigo-400 font-medium uppercase tracking-wider">Entries</div>
                                </div>
@@ -1647,7 +1659,7 @@ const PhysMemosApp: FC = () => {
                                <div>
                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">所属学科(自动聚合) / Disciplines</span>
                                <div className="flex flex-wrap gap-2">
-                                  {Array.from(new Set(nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').flatMap(n => n.disciplines))).map(disciplineKey => {
+                                  {activeTopicDisciplines.map(disciplineKey => {
                                       const disc = disciplinesMap[disciplineKey];
                                       if (!disc) return null;
                                       return (
@@ -1660,7 +1672,7 @@ const PhysMemosApp: FC = () => {
                                           </span>
                                       );
                                   })}
-                                  {Array.from(new Set(nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').flatMap(n => n.disciplines))).length === 0 && (
+                                  {activeTopicDisciplines.length === 0 && (
                                       <span className="text-xs text-slate-400 italic">暂无关联学科 / No disciplines found</span>
                                   )}
                                </div>
@@ -1694,7 +1706,7 @@ const PhysMemosApp: FC = () => {
                         {activeNode.title} 中的条目
                       </h3>
                       <div className="space-y-3">
-                        {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').map(child => (
+                        {activeTopicChildren.map(child => (
                            <TopicChildCard
                                key={child.id}
                                conceptId={child.id}
@@ -1704,7 +1716,7 @@ const PhysMemosApp: FC = () => {
                                onClick={() => setActiveNodeId(child.id)}
                            />
                         ))}
-                        {nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC').length === 0 && (
+                        {activeTopicChildren.length === 0 && (
                            <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 bg-slate-50/50">
                               暂无下属条目
                            </div>

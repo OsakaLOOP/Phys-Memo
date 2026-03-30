@@ -169,7 +169,7 @@ export function useNetworkLayout(
 
 
 
-        // 3. 树状向上螺旋生长的布局
+// 3. 树状向上螺旋生长的布局
         const nodes: Map<string, ProcessedNode> = new Map();
         const baseWidth = 30; // 轨道之间的水平步长
 
@@ -205,10 +205,6 @@ export function useNetworkLayout(
         const activeIntervals = new Map<number, Array<{ start: number; end: number }>>();
 
         const isOverlap = (s1: number, e1: number, s2: number, e2: number) => {
-            // 如果两个区间有重叠，则发生碰撞
-            // 注意：父节点分支出子节点的那一行（startRow）是允许"接触"的，但为了严格防止连线重叠，
-            // 如果一个线段在 startRow 到 endRow 活动，另一个在同一 X 的相同区间活动，就是交叉。
-            // 只要区间的交集长度 >= 0 就算重叠（即 max(s1, s2) <= min(e1, e2)）
             return Math.max(s1, s2) <= Math.min(e1, e2);
         };
 
@@ -230,10 +226,6 @@ export function useNetworkLayout(
 
         // 动态移开占据空间的外部轨道，为新的子轨道腾出空间
         const shiftOuterLanes = (fromX: number, direction: 1 | -1, _startRow: number, _endRow: number) => {
-            // 需要找到一个连续占用的区间，直到遇到一个空车道为止，把它们整体向外推一格
-            // 为了简单处理并保持拓扑相对顺序，当检测到目标X被占用且可能导致交叉时，
-            // 我们将所有在目标X以外（同侧）的轨道强行向外推一格
-
             // 找出需要移动的 track
             const tracksToShift: number[] = [];
             for (const [trackIdx, trackX] of trackXIndex.entries()) {
@@ -270,7 +262,6 @@ export function useNetworkLayout(
             const range = trackRanges.get(i)!;
 
             if (i === 0) {
-                // 主轨道固定在 X = 0
                 trackXIndex.set(i, 0);
                 addInterval(0, range.startRow, range.endRow);
                 continue;
@@ -285,29 +276,27 @@ export function useNetworkLayout(
                 const parentTrackIdx = idToTrackIndex.get(parentId)!;
                 const parentXIndex = trackXIndex.get(parentTrackIdx) || 0;
 
-                // 优先尝试靠近父节点的位置
-                let candLeft = parentXIndex - 1;
-                let candRight = parentXIndex + 1;
-
-                // 检查左边和右边是否空闲
-                const isLeftFree = isLaneFree(candLeft, range.startRow, range.endRow);
-                const isRightFree = isLaneFree(candRight, range.startRow, range.endRow);
-
-                if (isRightFree && isLaneFree(candRight, range.startRow, range.startRow)) {
-                    // 右侧完全空闲，且不存在跨越
-                    candidateX = candRight;
-                } else if (isLeftFree && isLaneFree(candLeft, range.startRow, range.startRow)) {
-                    // 左侧完全空闲
-                    candidateX = candLeft;
+                // 优先尝试直接继承父节点的位置（即保持完全垂直）
+                // 只有当父节点的轨道在上方（或当前行）已经被别的连续分支占据时，才考虑左右散开
+                if (isLaneFree(parentXIndex, range.startRow + 1, range.endRow) && isLaneFree(parentXIndex, range.startRow, range.startRow)) {
+                     candidateX = parentXIndex;
                 } else {
-                    // 如果两侧都被占用了（或者在 startRow 存在障碍物导致了交叉）
-                    // 我们强行扒开空间（Shift），把外侧的现有轨道往外挤。
-                    // 默认向右边挤（Git 图常见策略，子分支在右侧）
-                    shiftOuterLanes(candRight, 1, range.startRow, range.endRow);
-                    candidateX = candRight;
+                    let candLeft = parentXIndex - 1;
+                    let candRight = parentXIndex + 1;
+
+                    const isLeftFree = isLaneFree(candLeft, range.startRow, range.endRow);
+                    const isRightFree = isLaneFree(candRight, range.startRow, range.endRow);
+
+                    if (isRightFree && isLaneFree(candRight, range.startRow, range.startRow)) {
+                        candidateX = candRight;
+                    } else if (isLeftFree && isLaneFree(candLeft, range.startRow, range.startRow)) {
+                        candidateX = candLeft;
+                    } else {
+                        shiftOuterLanes(candRight, 1, range.startRow, range.endRow);
+                        candidateX = candRight;
+                    }
                 }
             } else {
-                // 如果没有父节点（游离分支），找一个绝对空闲的位置
                 let offset = 0;
                 let found = false;
                 while (!found) {

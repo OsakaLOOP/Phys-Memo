@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Star, ArrowBigUp, ArrowBigDown, GitMerge, Trash2, MoreHorizontal } from 'lucide-react';
+import { Star, ArrowBigUp, ArrowBigDown, GitMerge, Trash2, MoreHorizontal, LucideBrushCleaning } from 'lucide-react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { core } from '../../attrstrand/core';
 import type { EditionFlagType } from '../../attrstrand/types';
@@ -153,8 +153,8 @@ export const EditionFlagBar: React.FC<{
                     onMouseLeave={handleMouseLeave}
                     className="flex flex-col w-full h-full"
                 >
-                    {renderPrivateBtn('to-be-merged', GitMerge, '标记待合并 (To be merged)')}
-                    {renderPrivateBtn('to-be-cleaned', Trash2, '标记待清理 (To be cleaned)')}
+                    {renderPrivateBtn('to-be-merged', GitMerge, '标记待合并')}
+                    {renderPrivateBtn('to-be-cleaned', LucideBrushCleaning, '标记待清理')}
                 </div>
             </Modal>
         </div>

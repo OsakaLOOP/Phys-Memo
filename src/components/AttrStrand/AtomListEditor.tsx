@@ -117,6 +117,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                             <button
                                 onClick={() => handleAdd(-1)}
                                 className="bg-indigo-50 text-indigo-400 rounded-full p-1 mb-4 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200"
+                                aria-label="在上方添加"
                             >
                                 <Plus size={12} />
                             </button>
@@ -149,6 +150,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                                     ${isInline ? 'absolute -top-2 -right-2 bg-white rounded-full shadow border z-20 hover:bg-red-50' : 'absolute top-2 right-0'}
                                     ${isRelation ? 'top-[calc(50%-8px)] right-2' : ''}
                                 `}
+                                aria-label="删除"
                             >
                                 <Trash2 size={isInline ? 10 : 14} />
                             </button>
@@ -165,6 +167,7 @@ export const AtomListEditor: React.FC<AtomListEditorProps> = ({
                             <button
                                 onClick={() => handleAdd(index)}
                                 className="bg-indigo-50 text-indigo-400 rounded-full p-1 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm border border-indigo-200"
+                                aria-label="在下方添加"
                             >
                                 <Plus size={12} />
                             </button>

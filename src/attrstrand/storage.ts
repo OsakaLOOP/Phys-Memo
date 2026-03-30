@@ -12,6 +12,7 @@ export interface IStorage {
     saveEdition(edition: IEdition): Promise<void>;
     getEdition(id: string): Promise<IEdition | null>;
     getEditionsByConcept(conceptId: string): Promise<IEdition[]>;
+    getEditionCountByConcept(conceptId: string): Promise<number>;
 
     // Atom Operations
     saveAtom(atom: IContentAtom): Promise<void>;
@@ -124,6 +125,11 @@ export class IndexedDBStorage implements IStorage {
     async getEditionsByConcept(conceptId: string): Promise<IEdition[]> {
         const db = await this.getDB();
         return db.getAllFromIndex('attr_editions', 'conceptId', conceptId);
+    }
+
+    async getEditionCountByConcept(conceptId: string): Promise<number> {
+        const db = await this.getDB();
+        return db.countFromIndex('attr_editions', 'conceptId', conceptId);
     }
 
     // --- Atom Operations ---

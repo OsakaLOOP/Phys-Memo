@@ -85,8 +85,7 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                     // The upper images vertically centered, lower captions top-aligned.
                     return (
                         <div key={rowIndex} className="w-full flex flex-col items-center">
-                            {/* Combined Row: Images and Captions in columns */}
-                            {/* NEW CSS: justify-evenly (or justify-around/center) for distribution */}
+                            {/* Combined Row*/}
                             <div className="w-full flex flex-row justify-evenly items-end">
                                 {rowItems.map(({ imgMeta, index }) => {
                                     const url = urls[imgMeta.id] || '';
@@ -97,7 +96,7 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                                             key={`col-${index}`}
                                             // Ensure width fits content.
                                             style={{ maxWidth: `${effectiveRatio * 100}%` }}
-                                            className="flex flex-col items-center justify-start box-border shrink"
+                                            className="flex flex-col items-center justify-center box-border shrink"
                                         >
                                             <div className="flex flex-col items-center justify-center w-fit max-h-[800px]">
                                                 <img
@@ -118,30 +117,6 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                                     );
                                 })}
                             </div>
-                            {/* Captions Row: Top Aligned */}
-                            {rowItems.some(({ imgMeta }) => imgMeta.caption) && (
-                                <div className="w-full flex flex-row justify-center items-start mt-2">
-                                    {rowItems.map(({ imgMeta, index }) => {
-                                        const widthRatio = imgMeta.widthRatio || 1;
-                                        const caption = imgMeta.caption || '';
-                                        const effectiveWidthRatio = (imgMeta as any).effectiveWidthRatio || widthRatio;
-                                        return (
-                                            <div
-                                                key={`cap-${index}`}
-                                                style={{ width: `${effectiveWidthRatio * 100}%` }}
-                                                className="flex flex-col items-center justify-start box-border text-sm text-center"
-                                            >
-                                                {caption && (
-                                                    <span>
-                                                        {imagesMeta.length > 1 && `(${String.fromCharCode(97 + index)}) `}
-                                                        {caption}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
                         </div>
                     );
                 })}

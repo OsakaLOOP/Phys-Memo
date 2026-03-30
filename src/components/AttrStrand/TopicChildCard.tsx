@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { storage } from '../../attrstrand/storage';
 import type { IConceptRoot, IPopulatedEdition } from '../../attrstrand/types';
 
-import { Layers, Book } from 'lucide-react';
+import { Layers, Book, GitBranch } from 'lucide-react';
 import RichTextRenderer from '../RichTextRenderer';
 
 interface TopicChildCardProps {
@@ -22,14 +22,19 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
 }) => {
     const [concept, setConcept] = useState<IConceptRoot | null>(null);
     const [edition, setEdition] = useState<IPopulatedEdition | null>(null);
+    const [totalVersions, setTotalVersions] = useState<number>(0);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const loadData = async () => {
             try {
-                const c = await storage.getConcept(conceptId);
+                const [c, versionsCount] = await Promise.all([
+                    storage.getConcept(conceptId),
+                    storage.getEditionCountByConcept(conceptId)
+                ]);
                 if (c) {
                     setConcept(c);
+                    setTotalVersions(versionsCount);
                     // Get latest head
                     const heads = Object.entries(c.currentHeads).sort((a, b) => b[1] - a[1]);
                     if (heads.length > 0) {
@@ -150,8 +155,12 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
                 {/* Footer Info */}
                 <div className="flex items-center gap-4 text-[10px] text-slate-400 pt-2 border-t border-slate-50">
                      <span className="flex items-center gap-1">
+                        <GitBranch size={12} />
+                        {Object.keys(concept.currentHeads).length} Branches
+                     </span>
+                     <span className="flex items-center gap-1">
                         <Layers size={12} />
-                        v{Object.keys(concept.currentHeads).length} Versions
+                        {totalVersions} Versions
                      </span>
                      <span className="flex items-center gap-1">
                         <Book size={12} />

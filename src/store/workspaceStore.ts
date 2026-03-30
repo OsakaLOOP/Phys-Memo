@@ -27,6 +27,9 @@ interface WorkspaceState extends IWorkspaceDraft {
     // Concept Metadata
     updateConceptMeta: (name: string, topic: string, disciplines: string[]) => void;
 
+    // Flags
+    setEditionFlags: (flags: import('../attrstrand/types').IEditionFlag[]) => void;
+
     // Atom ID List 操作
     addAtomId: (field: ContentAtomField, id: DraftId, index?: number) => void;
     removeAtomId: (field: ContentAtomField, index: number) => void;
@@ -80,6 +83,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         conceptDisciplines: [] as string[] as string[],
         lastEdited: new Date().toISOString(),
         cmSessionId: null,
+
+        baseEditionFlags: [] as import('../attrstrand/types').IEditionFlag[],
 
         draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
         draftAtomsData: {},
@@ -156,6 +161,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     conceptDisciplines,
                     lastEdited: new Date().toISOString(),
                     cmSessionId: null,
+                    baseEditionFlags: [],
                     draftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
                     draftAtomsData: {},
                 cmDraftAtomLists: { core: [], doc: [], tags: [], refs: [], rels: [] } as Record<ContentAtomField, string[]>,
@@ -202,6 +208,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 conceptDisciplines,
                 lastEdited: new Date().toISOString(),
                 cmSessionId: null,
+                baseEditionFlags: (edition.frontMeta?.flags as import('../attrstrand/types').IEditionFlag[]) || [],
                 draftAtomLists: {
                     core: mapIds(edition.coreAtoms),
                     doc: mapIds(edition.docAtoms),
@@ -224,6 +231,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         // Concept Metadata 更新. 后期必须引入防抖, 而且 Metadata 将会跟着 Concept 一起提交.
         updateConceptMeta: (name: string, topic: string, disciplines: string[]) => {
             set({ conceptName: name, conceptTopic: topic, conceptDisciplines: disciplines, lastEdited: new Date().toISOString() });
+        },
+
+        setEditionFlags: (flags: import('../attrstrand/types').IEditionFlag[]) => {
+            set({ baseEditionFlags: flags });
         },
 
         addAtomId: (field: ContentAtomField, id: DraftId, index?: number) => {

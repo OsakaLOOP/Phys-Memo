@@ -7,8 +7,16 @@ export type DraftId = string; // 草稿 ID, 可以是随机的 256 位 uuid, 也
 export type ContentAtomField = 'doc' | 'core' | 'tags' | 'refs' | 'rels' // 所有概念页展示的字段内容均 json 格式化, 作为对应域的 Atom 存储.
 export type ContentAtomType = 'latex' | 'markdown' | 'inline' | 'sources' | 'bin' // inline -> tags/refs, sources -> uploaded md/pdf file links, bin -> binary blob.
 export type ContentAtomAttr = Record<string, number> // {"author1": prop1, ...}, 用于计算版权分配
-export type Meta = Record<string, string | number | boolean | null> // 其他字段, 只用于编辑器渲染/ 后端 worker. 否则应当定义在顶层. 前后端 meta 必须分离, 后者api返回时剔除. 不参与hash计算
+export type Meta = Record<string, string | number | boolean | null | any> // 其他字段, 只用于编辑器渲染/ 后端 worker. 否则应当定义在顶层. 前后端 meta 必须分离, 后者api返回时剔除. 不参与hash计算
 // createdAt 现已移入backmeta.
+
+export type EditionFlagType = 'star' | 'upvote' | 'downvote' | 'to-be-merged' | 'to-be-cleaned';
+export interface IEditionFlag {
+    userId: string;
+    type: EditionFlagType;
+    timestampISO: string; // 后端生成, 前端不显示
+}
+
 // 持续层定义. 这些接口对象一旦生成，其 Hash ID 绝对不可变.
 
 export interface BinAtomMeta {
@@ -142,6 +150,8 @@ export interface IWorkspaceDraft {
     draftAtomLists: Record<ContentAtomField, Array<DraftId>>;
 
     draftAtomsData: Record<DraftId, AtomDraft>; // 本地草稿编辑时的 Atom 数据. key 是 Atom ID, value 是 Atom 数据.
+
+    baseEditionFlags: IEditionFlag[]; // 当前加载的 Edition 的 flags 列表
 }
 
 // 前端提交的请求格式.

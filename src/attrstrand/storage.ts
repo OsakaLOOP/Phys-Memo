@@ -12,6 +12,7 @@ export interface IStorage {
     saveEdition(edition: IEdition): Promise<void>;
     getEdition(id: string): Promise<IEdition | null>;
     getEditionsByConcept(conceptId: string): Promise<IEdition[]>;
+    updateEditionFlags(id: string, flags: import('./types').IEditionFlag[]): Promise<void>;
 
     // Atom Operations
     saveAtom(atom: IContentAtom): Promise<void>;
@@ -124,6 +125,21 @@ export class IndexedDBStorage implements IStorage {
     async getEditionsByConcept(conceptId: string): Promise<IEdition[]> {
         const db = await this.getDB();
         return db.getAllFromIndex('attr_editions', 'conceptId', conceptId);
+    }
+
+    async updateEditionFlags(id: string, flags: import('./types').IEditionFlag[]): Promise<void> {
+        const db = await this.getDB();
+        const tx = db.transaction('attr_editions', 'readwrite');
+        const store = tx.objectStore('attr_editions');
+        const edition = await store.get(id);
+        if (edition) {
+            if (!edition.frontMeta) {
+                edition.frontMeta = {};
+            }
+            edition.frontMeta.flags = flags as any;
+            await store.put(edition);
+        }
+        await tx.done;
     }
 
     // --- Atom Operations ---

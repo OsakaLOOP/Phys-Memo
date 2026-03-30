@@ -25,6 +25,7 @@ import { core } from './attrstrand/core';
 import { storage } from './attrstrand/storage';
 import type { IEdition, IPopulatedEdition, IConceptView } from './attrstrand/types';
 import { AtomListEditor } from './components/AttrStrand/AtomListEditor';
+import { EditionFlagBar } from './components/AttrStrand/EditionFlagBar';
 import { FieldEditor } from './components/AttrStrand/FieldEditor';
 import { ConceptNetworkView } from './components/AttrStrand/ConceptNetworkView';
 import { TopicChildCard } from './components/AttrStrand/TopicChildCard';
@@ -820,6 +821,7 @@ const PhysMemosApp: FC = () => {
   const futureStatesLength = useStore(useWorkspaceStore.temporal, (state) => state.futureStates.length);
   const undo = useStore(useWorkspaceStore.temporal, (state) => state.undo);
   const redo = useStore(useWorkspaceStore.temporal, (state) => state.redo);
+  const baseEditionId = useWorkspaceStore(state => state.baseEditionId);
   const activeEditor = useWorkspaceStore(state => state.activeEditor);
   const cmUndoDepth = useWorkspaceStore(state => state.cmUndoDepth);
   const cmRedoDepth = useWorkspaceStore(state => state.cmRedoDepth);
@@ -869,7 +871,7 @@ const PhysMemosApp: FC = () => {
         toast.success(result.message || '保存成功');
         // Once submitted, ideally we update mapping IDs in store to avoid re-rendering issues
         // For simplicity here we just re-init the workspace with the new edition
-        const populated = await core.getPopulatedEdition(result.edition.id);
+        const populated = await core.getPopulatedEdition(result.edition.id, 'default-user');
         if (populated) {
              workspaceActions.initWorkspaceAndClear(populated, result.edition.conceptId, submission.conceptName, submission.conceptTopic, submission.conceptDisciplines);
 
@@ -1133,7 +1135,7 @@ const PhysMemosApp: FC = () => {
                const heads = Object.entries(concept.currentHeads).sort((a, b) => b[1] - a[1]);
                if (heads.length > 0) {
                    const headId = heads[0][0];
-                   return core.getPopulatedEdition(headId);
+                   return core.getPopulatedEdition(headId, 'default-user');
                }
                return Promise.resolve(null);
            });
@@ -1165,7 +1167,7 @@ const PhysMemosApp: FC = () => {
       const heads = Object.entries(concept.currentHeads).sort((a, b) => b[1] - a[1]);
       if (heads.length > 0) {
         const headId = heads[0][0];
-        const populated = await core.getPopulatedEdition(headId);
+        const populated = await core.getPopulatedEdition(headId, 'default-user');
         if (populated) {
           setActiveEdition(populated);
             workspaceActions.initWorkspaceAndClear(populated, activeNode.id, concept.name, concept.topic, concept.disciplines);
@@ -1570,7 +1572,7 @@ const PhysMemosApp: FC = () => {
                       onSelectEdition={async (edition) => {
                           // Switch to this edition
                           setActiveEdition(edition);
-                          const populated = await core.getPopulatedEdition(edition.id);
+                          const populated = await core.getPopulatedEdition(edition.id, 'default-user');
                           if (populated && activeNode) {
                               workspaceActions.initWorkspaceAndClear(populated, activeNode.id, activeNode.title, activeNode.topic, activeNode.disciplines);
                           }
@@ -1736,6 +1738,7 @@ const PhysMemosApp: FC = () => {
                   {/* Replace SmartFormulaBlock and EditableBlock with AtomListEditor */}
                   <div className="flex justify-between items-center mb-4 gap-4">
                        <div className="flex items-center gap-2">
+                           <EditionFlagBar editionId={baseEditionId} currentUserId="default-user" />
                            <button
                                 onClick={(e) => {
                                     e.preventDefault();

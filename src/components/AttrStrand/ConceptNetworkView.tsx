@@ -248,7 +248,7 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
     useEffect(() => {
         if (hoveredEditionId && !populatedEditionsCache[hoveredEditionId]) {
             setIsFetchingHovered(true);
-            core.getPopulatedEdition(hoveredEditionId).then(populated => {
+            core.getPopulatedEdition(hoveredEditionId, 'default-user').then(populated => {
                 if (populated) {
                     setPopulatedEditionsCache(prev => ({ ...prev, [hoveredEditionId]: populated }));
                 }

@@ -99,7 +99,7 @@ export class AttrStrandCore {
 
     // 提供的 api
 
-    async getPopulatedEdition(editionId: hash): Promise<IPopulatedEdition | null> {
+    async getPopulatedEdition(editionId: hash, currentUserId?: string): Promise<IPopulatedEdition | null> {
         const edition = await storage.getEdition(editionId);
         if (!edition) return null;
 
@@ -149,6 +149,15 @@ export class AttrStrandCore {
             editionAttr[edition.creator] = 1;
         }
 
+        // 过滤 frontMeta.flags
+        if (edition.frontMeta && Array.isArray(edition.frontMeta.flags)) {
+            const publicFlags = ['star', 'upvote', 'downvote'];
+            edition.frontMeta.flags = edition.frontMeta.flags.filter((flag: import('./types').IEditionFlag) => {
+                if (publicFlags.includes(flag.type)) return true;
+                return flag.userId === currentUserId;
+            });
+        }
+
         return {
             ...edition,
             coreAtoms,
@@ -161,6 +170,49 @@ export class AttrStrandCore {
             editionDiffDeleted,
             editionDiffRetained
         };
+    }
+
+    async toggleEditionFlag(editionId: hash, userId: string, flagType: import('./types').EditionFlagType): Promise<{ success: boolean, flags?: import('./types').IEditionFlag[], message?: string }> {
+        try {
+            const edition = await storage.getEdition(editionId);
+            if (!edition) {
+                return { success: false, message: 'Edition not found' };
+            }
+
+            if (!edition.frontMeta) {
+                edition.frontMeta = {};
+            }
+
+            let flags: import('./types').IEditionFlag[] = Array.isArray(edition.frontMeta.flags) ? edition.frontMeta.flags : [];
+
+            // 检查当前用户是否已经标记过该类型
+            const existingIndex = flags.findIndex(f => f.userId === userId && f.type === flagType);
+
+            if (existingIndex >= 0) {
+                // 如果已存在，则取消标记
+                flags.splice(existingIndex, 1);
+            } else {
+                // 如果不存在，则添加标记
+                flags.push({
+                    userId,
+                    type: flagType,
+                    timestampISO: new Date().toISOString()
+                });
+            }
+
+            await storage.updateEditionFlags(editionId, flags);
+
+            const publicFlags = ['star', 'upvote', 'downvote'];
+            const filteredFlags = flags.filter((flag: import('./types').IEditionFlag) => {
+                if (publicFlags.includes(flag.type)) return true;
+                return flag.userId === userId;
+            });
+
+            return { success: true, flags: filteredFlags, message: 'Flag updated successfully' };
+        } catch (error) {
+            console.error('Failed to toggle edition flag:', error);
+            return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+        }
     }
 
     async submitEdition(submission: EditionSubmission, creatorId: string, timestampISO: string): Promise<{ success: boolean, edition?: IEdition, message?: string }> {

@@ -1,5 +1,5 @@
 import {
-  useState, useEffect, useRef, useMemo,
+  useState, useEffect, useRef, useMemo, memo, useCallback,
   type FC, type ChangeEvent, type MouseEvent
 } from 'react';
 
@@ -226,7 +226,7 @@ interface HoveredNodeState extends NodeData {
   y?: number;
 }
 
-const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNodeClick }) => {
+const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, onNodeClick }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredNode, setHoveredNode] = useState<HoveredNodeState | null>(null);
   const [legendPaths, setLegendPaths] = useState<Record<string, string>>({});
@@ -783,7 +783,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = ({ nodes, disciplinesMap, onNode
 
     </div>
   );
-};
+});
 
 // --- Main App Component ---
 
@@ -804,6 +804,13 @@ const PhysMemosApp: FC = () => {
   const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
   const [showOcrPanel, setShowOcrPanel] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
+
+  // ⚡ Bolt: Memoize the click handler to prevent KnowledgeGraph (heavy D3 component) from re-rendering
+  // when unrelated parent state changes (like typing in the search bar).
+  const handleGraphNodeClick = useCallback((id: string) => {
+    setActiveNodeId(id);
+    setViewMode('editor');
+  }, []);
   
   // AttrStrand State
   const [activeEdition, setActiveEdition] = useState<IEdition | IPopulatedEdition | null>(null);
@@ -1542,10 +1549,7 @@ const PhysMemosApp: FC = () => {
                 nodes={nodes}
                 disciplinesMap={disciplinesMap}
                 activeNodeId={activeNodeId}
-                onNodeClick={(id) => {
-                  setActiveNodeId(id);
-                  setViewMode('editor');
-                }}
+                onNodeClick={handleGraphNodeClick}
               />
             </div>
           </div>

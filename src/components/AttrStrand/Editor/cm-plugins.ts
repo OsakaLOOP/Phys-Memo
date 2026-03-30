@@ -585,10 +585,8 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
     const fallbackData = store.draftAtomsData;
     
     for (const m of mappings) {
-        console.log(m,(atomsData[m.id] || fallbackData[m.id]).type)
         const atom = atomsData[m.id] || fallbackData[m.id];
         if (atom && atom.type === 'bin') {
-            console.log(`trying bin ${m.from} ${m.to}`)
             // Expand the replacement range slightly to hide leading/trailing blank lines associated purely with this bin atom
             // We want the block widget to sit exactly where the atom's text is, replacing the entire chunk including the `\n` if possible,
             // but we must not overlap with adjacent atoms. Using `m.from` to `m.to` is technically correct, but if there's text,
@@ -670,7 +668,9 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
         const sideB = (b.dec as any).startSide ?? 0;
         return sideA - sideB;
     }).map(d => {
-        return d.dec.range(d.from, d.to);
+        // Only pass `d.to` for replacements (where from !== to),
+        // fallback to original behavior (only `d.from`) for point widgets and lines.
+        return d.from !== d.to ? d.dec.range(d.from, d.to) : d.dec.range(d.from);
     }), true);
 }
 

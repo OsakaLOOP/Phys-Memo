@@ -812,7 +812,7 @@ const PhysMemosApp: FC = () => {
     setActiveNodeId(id);
     setViewMode('editor');
   }, []);
-  
+
   // AttrStrand State
   const [activeEdition, setActiveEdition] = useState<IEdition | IPopulatedEdition | null>(null);
   const [topicRefs, setTopicRefs] = useState<string[]>([]);
@@ -1116,6 +1116,19 @@ const PhysMemosApp: FC = () => {
   };
 
   const activeNode = nodes.find(n => n.id === activeNodeId);
+
+  // ⚡ Bolt: Memoize ConceptNetworkView handlers to prevent heavy D3 re-renders
+  const handleSelectEdition = useCallback(async (edition: IEdition) => {
+    setActiveEdition(edition);
+    const populated = await core.getPopulatedEdition(edition.id, 'default-user');
+    if (populated && activeNode) {
+        workspaceActions.initWorkspaceAndClear(populated, activeNode.id, activeNode.title, activeNode.topic, activeNode.disciplines);
+    }
+  }, [activeNode]);
+
+  const handleCreateBranch = useCallback((_parent: IEdition) => {
+    alert("Branch creation not implemented in UI demo yet, but core supports it!");
+  }, []);
 
   // Sync AttrStrand when activeNode changes
   useEffect(() => {
@@ -1591,17 +1604,8 @@ const PhysMemosApp: FC = () => {
                   <ConceptNetworkView
                       conceptId={activeNodeId}
                       currentEditionId={activeEdition?.id}
-                      onSelectEdition={async (edition) => {
-                          // Switch to this edition
-                          setActiveEdition(edition);
-                          const populated = await core.getPopulatedEdition(edition.id, 'default-user');
-                          if (populated && activeNode) {
-                              workspaceActions.initWorkspaceAndClear(populated, activeNode.id, activeNode.title, activeNode.topic, activeNode.disciplines);
-                          }
-                      }}
-                      onCreateBranch={(_parent) => {
-                          alert("Branch creation not implemented in UI demo yet, but core supports it!");
-                      }}
+                      onSelectEdition={handleSelectEdition}
+                      onCreateBranch={handleCreateBranch}
                   />
               </div>
             </div>

@@ -14,7 +14,7 @@ interface ConceptNetworkViewProps {
     onCreateBranch: (parentEdition: IEdition) => void;
 }
 
-export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
+export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = React.memo(({
     conceptId,
     currentEditionId,
     onSelectEdition,
@@ -332,4 +332,4 @@ export const ConceptNetworkView: React.FC<ConceptNetworkViewProps> = ({
             </div>
         </div>
     );
-};
+});

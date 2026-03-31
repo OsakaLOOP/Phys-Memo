@@ -93,7 +93,7 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
     // Fallback to minimal view if no attrstrand data (shouldn't happen with correct migration)
     if (!concept || !edition) {
          return (
-             <div onClick={onClick} className="bg-white border border-slate-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all opacity-70">
+             <div onClick={onClick} className="bg-white border border-slate-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all opacity-70 animate-[fadeIn_0.3s_ease-out_forwards]">
                  <h4 className="font-bold text-slate-800 mb-1">{legacyTitle}</h4>
                  <div className="text-xs text-red-400">Legacy Data Only (Migration Pending)</div>
              </div>
@@ -103,7 +103,7 @@ export const TopicChildCard: React.FC<TopicChildCardProps> = ({
     return (
         <div
             onClick={onClick}
-            className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-lg hover:-translate-y-1 hover:border-indigo-300 transition-all duration-300 cursor-pointer group flex gap-4"
+            className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-lg hover:-translate-y-1 hover:border-indigo-300 transition-all duration-300 cursor-pointer group flex gap-4 animate-[fadeIn_0.3s_ease-out_forwards]"
         >
              {/* Icon / Type */}
              <div className="flex flex-col items-center gap-2 pt-1">

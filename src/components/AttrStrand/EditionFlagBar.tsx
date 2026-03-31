@@ -16,12 +16,11 @@ export const EditionFlagBar: React.FC<{
     const flags = useWorkspaceStore(state => state.baseEditionFlags);
     const setFlags = useWorkspaceStore(state => state.setEditionFlags);
 
-    if (!editionId) return null;
-
     const getFlagCount = (type: EditionFlagType) => flags.filter(f => f.type === type).length;
     const isFlaggedByUser = (type: EditionFlagType) => flags.some(f => f.type === type && f.userId === currentUserId);
 
     const handleToggle = async (type: EditionFlagType) => {
+        if (!editionId) return;
         try {
             const res = await core.toggleEditionFlag(editionId, currentUserId, type);
             if (res.success && res.flags) {
@@ -77,7 +76,7 @@ export const EditionFlagBar: React.FC<{
             const rect = buttonRef.current.getBoundingClientRect();
             // Position modal relative to viewport, bottom right aligned to button
             setDropdownPos({
-                top: rect.bottom + 4,
+                top: rect.bottom,
                 left: rect.right, // We will use right edge mapping inside modal inline style
             });
         }
@@ -116,6 +115,8 @@ export const EditionFlagBar: React.FC<{
         };
     }, [showDropdown]);
 
+    if (!editionId) return null;
+
     return (
         <div className="flex items-center bg-white rounded-full shadow-sm border border-slate-200 px-1 h-8 relative">
             <div className="flex items-center gap-0.5">
@@ -137,12 +138,13 @@ export const EditionFlagBar: React.FC<{
                 isOpen={showDropdown}
                 onRequestClose={() => setShowDropdown(false)}
                 className="absolute outline-none bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50 overflow-hidden w-48"
-                overlayClassName="fixed inset-0 z-40 bg-transparent"
+                overlayClassName="fixed inset-0 z-40 bg-transparent pointer-events-none"
                 style={{
                     content: {
                         top: `${dropdownPos.top}px`,
                         left: `${dropdownPos.left}px`,
                         transform: 'translateX(-100%)', // Align right edge with button right edge
+                        pointerEvents: 'auto',
                     }
                 }}
             >

@@ -135,9 +135,6 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                                     nextCursor = 0;
                                 }
 
-                                const workspaceStore = useWorkspaceStore.getState();
-                                workspaceStore.removeAtomId(field, targetMapIndex);
-
                                 view.dispatch({
                                     changes: { from: deleteFrom, to: deleteTo, insert: '' },
                                     selection: { anchor: nextCursor, head: nextCursor },
@@ -145,6 +142,11 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                                     effects: removeAtomEffect.of({ id: targetMap.id }),
                                     annotations: Transaction.userEvent.of('remove_atom')
                                 });
+
+                                setTimeout(() => {
+                                    const workspaceStore = useWorkspaceStore.getState();
+                                    workspaceStore.removeAtomId(field, targetMapIndex);
+                                }, 0);
 
                                 return true;
                             }

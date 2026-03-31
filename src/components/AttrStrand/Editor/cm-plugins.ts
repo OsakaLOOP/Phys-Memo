@@ -35,6 +35,7 @@ export const strictMappingEditFilter = EditorState.transactionFilter.of((tr) => 
     if (
         tr.isUserEvent('add_atom') ||
         tr.isUserEvent('swap_atom') ||
+        tr.isUserEvent('remove_atom') ||
         tr.isUserEvent('external_sync') ||
         tr.isUserEvent('undo') ||
         tr.isUserEvent('redo')
@@ -768,14 +769,17 @@ class DeleteButtonWidget extends WidgetType {
             }
 
             // Sync removal to store
-            const state = useWorkspaceStore.getState();
-            state.removeAtomId(this.field, targetMapIndex);
-
             view.dispatch({
                 changes: { from: deleteFrom, to: deleteTo, insert: '' },
                 effects: removeAtomEffect.of({ id: this.id }),
                 annotations: Transaction.userEvent.of('remove_atom')
             });
+
+            // Delay state update slightly so syncAndSnapshot has mapped the removal correctly
+            setTimeout(() => {
+                const state = useWorkspaceStore.getState();
+                state.removeAtomId(this.field, targetMapIndex);
+            }, 0);
         };
 
         return wrap;

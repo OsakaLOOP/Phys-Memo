@@ -3,7 +3,7 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { ContentAtomField } from '../../attrstrand/types';
 import RichTextRenderer from '../RichTextRenderer';
 import { UnifiedCodeMirror } from './Editor/UnifiedCodeMirror';
-import { Check, Edit3, Plus, AlertTriangle } from 'lucide-react';
+import { Check, Edit3, Plus, AlertTriangle, Trash2 } from 'lucide-react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { CopyrightTooltip } from './CopyrightTooltip';
 import { genTempId } from '../../store/workspaceStore';
@@ -24,6 +24,7 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
     const atomIds = useWorkspaceStore(state => state.draftAtomLists[field] || []);
     const atomsData = useWorkspaceStore(state => state.draftAtomsData);
     const addAtomId = useWorkspaceStore(state => state.addAtomId);
+    const removeAtomId = useWorkspaceStore(state => state.removeAtomId);
 
     // 获取当前 field 的 lint 错误
     const fieldLintErrors = useWorkspaceStore(state => state.fieldLintErrors[field] || false);
@@ -114,6 +115,11 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
 
         // Let it stay in read-only or open editor, here we open editor
         setActiveEditor({ field, id: newId });
+    };
+
+    const handleDelete = (e: React.MouseEvent, index: number) => {
+        e.stopPropagation();
+        removeAtomId(field, index);
     };
 
     const handleCompleteEdit = () => {
@@ -243,14 +249,24 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                                     </div>
                                 )}
 
+                                {!readOnly && (
+                                    <button
+                                        onClick={(e) => handleDelete(e, index)}
+                                        className="opacity-0 group-hover/block:opacity-100 absolute top-2 right-0 text-slate-300 hover:text-red-400 transition-colors p-1"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                )}
+
                                 {/* 块内容与左侧边框 */}
                                 <div className="py-2">
                                     {atom?.type === 'bin' ? (
                                         <div className="pl-0 group-hover/block:bg-slate-50/50 transition-colors relative rounded-lg">
                                             {(() => {
-                                                let meta = {};
+                                                let meta: any = { images: [] };
                                                 try {
-                                                    meta = JSON.parse(atom.content || '{}');
+                                                    const parsed = JSON.parse(atom.content || '{}');
+                                                    if (parsed.images) meta = parsed;
                                                 } catch (e) {
                                                     // Fallback
                                                 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Transaction } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab, invertedEffects, undo, redo, undoDepth, redoDepth } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
@@ -94,6 +94,64 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                     ...historyKeymap,
                     indentWithTab
                 ]),
+                EditorView.domEventHandlers({
+                    keydown: (e, view) => {
+                        if (e.key === 'Backspace' || e.key === 'Delete') {
+                            const state = view.state;
+                            const selection = state.selection.main;
+                            if (!selection.empty) return false;
+
+                            const mappings = state.field(atomMapField);
+                            const cursor = selection.head;
+
+                            // Find the block where cursor is located
+                            const targetMapIndex = mappings.findIndex(m => cursor >= m.from && cursor <= m.to);
+                            if (targetMapIndex === -1) return false;
+
+                            const targetMap = mappings[targetMapIndex];
+
+                            // If block is completely empty
+                            if (targetMap.from === targetMap.to) {
+                                e.preventDefault();
+
+                                let deleteFrom = targetMap.from;
+                                let deleteTo = targetMap.to;
+                                let nextCursor = 0;
+
+                                if (targetMapIndex > 0) {
+                                    // There is a previous block, move cursor there
+                                    const prevMap = mappings[targetMapIndex - 1];
+                                    deleteFrom = prevMap.to;
+                                    nextCursor = prevMap.to;
+                                } else if (mappings.length > 1) {
+                                    // There is a next block
+                                    const nextMap = mappings[1];
+                                    deleteTo = nextMap.from;
+                                    nextCursor = nextMap.from;
+                                } else {
+                                    // It's the only block, just delete its wrapper basically
+                                    deleteFrom = 0;
+                                    deleteTo = state.doc.length;
+                                    nextCursor = 0;
+                                }
+
+                                const workspaceStore = useWorkspaceStore.getState();
+                                workspaceStore.removeAtomId(field, targetMapIndex);
+
+                                view.dispatch({
+                                    changes: { from: deleteFrom, to: deleteTo, insert: '' },
+                                    selection: { anchor: nextCursor, head: nextCursor },
+                                    scrollIntoView: true,
+                                    effects: removeAtomEffect.of({ id: targetMap.id }),
+                                    annotations: Transaction.userEvent.of('remove_atom')
+                                });
+
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                }),
                 // 核心状态机与装饰器
                 atomMapField,
                 strictMappingEditFilter,

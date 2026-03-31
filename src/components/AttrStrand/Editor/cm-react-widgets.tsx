@@ -32,9 +32,10 @@ const BinaryAtomEditorWrapper: React.FC<{ atomId: string }> = ({ atomId }) => {
     if (!atom || atom.type !== 'bin') return null;
 
     // Parse meta from content JSON
-    let meta = {};
+    let meta: any = { images: [] };
     try {
-        meta = JSON.parse(atom.content || '{}');
+        const parsed = JSON.parse(atom.content || '{}');
+        if (parsed.images) meta = parsed;
     } catch (e) {
         // Fallback
     }
@@ -66,16 +67,18 @@ const BinaryAtomEditorWrapper: React.FC<{ atomId: string }> = ({ atomId }) => {
                                 const view = EditorView.findFromDOM(containerRef.current);
                                 if (view) {
                                     // Need to find the mapped atom to get the exact `from` / `to` position
-                                    const { atomMapField } = require('./cm-plugins');
-                                    const { Transaction } = require('@codemirror/state');
-                                    const mappings = view.state.field(atomMapField);
-                                    const m = mappings.find((mapping: any) => mapping.id === atomId);
-                                    if (m) {
-                                        view.dispatch({
-                                            changes: { from: m.from, to: m.to, insert: newContent },
-                                            annotations: Transaction.userEvent.of('input') // Ensure sync And Snapshot catches it.
+                                    import('./cm-plugins').then(({ atomMapField }) => {
+                                        import('@codemirror/state').then(({ Transaction }) => {
+                                            const mappings = view.state.field(atomMapField);
+                                            const m = mappings.find((mapping: any) => mapping.id === atomId);
+                                            if (m) {
+                                                view.dispatch({
+                                                    changes: { from: m.from, to: m.to, insert: newContent },
+                                                    annotations: Transaction.userEvent.of('input') // Ensure sync And Snapshot catches it.
+                                                });
+                                            }
                                         });
-                                    }
+                                    });
                                 }
                             }
 

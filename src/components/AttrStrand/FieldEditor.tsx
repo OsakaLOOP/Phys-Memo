@@ -252,7 +252,7 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                                 {!readOnly && (
                                     <button
                                         onClick={(e) => handleDelete(e, index)}
-                                        className="opacity-0 group-hover/block:opacity-100 absolute top-2 right-0 text-slate-300 hover:text-red-400 transition-colors p-1"
+                                        className="opacity-0 group-hover/block:opacity-100 absolute top-2 right-0 text-slate-300 hover:text-red-400 transition-colors p-1 z-10"
                                     >
                                         <Trash2 size={14} />
                                     </button>
@@ -261,7 +261,7 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                                 {/* 块内容与左侧边框 */}
                                 <div className="py-2">
                                     {atom?.type === 'bin' ? (
-                                        <div className="pl-0 group-hover/block:bg-slate-50/50 transition-colors relative rounded-lg">
+                                        <div className="pl-0 group-hover/block:bg-slate-50/50 transition-colors relative rounded-lg min-h-[30px]">
                                             {(() => {
                                                 let meta: any = { images: [] };
                                                 try {
@@ -277,8 +277,12 @@ export const FieldEditor: React.FC<FieldEditorProps> = ({ field, readOnly = fals
                                             })()}
                                         </div>
                                     ) : (
-                                        <div className="pl-3 border-l-[3px] border-slate-200 group-hover/block:border-indigo-300 transition-colors">
-                                            <RichTextRenderer content={content} enableAnalysis={true} />
+                                        <div className="pl-3 border-l-[3px] border-slate-200 group-hover/block:border-indigo-300 transition-colors min-h-[30px]">
+                                            {content ? (
+                                                <RichTextRenderer content={content} enableAnalysis={true} />
+                                            ) : (
+                                                <div className="h-6 w-full opacity-0" />
+                                            )}
                                         </div>
                                     )}
                                 </div>

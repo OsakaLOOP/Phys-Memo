@@ -1197,6 +1197,16 @@ const PhysMemosApp: FC = () => {
     setActiveNodeId(null); // Deselect active node when toggling
   };
 
+  const activeTopicChildren = useMemo(() => {
+    if (!activeNode || activeNode.type !== 'TOPIC') return [];
+    return nodes.filter(n => n.topic === activeNode.title && n.type !== 'TOPIC');
+  }, [nodes, activeNode]);
+
+  const activeTopicDisciplines = useMemo(() => {
+    if (activeTopicChildren.length === 0) return [];
+    return Array.from(new Set(activeTopicChildren.flatMap(n => n.disciplines)));
+  }, [activeTopicChildren]);
+
   const sidebarData = useMemo(() => {
     const q = searchQuery.toLowerCase();
     const childrenMap: Record<string, NodeData[]> = {};

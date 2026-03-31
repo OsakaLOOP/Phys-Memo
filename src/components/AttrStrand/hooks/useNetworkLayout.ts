@@ -82,10 +82,9 @@ export function useNetworkLayout(
         // 从上到下找最长链：严格按照刚才算出的拓扑深度排序
         const sortedIds = [...editions].sort((a, b) => (depths.get(b.id) || 0) - (depths.get(a.id) || 0)).map(e => e.id);
 
-        while (unassignedIds.size > 0) {
-            // 寻找当前未分配节点中深度最大的（即最上面的叶子端）
-            const startId = sortedIds.find(id => unassignedIds.has(id));
-            if (!startId) break;
+        // ⚡ Bolt: Optimize O(N^2) unassignedIds search into O(N) by iterating sortedIds once
+        for (const startId of sortedIds) {
+            if (!unassignedIds.has(startId)) continue;
 
             const currentTrack: string[] = [];
             let currId: string | undefined = startId;

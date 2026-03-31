@@ -166,13 +166,17 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     const renderContent = () => {
         if (atom.type === 'bin') {
-            let meta = {};
+            let meta: any = {};
             try {
                 meta = JSON.parse(atom.content || '{}');
             } catch (e) {
                 // Ignore
             }
-            return <ImageGroupViewer blobs={atom.blobs || {}} meta={meta} />;
+            if (meta.images) {
+                return <ImageGroupViewer blobs={atom.blobs || {}} meta={meta} />;
+            } else {
+                return <div className="text-sm text-red-500">无法显示内容: 缺少 images 元信息</div>;
+            }
         }
 
         if (!atom.content) return <span className="text-slate-300 italic text-sm">点击编辑内容...</span>;

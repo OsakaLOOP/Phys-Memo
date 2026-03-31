@@ -538,10 +538,10 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
             }
 
             // 添加红色圆形删除按钮 Widget 到块的首行结尾
-            const firstBlockLine = state.doc.lineAt(m.from);
+            const midBlockLine = state.doc.lineAt(Math.floor((m.from + m.to) / 2));
             decorations.push({
-                from: firstBlockLine.to,
-                to: firstBlockLine.to,
+                from: midBlockLine.to,
+                to: midBlockLine.to,
                 dec: Decoration.widget({
                     widget: new DeleteButtonWidget(field, m.id),
                     side: 1
@@ -754,32 +754,44 @@ class DeleteButtonWidget extends WidgetType {
             let deleteFrom = targetMap.from;
             let deleteTo = targetMap.to;
 
-            // Include preceding newline if it exists (and it's not the first atom)
-            if (targetMapIndex > 0) {
-                const prevMap = mappings[targetMapIndex - 1];
-                deleteFrom = prevMap.to;
-            } else if (mappings.length > 1) {
-                // If it's the first atom, delete the newline after it
-                const nextMap = mappings[1];
-                deleteTo = nextMap.from;
+            // Normally delete the following newline gap, unless it's the last block,
+            // then delete the preceding newline gap.
+            if (mappings.length > 1) {
+                if (targetMapIndex < mappings.length - 1) {
+                    // Not the last block, delete up to the next block's start
+                    const nextMap = mappings[targetMapIndex + 1];
+                    deleteTo = nextMap.from;
+                } else {
+                    // Last block, delete back to the previous block's end
+                    const prevMap = mappings[targetMapIndex - 1];
+                    deleteFrom = prevMap.to;
+                    // Also clear any trailing newlines up to EOF just in case
+                    deleteTo = view.state.doc.length;
+                }
             } else {
                 // Only one atom, clear everything
                 deleteFrom = 0;
                 deleteTo = view.state.doc.length;
             }
 
-            // Sync removal to store
             view.dispatch({
                 changes: { from: deleteFrom, to: deleteTo, insert: '' },
                 effects: removeAtomEffect.of({ id: this.id }),
                 annotations: Transaction.userEvent.of('remove_atom')
             });
 
-            // Delay state update slightly so syncAndSnapshot has mapped the removal correctly
-            setTimeout(() => {
-                const state = useWorkspaceStore.getState();
-                state.removeAtomId(this.field, targetMapIndex);
-            }, 0);
+            // We do NOT call `useWorkspaceStore.getState().removeAtomId` here.
+            // The `remove_atom` structural change is captured by `syncAndSnapshotPlugin`
+            // which will sync the parallel CM state and the snapshot will correctly reflect the removed ID.
+            // When we eventually exit, `applyCMSnapshotsToZundo` applies the final state list.
+            // Alternatively, if we wanted live syncing of the main list, we'd do it.
+            // Wait, we need the main list to update because the parallel state's sync
+            // relies on the main list sometimes. Actually `syncAndSnapshotPlugin` does NOT mutate the main Zundo list directly,
+            // it updates `cmDraftAtomLists`. But wait!
+            // In the `syncAndSnapshotPlugin` inside `UnifiedCodeMirror`, we do:
+            // `state.syncCMToParallelState(field, newList, newAtomsData)` where `newList` comes from mapping!
+            // Yes, the CM list maps perfectly and parallel state is synced. We shouldn't double-delete.
+            // The previous logic triggered `removeAtomId` which modified the Zundo store, causing a re-render.
         };
 
         return wrap;

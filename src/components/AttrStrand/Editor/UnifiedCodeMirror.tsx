@@ -118,16 +118,33 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                                 let deleteTo = targetMap.to;
                                 let nextCursor = 0;
 
-                                if (targetMapIndex > 0) {
-                                    // There is a previous block, move cursor there
-                                    const prevMap = mappings[targetMapIndex - 1];
-                                    deleteFrom = prevMap.to;
-                                    nextCursor = prevMap.to;
-                                } else if (mappings.length > 1) {
-                                    // There is a next block
-                                    const nextMap = mappings[1];
-                                    deleteTo = nextMap.from;
-                                    nextCursor = nextMap.from;
+                                if (mappings.length > 1) {
+                                    if (e.key === 'Backspace') {
+                                        if (targetMapIndex > 0) {
+                                            // Delete preceding gap, move cursor to prev block
+                                            const prevMap = mappings[targetMapIndex - 1];
+                                            deleteFrom = prevMap.to;
+                                            nextCursor = prevMap.to;
+                                        } else {
+                                            // Backspace on first block: delete following gap, move cursor to next block
+                                            const nextMap = mappings[1];
+                                            deleteTo = nextMap.from;
+                                            nextCursor = nextMap.from - (deleteTo - deleteFrom); // adjust for deleted gap
+                                        }
+                                    } else { // 'Delete'
+                                        if (targetMapIndex < mappings.length - 1) {
+                                            // Delete following gap, move cursor to next block
+                                            const nextMap = mappings[targetMapIndex + 1];
+                                            deleteTo = nextMap.from;
+                                            nextCursor = nextMap.from - (deleteTo - deleteFrom);
+                                        } else {
+                                            // Delete on last block: delete preceding gap, move cursor to prev block
+                                            const prevMap = mappings[targetMapIndex - 1];
+                                            deleteFrom = prevMap.to;
+                                            deleteTo = state.doc.length; // Ensure trailing spaces are gone
+                                            nextCursor = prevMap.to;
+                                        }
+                                    }
                                 } else {
                                     // It's the only block, just delete its wrapper basically
                                     deleteFrom = 0;
@@ -142,11 +159,6 @@ export const UnifiedCodeMirror: React.FC<UnifiedCodeMirrorProps> = ({ field, ini
                                     effects: removeAtomEffect.of({ id: targetMap.id }),
                                     annotations: Transaction.userEvent.of('remove_atom')
                                 });
-
-                                setTimeout(() => {
-                                    const workspaceStore = useWorkspaceStore.getState();
-                                    workspaceStore.removeAtomId(field, targetMapIndex);
-                                }, 0);
 
                                 return true;
                             }

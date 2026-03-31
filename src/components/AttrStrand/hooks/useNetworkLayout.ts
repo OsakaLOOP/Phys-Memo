@@ -229,7 +229,7 @@ export function useNetworkLayout(
         };
 
         // 动态移开占据空间的外部轨道，为新的子轨道腾出空间
-        const shiftOuterLanes = (fromX: number, direction: 1 | -1, startRow: number, endRow: number) => {
+        const shiftOuterLanes = (fromX: number, direction: 1 | -1, _startRow: number, _endRow: number) => {
             // 需要找到一个连续占用的区间，直到遇到一个空车道为止，把它们整体向外推一格
             // 为了简单处理并保持拓扑相对顺序，当检测到目标X被占用且可能导致交叉时，
             // 我们将所有在目标X以外（同侧）的轨道强行向外推一格

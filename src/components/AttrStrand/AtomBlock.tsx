@@ -6,7 +6,6 @@ import { Edit3, Check, X } from 'lucide-react';
 import { calculateDiffStats } from '../../attrstrand/utils';
 import { CopyrightTooltip } from './CopyrightTooltip';
 import { ImageGroupViewer } from './Editor/ImageGroupViewer';
-import { ImageGroupEditor } from './Editor/ImageGroupEditor';
 
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
@@ -166,9 +165,10 @@ export const AtomBlock: React.FC<AtomBlockProps> = ({ atomId, readOnly = false, 
 
     const renderContent = () => {
         if (atom.type === 'bin') {
-            let meta: any = {};
+            let meta: any = { images: [] };
             try {
-                meta = JSON.parse(atom.content || '{}');
+                const parsed = JSON.parse(atom.content || '{}');
+                if (parsed.images) meta = parsed;
             } catch (e) {
                 // Ignore
             }

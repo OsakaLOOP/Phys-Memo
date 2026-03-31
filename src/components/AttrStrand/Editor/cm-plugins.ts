@@ -190,12 +190,6 @@ export const dragDropImagePlugin = (field: ContentAtomField) => EditorView.domEv
         }
 
         const newId = `temp_${crypto.randomUUID().replace(/-/g, '')}`;
-        let insertText = '\n';
-        if (mappingIndex === mappings.length - 1 && view.state.sliceDoc(view.state.doc.length - 1) !== '\n') {
-            insertText = '\n\n';
-        }
-
-        const atomFrom = insertText === '\n\n' ? insertPos + 1 : insertPos;
 
         // Read files as blobs asynchronously to get natural dimensions
         const processFiles = async () => {
@@ -535,12 +529,23 @@ function buildDecorations(state: EditorState, field: ContentAtomField): Decorati
                 // 仅当这行真的属于这个块时添加 class
                 if (line.from >= m.from && line.to <= m.to) {
                     decorations.push({ from: line.from, to: line.from, dec: Decoration.line({
-                        class: 'cm-atom-line border-l-2 border-slate-200 ml-2 pl-2'
+                        class: 'cm-atom-line border-l-2 border-slate-200 ml-2 pl-2 group/cmline'
                     })});
                 }
                 pos = line.to + 1;
                 if (pos > state.doc.length) break;
             }
+
+            // 添加红色圆形删除按钮 Widget 到块的首行结尾
+            const firstBlockLine = state.doc.lineAt(m.from);
+            decorations.push({
+                from: firstBlockLine.to,
+                to: firstBlockLine.to,
+                dec: Decoration.widget({
+                    widget: new DeleteButtonWidget(field, m.id),
+                    side: 1
+                })
+            });
         }
 
         nextGapStart = m.to;
@@ -701,6 +706,81 @@ class EmptyDragMarker extends GutterMarker {
     }
 }
 const dragMarker = new EmptyDragMarker();
+
+class DeleteButtonWidget extends WidgetType {
+    field: ContentAtomField;
+    id: string;
+
+    constructor(field: ContentAtomField, id: string) {
+        super();
+        this.field = field;
+        this.id = id;
+    }
+
+    eq(other: DeleteButtonWidget) {
+        return other.field === this.field && other.id === this.id;
+    }
+
+    toDOM() {
+        const wrap = document.createElement("span");
+        wrap.className = "cm-delete-btn-wrapper absolute right-0 top-1/2 -translate-y-1/2 flex justify-center items-center pointer-events-auto z-10 opacity-0 group-hover/cmline:opacity-100 hover:opacity-100 transition-opacity duration-200 pr-2";
+
+        // Use a larger invisible hit area
+        const hitArea = document.createElement("div");
+        hitArea.className = "p-2 cursor-pointer";
+
+        const btn = document.createElement("button");
+        btn.className = "bg-red-50 text-red-400 rounded-full p-1 hover:bg-red-100 hover:text-red-600 shadow-sm border border-red-200 bg-opacity-90 backdrop-blur-sm cursor-pointer";
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
+
+        hitArea.appendChild(btn);
+        wrap.appendChild(hitArea);
+
+        hitArea.onmousedown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const view = EditorView.findFromDOM(wrap);
+            if (!view) return;
+
+            const mappings = view.state.field(atomMapField);
+            const targetMapIndex = mappings.findIndex(m => m.id === this.id);
+            if (targetMapIndex === -1) return;
+
+            const targetMap = mappings[targetMapIndex];
+
+            // Calculate range to delete including gap
+            let deleteFrom = targetMap.from;
+            let deleteTo = targetMap.to;
+
+            // Include preceding newline if it exists (and it's not the first atom)
+            if (targetMapIndex > 0) {
+                const prevMap = mappings[targetMapIndex - 1];
+                deleteFrom = prevMap.to;
+            } else if (mappings.length > 1) {
+                // If it's the first atom, delete the newline after it
+                const nextMap = mappings[1];
+                deleteTo = nextMap.from;
+            } else {
+                // Only one atom, clear everything
+                deleteFrom = 0;
+                deleteTo = view.state.doc.length;
+            }
+
+            // Sync removal to store
+            const state = useWorkspaceStore.getState();
+            state.removeAtomId(this.field, targetMapIndex);
+
+            view.dispatch({
+                changes: { from: deleteFrom, to: deleteTo, insert: '' },
+                effects: removeAtomEffect.of({ id: this.id }),
+                annotations: Transaction.userEvent.of('remove_atom')
+            });
+        };
+
+        return wrap;
+    }
+}
 
 class AddButtonWidget extends WidgetType {
     field: ContentAtomField;

@@ -16,3 +16,9 @@
 ## 2026-03-31 - [Replace O(N²) nested array search with O(N) iteration]
 **Learning:** Found an O(N²) anti-pattern in `src/components/AttrStrand/hooks/useNetworkLayout.ts` where a `while (unassignedIds.size > 0)` loop repeatedly called `Array.prototype.find()` on an already sorted array of length N. This causes expensive redundant searches for tracking branch history in the ConceptNetworkView.
 **Action:** Replaced the `while` loop and inner `find()` with a single `for...of` iteration over the pre-sorted array, skipping assigned IDs using the `Set.has()` check. This drops the algorithm's time complexity to O(N).
+## 2026-04-01 - [Throttle Expensive Calculations in D3 Tick Loops]
+**Learning:** In heavy D3 visualizations like `KnowledgeGraph`, running expensive geometric algorithms (such as (N \log N)$ convex hulls or `generateBezierPath`) synchronously on every `tick` event severely blocks the main thread and degrades performance.
+**Action:** Throttle expensive background calculations within the `tick` loop (e.g., using `if (tickCount % 3 === 0)`) to significantly reduce CPU load while maintaining visual smoothness.
+## 2026-04-01 - [Avoid N+1 Queries on IndexedDB]
+**Learning:** When querying IndexedDB locally, replacing a single `getAllConcepts()` scan with batched `Promise.all(ids.map(id => getConcept(id)))` introduces an N+1 query bottleneck. Opening N separate local database transactions is often significantly slower than a single table scan.
+**Action:** Use `getAll()` or specific indexed bulk queries instead of looping over single-item fetches when working with local IndexedDB wrappers.

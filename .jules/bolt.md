@@ -12,3 +12,7 @@
 ## 2024-05-18 - [Memoize derived topic node datasets in React renders]
 **Learning:** Found multiple identical derived state calculations (e.g. `nodes.filter(...)` and `Array.from(new Set(...))`) directly inside JSX within the "TOPIC OVERVIEW PAGE" render path of `src/App.tsx`. This causes expensive O(N) array allocation and iterations on every render, especially when the nodes array is large.
 **Action:** Always extract heavy derived array calculations inside React functional components into `useMemo` hooks with proper dependency arrays, and reuse the memoized variables throughout the JSX.
+
+## 2026-03-31 - [Replace O(N²) nested array search with O(N) iteration]
+**Learning:** Found an O(N²) anti-pattern in `src/components/AttrStrand/hooks/useNetworkLayout.ts` where a `while (unassignedIds.size > 0)` loop repeatedly called `Array.prototype.find()` on an already sorted array of length N. This causes expensive redundant searches for tracking branch history in the ConceptNetworkView.
+**Action:** Replaced the `while` loop and inner `find()` with a single `for...of` iteration over the pre-sorted array, skipping assigned IDs using the `Set.has()` check. This drops the algorithm's time complexity to O(N).

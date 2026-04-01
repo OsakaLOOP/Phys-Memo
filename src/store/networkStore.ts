@@ -86,7 +86,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
 
             // 兜底：处理可能的环形依赖 (断开环)，追加到最后
             if (sortedEditions.length < e.length) {
-                const remaining = e.filter(edition => !sortedEditions.includes(edition));
+                // ⚡ Bolt: Optimize O(N^2) array search into O(N) by using a Set lookup
+                const sortedSet = new Set(sortedEditions);
+                const remaining = e.filter(edition => !sortedSet.has(edition));
                 remaining.sort((a, b) => new Date(a.timestampISO).getTime() - new Date(b.timestampISO).getTime());
                 sortedEditions.push(...remaining);
             }

@@ -16,3 +16,7 @@
 ## 2026-03-31 - [Replace O(N²) nested array search with O(N) iteration]
 **Learning:** Found an O(N²) anti-pattern in `src/components/AttrStrand/hooks/useNetworkLayout.ts` where a `while (unassignedIds.size > 0)` loop repeatedly called `Array.prototype.find()` on an already sorted array of length N. This causes expensive redundant searches for tracking branch history in the ConceptNetworkView.
 **Action:** Replaced the `while` loop and inner `find()` with a single `for...of` iteration over the pre-sorted array, skipping assigned IDs using the `Set.has()` check. This drops the algorithm's time complexity to O(N).
+
+## 2024-04-03 - [Throttle Expensive Computations in D3 Force Simulation ticks]
+**Learning:** In D3 force simulations (`src/App.tsx` KnowledgeGraph), running expensive geometric calculations (like calculating a smoothed convex hull via `generateBezierPath`) synchronously on every single `tick` event causes significant main thread blocking and degrades the simulation's visual framerate, especially with many nodes.
+**Action:** Throttle the execution of these expensive computations by introducing a `tickCount` variable in the simulation scope and only running the updates occasionally (e.g., `tickCount % 3 === 0`). The basic layout calculations (x/y positioning) must still run every tick for smoothness, but auxiliary visual calculations can safely skip frames.

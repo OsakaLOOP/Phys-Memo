@@ -656,8 +656,12 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
           .attr("stroke-width", 3);
       });
 
+    let tickCount = 0;
+
     // Update positions on tick
     simulation.on("tick", () => {
+      tickCount++;
+
       link
         .attr("x1", (d: D3Link) => (d.source as D3Node).x || 0)
         .attr("y1", (d: D3Link) => (d.source as D3Node).y || 0)
@@ -672,9 +676,10 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
         .attr("transform", (d: D3Node) => `translate(${d.x},${d.y})`);
 
       // 🔄 动态更新所有学科的贝塞尔曲线多边形
-      Array.from(disciplines).forEach(discipline => {
-        const disciplineNodes = disciplineGroups[discipline];
-        if (disciplineNodes.length === 0) return;
+      if (tickCount % 3 === 0) {
+        Array.from(disciplines).forEach(discipline => {
+          const disciplineNodes = disciplineGroups[discipline];
+          if (disciplineNodes.length === 0) return;
 
         // 生成新的贝塞尔曲线路径
         const pathData = generateBezierPath(disciplineNodes, 60);
@@ -714,13 +719,14 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
               label.x += label.vx;
               label.y += label.vy;
 
-              disciplineLabels[discipline]
-                .attr("x", label.x)
-                .attr("y", label.y + 5);
+                disciplineLabels[discipline]
+                  .attr("x", label.x)
+                  .attr("y", label.y + 5);
+              }
             }
           }
-        }
-      });
+        });
+      }
     });
 
     // Drag functions

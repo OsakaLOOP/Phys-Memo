@@ -657,7 +657,10 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
       });
 
     // Update positions on tick
+    let tickCount = 0;
     simulation.on("tick", () => {
+      tickCount++;
+
       link
         .attr("x1", (d: D3Link) => (d.source as D3Node).x || 0)
         .attr("y1", (d: D3Link) => (d.source as D3Node).y || 0)
@@ -671,56 +674,61 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
       node
         .attr("transform", (d: D3Node) => `translate(${d.x},${d.y})`);
 
-      // 🔄 动态更新所有学科的贝塞尔曲线多边形
-      Array.from(disciplines).forEach(discipline => {
-        const disciplineNodes = disciplineGroups[discipline];
-        if (disciplineNodes.length === 0) return;
+      // ⚡ Bolt: Throttle expensive geometric calculations (like Bezier path generation)
+      // to reduce main thread blocking and preserve visual framerate.
+      // Update these only every 3rd tick.
+      if (tickCount % 3 === 0) {
+        // 🔄 动态更新所有学科的贝塞尔曲线多边形
+        Array.from(disciplines).forEach(discipline => {
+          const disciplineNodes = disciplineGroups[discipline];
+          if (disciplineNodes.length === 0) return;
 
-        // 生成新的贝塞尔曲线路径
-        const pathData = generateBezierPath(disciplineNodes, 60);
-        if (pathData) {
-          disciplinePaths[discipline].attr("d", pathData);
+          // 生成新的贝塞尔曲线路径
+          const pathData = generateBezierPath(disciplineNodes, 60);
+          if (pathData) {
+            disciplinePaths[discipline].attr("d", pathData);
 
-          // 计算标签位置（物理模拟）
-          const validNodes = disciplineNodes.filter(n => n.x !== undefined && n.y !== undefined);
-          if (validNodes.length > 0) {
-            const centerX = validNodes.reduce((sum, n) => sum + n.x!, 0) / validNodes.length;
-            const centerY = validNodes.reduce((sum, n) => sum + n.y!, 0) / validNodes.length;
+            // 计算标签位置（物理模拟）
+            const validNodes = disciplineNodes.filter(n => n.x !== undefined && n.y !== undefined);
+            if (validNodes.length > 0) {
+              const centerX = validNodes.reduce((sum, n) => sum + n.x!, 0) / validNodes.length;
+              const centerY = validNodes.reduce((sum, n) => sum + n.y!, 0) / validNodes.length;
 
-            const label = labelPhysics[discipline];
-            if (label) {
-              // 1. Attraction to Centroid
-              const kAttract = 0.05;
-              label.vx += (centerX - label.x) * kAttract;
-              label.vy += (centerY - label.y) * kAttract;
+              const label = labelPhysics[discipline];
+              if (label) {
+                // 1. Attraction to Centroid
+                const kAttract = 0.05;
+                label.vx += (centerX - label.x) * kAttract;
+                label.vy += (centerY - label.y) * kAttract;
 
-              // 2. Repulsion from Nodes (Collision Avoidance)
-              validNodes.forEach(node => {
-                const dx = label.x - node.x!;
-                const dy = label.y - node.y!;
-                const dist = Math.hypot(dx, dy);
-                const minDist = 40; // Fixed buffer
+                // 2. Repulsion from Nodes (Collision Avoidance)
+                validNodes.forEach(node => {
+                  const dx = label.x - node.x!;
+                  const dy = label.y - node.y!;
+                  const dist = Math.hypot(dx, dy);
+                  const minDist = 40; // Fixed buffer
 
-                if (dist < minDist && dist > 0) {
-                  const force = (minDist - dist) / dist * 0.2;
-                  label.vx += dx * force;
-                  label.vy += dy * force;
-                }
-              });
+                  if (dist < minDist && dist > 0) {
+                    const force = (minDist - dist) / dist * 0.2;
+                    label.vx += dx * force;
+                    label.vy += dy * force;
+                  }
+                });
 
-              // 3. Update & Damping
-              label.vx *= 0.5;
-              label.vy *= 0.5;
-              label.x += label.vx;
-              label.y += label.vy;
+                // 3. Update & Damping
+                label.vx *= 0.5;
+                label.vy *= 0.5;
+                label.x += label.vx;
+                label.y += label.vy;
 
-              disciplineLabels[discipline]
-                .attr("x", label.x)
-                .attr("y", label.y + 5);
+                disciplineLabels[discipline]
+                  .attr("x", label.x)
+                  .attr("y", label.y + 5);
+              }
             }
           }
-        }
-      });
+        });
+      }
     });
 
     // Drag functions

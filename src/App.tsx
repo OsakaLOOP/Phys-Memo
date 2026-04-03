@@ -657,7 +657,9 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
       });
 
     // Update positions on tick
+    let tickCount = 0;
     simulation.on("tick", () => {
+      tickCount++;
       link
         .attr("x1", (d: D3Link) => (d.source as D3Node).x || 0)
         .attr("y1", (d: D3Link) => (d.source as D3Node).y || 0)
@@ -671,13 +673,16 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
       node
         .attr("transform", (d: D3Node) => `translate(${d.x},${d.y})`);
 
-      // 🔄 动态更新所有学科的贝塞尔曲线多边形
-      Array.from(disciplines).forEach(discipline => {
-        const disciplineNodes = disciplineGroups[discipline];
-        if (disciplineNodes.length === 0) return;
+      // ⚡ Bolt: Optimize main thread rendering by throttling expensive D3 geometric computations (convex hull/bezier paths)
+      // Running these synchronously on every frame during force simulation drastically drops the framerate.
+      if (tickCount % 3 === 0) {
+        // 🔄 动态更新所有学科的贝塞尔曲线多边形
+        Array.from(disciplines).forEach(discipline => {
+          const disciplineNodes = disciplineGroups[discipline];
+          if (disciplineNodes.length === 0) return;
 
-        // 生成新的贝塞尔曲线路径
-        const pathData = generateBezierPath(disciplineNodes, 60);
+          // 生成新的贝塞尔曲线路径
+          const pathData = generateBezierPath(disciplineNodes, 60);
         if (pathData) {
           disciplinePaths[discipline].attr("d", pathData);
 
@@ -719,6 +724,19 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
                 .attr("y", label.y + 5);
             }
           }
+        }
+        });
+      } // end tick throttling block
+    });
+
+    // Final alignment on simulation end
+    simulation.on("end", () => {
+      Array.from(disciplines).forEach(discipline => {
+        const disciplineNodes = disciplineGroups[discipline];
+        if (disciplineNodes.length === 0) return;
+        const pathData = generateBezierPath(disciplineNodes, 60);
+        if (pathData) {
+          disciplinePaths[discipline].attr("d", pathData);
         }
       });
     });

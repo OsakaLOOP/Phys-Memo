@@ -1,20 +1,9 @@
 import fs from 'fs';
 
-const storeContent = fs.readFileSync('src/store/workspaceStore.ts', 'utf8');
-const editorContent = fs.readFileSync('src/components/AttrStrand/AtomListEditor.tsx', 'utf8');
-
-if (storeContent.includes('list.unshift(id);')) {
-  console.log('WorkspaceStore fixed.');
+const content = fs.readFileSync('src/App.tsx', 'utf8');
+if (content.includes('tickCount % 3 === 0')) {
+  console.log('throttle condition found!');
 } else {
-  console.error('WorkspaceStore bug NOT fixed.');
+  console.log('throttle condition missing!');
   process.exit(1);
 }
-
-if (editorContent.includes('w-full h-[66px] rounded-lg mt-0')) {
-  console.log('AtomListEditor fixed.');
-} else {
-  console.error('AtomListEditor NOT fixed.');
-  process.exit(1);
-}
-
-console.log('Verification Complete.');

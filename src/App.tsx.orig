@@ -3,8 +3,8 @@ import {
   type FC, type ChangeEvent, type MouseEvent
 } from 'react';
 
-import { 
-  ArrowRight, Maximize, Crop, 
+import {
+  ArrowRight, Maximize, Crop,
   Database, GitCommit, X, FileText, Hash, Layers,
   Network, Book, Download, Upload, Plus, Trash2, Search, Tag,
   ChevronRight, ChevronDown, Folder, FolderOpen,
@@ -302,7 +302,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
     // 绘制动态背景学科区域（贝塞尔曲线多边形 Venn图）
     const disciplines = new Set<string>();
     graphData.nodes.forEach(n => (n.disciplines || []).forEach(d => disciplines.add(d)));
-    
+
     const disciplineGroups: Record<string, D3Node[]> = {};
     disciplines.forEach(d => {
       disciplineGroups[d] = graphData.nodes.filter(n => (n.disciplines || []).includes(d));
@@ -413,7 +413,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
         if (angles[i] < minAngleRad || angles[(i + 1) % expandedHull.length] < minAngleRad) {
           inserts += extraInsert;
         }
-        smoothedHull.push(current); 
+        smoothedHull.push(current);
         for (let j = 1; j <= inserts; j++) {
           const t = j / (inserts + 1);
           const x = current[0] + (next[0] - current[0]) * t;
@@ -441,7 +441,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
 
     Array.from(disciplines).forEach(discipline => {
       const color = disciplinesMap[discipline]?.color || '#cbd5e1';
-      
+
       // Initialize physics state
       labelPhysics[discipline] = { x: width / 2, y: height / 2, vx: 0, vy: 0 };
 
@@ -603,10 +603,10 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
     // Interaction logic
     node.on("mouseenter", (event: MouseEvent, d: D3Node) => {
       setHoveredNode(d);
-      
+
       const linkedNodeIds = new Set<string>();
       linkedNodeIds.add(d.id);
-      
+
       graphData.links.forEach(l => {
         const sourceId = typeof l.source === 'string' ? l.source : (l.source as D3Node).id;
         const targetId = typeof l.target === 'string' ? l.target : (l.target as D3Node).id;
@@ -635,7 +635,7 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
         const tgtId = typeof l.target === 'string' ? l.target : (l.target as D3Node).id;
         return (srcId === d.id || tgtId === d.id) ? 1 : 0;
       });
-      
+
       // Highlight the outline path
       d3.select(event.currentTarget).select(".node-outline")
         .attr("stroke", "#4f46e5")
@@ -643,23 +643,21 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
     })
       .on("mouseleave", (event: MouseEvent) => {
         setHoveredNode(null);
-        
+
         node.style("opacity", 1);
         link.style("stroke", "#cbd5e1")
           .style("stroke-width", 1.5)
           .style("opacity", 1);
         linkLabel.style("opacity", 1);
-        
+
         // Restore outline path
         d3.select(event.currentTarget).select(".node-outline")
           .attr("stroke", (d: any) => NODE_TYPES[d.type]?.nodeColor || '#91a3b0')
           .attr("stroke-width", 3);
       });
 
-    let tickCount = 0;
     // Update positions on tick
     simulation.on("tick", () => {
-      tickCount++;
       link
         .attr("x1", (d: D3Link) => (d.source as D3Node).x || 0)
         .attr("y1", (d: D3Link) => (d.source as D3Node).y || 0)
@@ -672,10 +670,6 @@ const KnowledgeGraph: FC<KnowledgeGraphProps> = memo(({ nodes, disciplinesMap, o
 
       node
         .attr("transform", (d: D3Node) => `translate(${d.x},${d.y})`);
-
-      // ⚡ Bolt: Throttle expensive geometric calculations (convex hull, bezier path)
-      // to run only every 3 ticks. This reduces main thread blocking while preserving visual framerate.
-      if (tickCount % 3 !== 0) return;
 
       // 🔄 动态更新所有学科的贝塞尔曲线多边形
       Array.from(disciplines).forEach(discipline => {
@@ -838,7 +832,7 @@ const PhysMemosApp: FC = () => {
   const submitWorkspace = async () => {
     // Collect data to submit
     const state = useWorkspaceStore.getState();
-    
+
     // Check for UnexpectedInterruption (Lint Errors)
     const hasLintErrors = Object.values(state.fieldLintErrors).some(hasError => hasError);
     if (hasLintErrors) {
@@ -1294,7 +1288,7 @@ const PhysMemosApp: FC = () => {
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
-        
+
         <div className="p-3 bg-white border-b border-slate-50">
           <div className="relative group">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
@@ -1424,7 +1418,7 @@ const PhysMemosApp: FC = () => {
 
       {/* Main Work Area */}
       <div className="flex-1 flex flex-col h-full relative bg-white">
-        
+
         {/* Common Header */}
         <div className={`bg-white border-b border-slate-100 flex flex-col justify-center px-8 z-10 transition-all ${activeNode?.type === 'TOPIC' ? 'h-16' : 'min-h-32 py-4 space-y-4'}`}>
           <div className="flex-between w-full">
@@ -1491,7 +1485,7 @@ const PhysMemosApp: FC = () => {
                           </button>
                         </div>
                       </div>
-                      
+
                       {/* 主题/Topic */}
                       <div className="flex flex-col gap-2">
                         <span className="text-xs font-bold text-slate-400 flex-center-gap">
@@ -1663,7 +1657,7 @@ const PhysMemosApp: FC = () => {
                           />
                         </div>
                         <div className="space-y-4 grow">
-                            
+
                             <div className="p-4 bg-indigo-50/50 rounded-lg border border-indigo-100 flex flex-row">
                                <div className='pr-8'>
                                <div className="text-2xl font-bold text-indigo-600 mb-1 ">
@@ -1712,7 +1706,7 @@ const PhysMemosApp: FC = () => {
                           className="card-panel min-h-[120px] bg-slate-50 border-none"
                         />
                       </div>
-                      
+
                     </div>
 
                     {/* Children Cards List - REFACTORED to use TopicChildCard */}
@@ -1853,7 +1847,7 @@ const PhysMemosApp: FC = () => {
                        <AtomListEditor field="rels" className="space-y-0" />
                     </div>
                   </div>
-                  
+
                   <div className="card-base">
                     <div className="flex-center-gap mb-2">
                       <Hash className="w-4 h-4 text-indigo-500" />

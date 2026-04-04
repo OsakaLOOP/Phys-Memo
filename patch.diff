@@ -1,0 +1,22 @@
+--- src/App.tsx
++++ src/App.tsx
+@@ -657,7 +657,9 @@
+       });
+
++    let tickCount = 0;
+     // Update positions on tick
+     simulation.on("tick", () => {
++      tickCount++;
+       link
+         .attr("x1", (d: D3Link) => (d.source as D3Node).x || 0)
+         .attr("y1", (d: D3Link) => (d.source as D3Node).y || 0)
+@@ -672,6 +674,10 @@
+       node
+         .attr("transform", (d: D3Node) => `translate(${d.x},${d.y})`);
+
++      // ⚡ Bolt: Throttle expensive geometric calculations (convex hull, bezier path)
++      // to run only every 3 ticks. This reduces main thread blocking while preserving visual framerate.
++      if (tickCount % 3 !== 0) return;
++
+       // 🔄 动态更新所有学科的贝塞尔曲线多边形
+       Array.from(disciplines).forEach(discipline => {

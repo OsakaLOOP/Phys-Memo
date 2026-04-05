@@ -16,3 +16,7 @@
 ## 2026-03-31 - [Replace O(N²) nested array search with O(N) iteration]
 **Learning:** Found an O(N²) anti-pattern in `src/components/AttrStrand/hooks/useNetworkLayout.ts` where a `while (unassignedIds.size > 0)` loop repeatedly called `Array.prototype.find()` on an already sorted array of length N. This causes expensive redundant searches for tracking branch history in the ConceptNetworkView.
 **Action:** Replaced the `while` loop and inner `find()` with a single `for...of` iteration over the pre-sorted array, skipping assigned IDs using the `Set.has()` check. This drops the algorithm's time complexity to O(N).
+
+## 2025-03-31 - [Optimize Atom Processing in Edition Submission]
+**Learning:** Found sequential loops executing await inside `for...of` across UI components and `core` utilities. This caused major I/O bottlenecks in IndexedDB storage retrieval and hashing functions since it had to wait for each promise to resolve sequentially.
+**Action:** Used `Promise.all` mapping to convert O(N) sequential queries into concurrent batch operations in `src/attrstrand/core.ts` `processAtoms`, allowing multiple atoms to be processed and hashed in parallel, then resolving their database existence check and pushing their outcomes safely in a final synchronous loop to avoid race conditions.

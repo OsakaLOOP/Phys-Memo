@@ -9,6 +9,7 @@
 ## 2024-11-20 - [Avoid Redundant Array Filtrations in Render]
 **Learning:** Found multiple identical inline array filtrations (`nodes.filter(...)`) during the render cycle of the TOPIC OVERVIEW page in `src/App.tsx`. Because `nodes` can be a very large array containing all concepts and topics, filtering it 5 separate times per render turns an O(N) operation into O(5N) and allocates new arrays unnecessarily.
 **Action:** Use `useMemo` to compute derived data like filtered children arrays or unique discipline lists once per dependency change (`nodes` or `activeNode`). Then, reference these memoized values in the JSX to prevent wasteful recalculations during state updates.
+
 ## 2024-05-18 - [Memoize derived topic node datasets in React renders]
 **Learning:** Found multiple identical derived state calculations (e.g. `nodes.filter(...)` and `Array.from(new Set(...))`) directly inside JSX within the "TOPIC OVERVIEW PAGE" render path of `src/App.tsx`. This causes expensive O(N) array allocation and iterations on every render, especially when the nodes array is large.
 **Action:** Always extract heavy derived array calculations inside React functional components into `useMemo` hooks with proper dependency arrays, and reuse the memoized variables throughout the JSX.
@@ -16,3 +17,7 @@
 ## 2026-03-31 - [Replace O(N²) nested array search with O(N) iteration]
 **Learning:** Found an O(N²) anti-pattern in `src/components/AttrStrand/hooks/useNetworkLayout.ts` where a `while (unassignedIds.size > 0)` loop repeatedly called `Array.prototype.find()` on an already sorted array of length N. This causes expensive redundant searches for tracking branch history in the ConceptNetworkView.
 **Action:** Replaced the `while` loop and inner `find()` with a single `for...of` iteration over the pre-sorted array, skipping assigned IDs using the `Set.has()` check. This drops the algorithm's time complexity to O(N).
+
+## 2026-04-01 - [Avoid repetitive JSON parse/stringify in recursive tree traversal]
+**Learning:** In `src/attrstrand/utils.ts`, `deterministicStringify` was implemented using `JSON.parse(deterministicStringify(item))` for every level of nested objects and arrays. This meant a deeply nested object was repeatedly stringified and parsed multiple times per traversal step, creating immense garbage collection and CPU overhead during object hashing operations.
+**Action:** When preparing data structures for deterministic JSON serialization, perform the structural sorting entirely in memory (returning raw objects/arrays) and only call `JSON.stringify` exactly once at the final root node.

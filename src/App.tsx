@@ -1638,19 +1638,24 @@ const PhysMemosApp: FC = () => {
                               // Optimistic update for UI
                               const updatedNode = { ...activeNode, title: newTitle, topic: newTitle };
 
-                              // Propagate to children
-                              const children = nodes.filter(n => n.topic === oldTitle && n.id !== activeNode.id);
-                              const updatedChildren = children.map(c => ({ ...c, topic: newTitle }));
-
+                              // ⚡ Bolt: Replace O(N²) nested array search with O(N) iteration and sequential IndexedDB writes with Promise.all
+                              // Propagate to children in a single pass
+                              const updatedChildren: typeof nodes = [];
                               const newNodes = nodes.map(n => {
                                 if (n.id === activeNode.id) return updatedNode;
-                                const child = updatedChildren.find(c => c.id === n.id);
-                                return child || n;
+                                if (n.topic === oldTitle && n.id !== activeNode.id) {
+                                  const updatedChild = { ...n, topic: newTitle };
+                                  updatedChildren.push(updatedChild);
+                                  return updatedChild;
+                                }
+                                return n;
                               });
 
                               setNodes(newNodes);
-                              await dbHelper.put(updatedNode);
-                              for (const child of updatedChildren) await dbHelper.put(child);
+                              await Promise.all([
+                                dbHelper.put(updatedNode),
+                                ...updatedChildren.map(child => dbHelper.put(child))
+                              ]);
                             }}
                             className="text-3xl font-bold text-slate-800 bg-transparent border-b-2 border-transparent hover:border-slate-200 focus:border-indigo-500 focus:outline-none w-full transition-colors"
                             placeholder="Topic Name..."

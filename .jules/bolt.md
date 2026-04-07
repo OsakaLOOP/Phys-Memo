@@ -9,6 +9,7 @@
 ## 2024-11-20 - [Avoid Redundant Array Filtrations in Render]
 **Learning:** Found multiple identical inline array filtrations (`nodes.filter(...)`) during the render cycle of the TOPIC OVERVIEW page in `src/App.tsx`. Because `nodes` can be a very large array containing all concepts and topics, filtering it 5 separate times per render turns an O(N) operation into O(5N) and allocates new arrays unnecessarily.
 **Action:** Use `useMemo` to compute derived data like filtered children arrays or unique discipline lists once per dependency change (`nodes` or `activeNode`). Then, reference these memoized values in the JSX to prevent wasteful recalculations during state updates.
+
 ## 2024-05-18 - [Memoize derived topic node datasets in React renders]
 **Learning:** Found multiple identical derived state calculations (e.g. `nodes.filter(...)` and `Array.from(new Set(...))`) directly inside JSX within the "TOPIC OVERVIEW PAGE" render path of `src/App.tsx`. This causes expensive O(N) array allocation and iterations on every render, especially when the nodes array is large.
 **Action:** Always extract heavy derived array calculations inside React functional components into `useMemo` hooks with proper dependency arrays, and reuse the memoized variables throughout the JSX.
@@ -16,3 +17,7 @@
 ## 2026-03-31 - [Replace O(N²) nested array search with O(N) iteration]
 **Learning:** Found an O(N²) anti-pattern in `src/components/AttrStrand/hooks/useNetworkLayout.ts` where a `while (unassignedIds.size > 0)` loop repeatedly called `Array.prototype.find()` on an already sorted array of length N. This causes expensive redundant searches for tracking branch history in the ConceptNetworkView.
 **Action:** Replaced the `while` loop and inner `find()` with a single `for...of` iteration over the pre-sorted array, skipping assigned IDs using the `Set.has()` check. This drops the algorithm's time complexity to O(N).
+
+## 2026-04-07 - [Avoid redundant JSON parsing in deterministic sorting]
+**Learning:** Found that `deterministicStringify` in `src/attrstrand/utils.ts` recursively called `JSON.parse` and `JSON.stringify` on deeply nested object levels to generate a sorted serialization. This created an exponential performance overhead when processing complex recursive structures (like testing with 10 levels of nesting), taking almost 4 seconds for 100 iterations.
+**Action:** Refactored to sort keys purely in memory via a helper function (`sortObjectKeys`) and only stringify once at the end. This reduced the time from ~4000ms to ~400ms for 100 iterations.

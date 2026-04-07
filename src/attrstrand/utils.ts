@@ -15,21 +15,28 @@ export async function sha256Int(str: string): Promise<number> {
     return view.getInt32(0); }
 
 export function deterministicStringify(obj: unknown): string {
-    if (obj === null || typeof obj !== 'object') {
-        return JSON.stringify(obj);
+    // ⚡ Bolt: Optimize deterministic stringification by performing recursive key sorting
+    // entirely in memory and calling JSON.stringify only once at the end.
+    // This avoids exponential overhead from redundant JSON.parse(JSON.stringify(...))
+    // calls at every depth level.
+    function sortKeys(o: unknown): unknown {
+        if (o === null || typeof o !== 'object') {
+            return o;
+        }
+
+        if (Array.isArray(o)) {
+            return o.map(sortKeys);
+        }
+
+        const sortedKeys = Object.keys(o as Record<string, unknown>).sort();
+        const result: Record<string, unknown> = {};
+        for (const key of sortedKeys) {
+            result[key] = sortKeys((o as Record<string, unknown>)[key]);
+        }
+        return result;
     }
 
-    if (Array.isArray(obj)) {
-        const arr = obj.map(item => JSON.parse(deterministicStringify(item)));
-        return JSON.stringify(arr);
-    }
-
-    const sortedKeys = Object.keys(obj).sort();
-    const result: Record<string, unknown> = {};
-    for (const key of sortedKeys) {
-        result[key] = JSON.parse(deterministicStringify((obj as Record<string, unknown>)[key]));
-    }
-    return JSON.stringify(result);
+    return JSON.stringify(sortKeys(obj));
 }
 
 

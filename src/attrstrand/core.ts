@@ -274,8 +274,7 @@ export class AttrStrandCore {
             const atomsToSave: IContentAtom[] = [];
 
             const processAtoms = async (field: ContentAtomField, atoms: AtomSubmission[]) => {
-                const atomIds: hash[] = [];
-                for (const sub of atoms) {
+                const results = await Promise.all(atoms.map(async (sub) => {
                     let contentHash: string;
                     if (sub.type === 'bin' && sub.blobs) {
                         contentHash = await generateBinaryHash(sub.contentPayload, sub.blobs);
@@ -291,8 +290,7 @@ export class AttrStrandCore {
 
                     // 检查内容更新.
                     if (prevAtom && prevAtom.contentHash === contentHash) {
-                        atomIds.push(prevAtom.id);
-                        continue;
+                        return { id: prevAtom.id };
                     }
                     // 基于 diff 的变动记录
                     let attr: ContentAtomAttr = { [creatorId]: 1 };
@@ -306,8 +304,8 @@ export class AttrStrandCore {
                         diffDeleted = diffStats.deleted;
                         diffRetained = diffStats.retained;
 
-                        const totalWeight = diffAdded + diffRetained;
-                        const retainedWeight = totalWeight > 0 ? diffRetained / totalWeight : 0;
+                        const totalWeight = (diffAdded || 0) + (diffRetained || 0);
+                        const retainedWeight = totalWeight > 0 ? (diffRetained || 0) / totalWeight : 0;
 
                         attr = this.calculateAttribution(prevAtom.attr, retainedWeight, creatorId);
                     } else {
@@ -328,7 +326,7 @@ export class AttrStrandCore {
                     // 检查是否与历史 atom 完全一致.
                     const existingAtom = await storage.getAtom(atomId);
                     if (existingAtom) {
-                        atomIds.push(existingAtom.id);
+                        return { id: existingAtom.id };
                     } else {
                         const newAtom: IContentAtom = {
                             id: atomId,
@@ -348,8 +346,15 @@ export class AttrStrandCore {
                             frontMeta: sub.frontMeta || {},
                             backMeta: { createdAt: timestampISO }
                         };
-                        atomsToSave.push(newAtom);
-                        atomIds.push(atomId);
+                        return { id: atomId, newAtom };
+                    }
+                }));
+
+                const atomIds: hash[] = [];
+                for (const res of results) {
+                    atomIds.push(res.id);
+                    if (res.newAtom) {
+                        atomsToSave.push(res.newAtom);
                     }
                 }
                 return atomIds;

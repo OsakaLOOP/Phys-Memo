@@ -14,22 +14,30 @@ export async function sha256Int(str: string): Promise<number> {
         const view = new DataView(hashBuffer);
     return view.getInt32(0); }
 
-export function deterministicStringify(obj: unknown): string {
+function sortObjectKeys(obj: unknown): unknown {
     if (obj === null || typeof obj !== 'object') {
-        return JSON.stringify(obj);
+        return obj;
     }
 
     if (Array.isArray(obj)) {
-        const arr = obj.map(item => JSON.parse(deterministicStringify(item)));
-        return JSON.stringify(arr);
+        return obj.map(sortObjectKeys);
     }
 
-    const sortedKeys = Object.keys(obj).sort();
+    const sortedKeys = Object.keys(obj as Record<string, unknown>).sort();
     const result: Record<string, unknown> = {};
     for (const key of sortedKeys) {
-        result[key] = JSON.parse(deterministicStringify((obj as Record<string, unknown>)[key]));
+        result[key] = sortObjectKeys((obj as Record<string, unknown>)[key]);
     }
-    return JSON.stringify(result);
+    return result;
+}
+
+/**
+ * Deterministically stringifies an object by sorting its keys.
+ * Performance optimization: avoids recursive JSON.parse/stringify overhead
+ * by sorting keys purely in memory and serializing only once at the end.
+ */
+export function deterministicStringify(obj: unknown): string {
+    return JSON.stringify(sortObjectKeys(obj));
 }
 
 

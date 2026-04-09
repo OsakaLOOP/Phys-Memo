@@ -86,7 +86,7 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                     return (
                         <div key={rowIndex} className="w-full flex flex-col items-center">
                             {/* Combined Row*/}
-                            <div className="w-full flex flex-row justify-evenly items-end">
+                            <div className="w-full flex flex-row justify-evenly items-stretch">
                                 {rowItems.map(({ imgMeta, index }) => {
                                     const url = urls[imgMeta.id] || '';
                                     const effectiveRatio = imgMeta.widthRatio || 1; // already calculated in the loop above
@@ -98,20 +98,20 @@ export const ImageGroupViewer: React.FC<ImageGroupViewerProps> = ({ blobs, meta 
                                             style={{ maxWidth: `${effectiveRatio * 100}%` }}
                                             className="flex flex-col items-center justify-center box-border shrink"
                                         >
-                                            <div className="flex flex-col items-center justify-center w-fit max-h-[800px]">
-                                                <img
-                                                    src={url}
-                                                    alt={caption || `Figure sub ${index + 1}`}
-                                                    className="max-w-full max-h-[800px] object-contain"
-                                                />
-                                                {caption && (
-                                                    <div className="mt-2 text-sm text-center w-full">
-                                                        <span>
-                                                            {imagesMeta.length > 1 && `(${String.fromCharCode(97 + index)}) `}
-                                                            {caption}
-                                                        </span>
-                                                    </div>
-                                                )}
+                                            <div className="flex flex-col items-center justify-center w-fit max-h-[800px] h-full">
+                                                <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full">
+                                                    <img
+                                                        src={url}
+                                                        alt={caption || `Figure sub ${index + 1}`}
+                                                        className="max-w-full max-h-[800px] object-contain"
+                                                    />
+                                                </div>
+                                                <div className={`mt-2 text-sm text-center w-full ${!caption ? 'invisible' : ''}`}>
+                                                    <span>
+                                                        {imagesMeta.length > 1 && `(${String.fromCharCode(97 + index)}) `}
+                                                        {caption || '\u00A0'}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
                                     );

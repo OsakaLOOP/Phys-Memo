@@ -1261,6 +1261,7 @@ const PhysMemosApp: FC = () => {
 
   return (
     <div className="flex h-screen w-full bg-slate-50 text-slate-800 font-sans overflow-hidden">
+
       <Toaster position="top-center" />
       <style>{`
         .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; color: #1e293b; }

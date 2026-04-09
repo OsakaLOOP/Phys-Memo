@@ -16,3 +16,6 @@
 ## 2026-03-31 - [Replace O(N²) nested array search with O(N) iteration]
 **Learning:** Found an O(N²) anti-pattern in `src/components/AttrStrand/hooks/useNetworkLayout.ts` where a `while (unassignedIds.size > 0)` loop repeatedly called `Array.prototype.find()` on an already sorted array of length N. This causes expensive redundant searches for tracking branch history in the ConceptNetworkView.
 **Action:** Replaced the `while` loop and inner `find()` with a single `for...of` iteration over the pre-sorted array, skipping assigned IDs using the `Set.has()` check. This drops the algorithm's time complexity to O(N).
+## 2026-04-09 - [Avoid O(N) Table Scans in IndexedDB Atom Queries]
+**Learning:** Found an O(N) anti-pattern in `src/attrstrand/core.ts` where `queryAtoms` redundantly fetched all records from IndexedDB and performed in-memory filtering. Furthermore, `storage.queryAtoms` suffered from the same issue, performing full table scans even when querying fields that had secondary indices (e.g., `contentHash`, `field`). For large numbers of atoms, this causes significant I/O and memory overhead.
+**Action:** Updated `storage.queryAtoms` to leverage `db.getAllFromIndex` when querying by `contentHash` or `field`, dramatically dropping time complexity. Updated `core.queryAtoms` to delegate directly to `storage.queryAtoms` to reuse the optimized index queries.

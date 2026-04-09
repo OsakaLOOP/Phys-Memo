@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type FC } from 'react';
+import { useState, useRef, useEffect, memo, type FC } from 'react';
 import { createPortal } from 'react-dom';
 import { parseFormula, type ParsedCategory } from '../utils/latexParser';
 import katex from 'katex';
@@ -162,4 +162,4 @@ const InstanceItem: FC<InstanceItemProps> = ({ latex }) => {
   );
 };
 
-export default FormulaAnalysis;
+export default memo(FormulaAnalysis);

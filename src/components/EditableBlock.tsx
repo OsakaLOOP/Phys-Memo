@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, type FC, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
+import React, { useState, useEffect, useRef, memo, type FC, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
 import { Edit3 } from 'lucide-react';
 import RichTextRenderer from './RichTextRenderer';
 
@@ -186,4 +186,4 @@ const EditableBlock: FC<EditableBlockProps> = ({
   );
 };
 
-export default EditableBlock;
+export default memo(EditableBlock);

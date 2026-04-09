@@ -1284,7 +1284,7 @@ const PhysMemosApp: FC = () => {
             <Database className="w-5 h-5 text-indigo-600" />
             Phys-Memos <span className="text-[10px] font-normal text-slate-400 bg-slate-100 px-1.5 rounded">v5.0</span>
           </h1>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-slate-600">
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-slate-600" aria-label="关闭侧边栏">
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -1341,6 +1341,7 @@ const PhysMemosApp: FC = () => {
                       toggleTopicCollapse(topic);
                     }}
                     className="btn-icon"
+                    aria-label="展开/收起主题"
                   >
                     {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                   </button>
@@ -1424,7 +1425,7 @@ const PhysMemosApp: FC = () => {
           <div className="flex-between w-full">
             <div className="flex-center-gap">
               {!sidebarOpen && (
-                <button onClick={() => setSidebarOpen(true)} className="btn-ghost rounded-full mr-2">
+                <button onClick={() => setSidebarOpen(true)} className="btn-ghost rounded-full mr-2" aria-label="展开侧边栏">
                   <ArrowRight className="w-5 h-5" />
                 </button>
               )}
@@ -1470,6 +1471,7 @@ const PhysMemosApp: FC = () => {
                                    }}
                                    className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full flex-center opacity-0 group-hover:opacity-100 transition-all shadow-sm z-10 hover:bg-red-600 hover:scale-110"
                                    title="全局删除此学科"
+                                   aria-label="删除学科"
                                 >
                                    <X className="w-2.5 h-2.5" />
                                 </button>
@@ -1480,6 +1482,7 @@ const PhysMemosApp: FC = () => {
                              onClick={() => setShowDiscModal(true)}
                              className="w-8 h-8 rounded-full flex-center border-2 border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all"
                              title="新建学科"
+                             aria-label="新建学科"
                           >
                              <Plus className="w-4 h-4" />
                           </button>
@@ -1524,6 +1527,7 @@ const PhysMemosApp: FC = () => {
                       onClick={handleDeleteNode}
                       className="btn-danger p-2 rounded-full text-slate-300"
                       title={activeNode.type === 'TOPIC' ? "删除主题" : "删除条目"}
+                      aria-label={activeNode.type === 'TOPIC' ? "删除主题" : "删除条目"}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -1879,7 +1883,7 @@ const PhysMemosApp: FC = () => {
               <Book className="w-4 h-4 text-indigo-500" />
               文献阅读 / OCR 提取
             </h3>
-            <button onClick={() => setShowOcrPanel(false)} className="btn-icon">
+            <button onClick={() => setShowOcrPanel(false)} className="btn-icon" aria-label="关闭 OCR 辅助阅读">
               <Maximize className="w-4 h-4" />
             </button>
           </div>
@@ -1932,7 +1936,7 @@ const PhysMemosApp: FC = () => {
                     <Layers className="w-4 h-4 text-indigo-500" />
                     新建学科
                  </h3>
-                 <button onClick={() => setShowDiscModal(false)} className="text-slate-400 hover:text-slate-600">
+                 <button onClick={() => setShowDiscModal(false)} className="text-slate-400 hover:text-slate-600" aria-label="关闭">
                     <X className="w-4 h-4" />
                  </button>
               </div>

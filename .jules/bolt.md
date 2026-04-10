@@ -16,3 +16,7 @@
 ## 2026-03-31 - [Replace O(N²) nested array search with O(N) iteration]
 **Learning:** Found an O(N²) anti-pattern in `src/components/AttrStrand/hooks/useNetworkLayout.ts` where a `while (unassignedIds.size > 0)` loop repeatedly called `Array.prototype.find()` on an already sorted array of length N. This causes expensive redundant searches for tracking branch history in the ConceptNetworkView.
 **Action:** Replaced the `while` loop and inner `find()` with a single `for...of` iteration over the pre-sorted array, skipping assigned IDs using the `Set.has()` check. This drops the algorithm's time complexity to O(N).
+
+## 2024-04-10 - O(N) In-Memory Sorting prevents Exponential JSON parsing
+**Learning:** In recursive nested algorithms, performing heavy I/O or parsing operations like `JSON.stringify` inside the loop causes exponential performance hits and crashes on `undefined` values.
+**Action:** Always attempt to separate the sorting or tree traversal logic from the serialization layer. Sort strictly in-memory into an intermediate Object layout, and let native APIs handle stringification in a single pass at the top level.

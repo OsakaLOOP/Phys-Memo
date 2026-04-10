@@ -193,8 +193,19 @@ export class IndexedDBStorage implements IStorage {
         contentSimHash?: string;
         contains?: string;
     }): Promise<IContentAtom[]> {
-        const allAtoms = await this.getAllAtoms();
-        return allAtoms.filter(atom => {
+        const db = await this.getDB();
+        let baseAtoms: IContentAtom[] = [];
+
+        // Optimize by fetching from index if possible to prevent full table scan
+        if (filter.contentHash) {
+            baseAtoms = await db.getAllFromIndex('attr_atoms', 'contentHash', filter.contentHash);
+        } else if (filter.field) {
+            baseAtoms = await db.getAllFromIndex('attr_atoms', 'field', filter.field);
+        } else {
+            baseAtoms = await db.getAll('attr_atoms');
+        }
+
+        return baseAtoms.filter(atom => {
             if (filter.field && atom.field !== filter.field) return false;
             if (filter.type && atom.type !== filter.type) return false;
             if (filter.creatorId && atom.creatorId !== filter.creatorId) return false;

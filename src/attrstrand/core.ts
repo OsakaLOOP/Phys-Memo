@@ -32,16 +32,7 @@ export class AttrStrandCore {
         contentSimHash?: string;
         contains?: string;
     }): Promise<IContentAtom[]> {
-        const allAtoms = await storage.getAllAtoms();
-        return allAtoms.filter(atom => {
-            if (options.field && atom.field !== options.field) return false;
-            if (options.type && atom.type !== options.type) return false;
-            if (options.creatorId && atom.creatorId !== options.creatorId) return false;
-            if (options.contentHash && atom.contentHash !== options.contentHash) return false;
-            if (options.contentSimHash && atom.contentSimHash !== options.contentSimHash) return false;
-            if (options.contains && !atom.content.includes(options.contains)) return false;
-            return true;
-        });
+        return storage.queryAtoms(options);
     }
 
     async findExactContentMatch(content: string, field?: ContentAtomField, type?: ContentAtomType): Promise<IContentAtom | null> {

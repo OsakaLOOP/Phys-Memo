@@ -16,3 +16,7 @@
 ## 2026-03-31 - [Replace O(N²) nested array search with O(N) iteration]
 **Learning:** Found an O(N²) anti-pattern in `src/components/AttrStrand/hooks/useNetworkLayout.ts` where a `while (unassignedIds.size > 0)` loop repeatedly called `Array.prototype.find()` on an already sorted array of length N. This causes expensive redundant searches for tracking branch history in the ConceptNetworkView.
 **Action:** Replaced the `while` loop and inner `find()` with a single `for...of` iteration over the pre-sorted array, skipping assigned IDs using the `Set.has()` check. This drops the algorithm's time complexity to O(N).
+
+## 2026-04-11 - [Optimize recursive deterministic Stringify]
+**Learning:** The previous implementation of `deterministicStringify` serialized and deserialized (`JSON.parse` and `JSON.stringify`) recursively at every nested property. This resulted in an exponential performance overhead and a SyntaxError crash when parsing `undefined` values.
+**Action:** Always process recursive object sorting purely in memory, then apply serialization (`JSON.stringify`) only once at the root level to guarantee linear time complexity and prevent parsing errors.

@@ -15,21 +15,26 @@ export async function sha256Int(str: string): Promise<number> {
     return view.getInt32(0); }
 
 export function deterministicStringify(obj: unknown): string {
-    if (obj === null || typeof obj !== 'object') {
-        return JSON.stringify(obj);
+    // Helper to deeply sort object keys in memory
+    function sortObject(val: unknown): unknown {
+        if (val === null || typeof val !== 'object') {
+            return val;
+        }
+
+        if (Array.isArray(val)) {
+            return val.map(sortObject);
+        }
+
+        const sortedKeys = Object.keys(val).sort();
+        const result: Record<string, unknown> = {};
+        for (const key of sortedKeys) {
+            result[key] = sortObject((val as Record<string, unknown>)[key]);
+        }
+        return result;
     }
 
-    if (Array.isArray(obj)) {
-        const arr = obj.map(item => JSON.parse(deterministicStringify(item)));
-        return JSON.stringify(arr);
-    }
-
-    const sortedKeys = Object.keys(obj).sort();
-    const result: Record<string, unknown> = {};
-    for (const key of sortedKeys) {
-        result[key] = JSON.parse(deterministicStringify((obj as Record<string, unknown>)[key]));
-    }
-    return JSON.stringify(result);
+    // Serialize exactly once at the end
+    return JSON.stringify(sortObject(obj));
 }
 
 
